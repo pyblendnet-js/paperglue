@@ -18,6 +18,9 @@ var first_image = {src:"img/verodes.png", id:"verodes", isSymbol:true, dragClone
 //   loadImages();
 // };
 
+//view.on('frame', frameHandler);
+
+
 window.globals.loadImages([first_image]);
 
 function imgGetNameCall(obj){

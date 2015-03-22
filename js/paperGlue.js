@@ -1,3 +1,24 @@
+/*!
+* paperglue.js v0.0.01 - Sandbox editor using Paper.js.
+* See paper.ps
+*
+* Current features:
+*   - click and drag to create snap locked lines
+*   - click ends or middle to drag line end or whole lines
+*   - click on master image to clone and drag to locate
+*   - right click on images for context menu and properties
+*   - communication with external paperscript via window.globals
+*
+* paperglue.js Copyright (c) 2015 - 2015, Robert Parker
+* http://grapevine.com.au/~wisteria/index.html
+*
+* Distributed under the MIT license. See LICENSE file for details.
+*
+* All rights reserved.
+*
+* Date: Sat Jan 10 2015
+*/
+
 //note:objects here are all somewhere within the paper scope
 // Tp make visibile to window, declare as window.object
 
@@ -20,85 +41,7 @@ window.globals.loadImages = loadImages;
 window.globals.getInstances = getInstances();
 window.globals.getLines = getLines();
 
-function addImage(source, id) {
-  var img = document.createElement("img");
-  img.src = source;
-  img.id = id;
-  img.hidden = true;
-  //img.hidden = true;
-  var src = document.getElementById("body");
-  src.appendChild(img);
-}
-
-function imageMouseDown(event) {
-  if(rightButtonCheck(event)) {
-    console.log("Right button down");
-  }
-  console.log("image mouse down");
-  for(var i in imagesLoaded) {
-    var imgobj = imagesLoaded[i];
-    if(this == imgobj.raster) {
-      if(rightButton) {
-        if(imgobj.contextMenu)
-          currentContextMenu = imgobj.contextMenu;
-          currentContextObject = {imageObject:imgobj,raster:imgobj.raster};  //to match image instance object
-          return;
-      }
-      if(imgobj.dragClone === true) {
-        //console.log("Symbol:" + imgobj.symbol);
-        imageSelected = imgobj.symbol.place();
-        imageSelected.position = this.position;
-        imageSelected.scale(0.5);
-        imageSelected.onMouseDown = imageMouseDown;
-        imageInstances.push({imageObject:imgobj, raster:imageSelected, id:imgobj.instances});
-        imgobj.instances += 1;
-      }
-      return;
-    }
-  }
-  if(rightButton) {
-    for(i in imageInstances) {
-      var imginst = imageInstances[i];
-      if(this == imginst.raster) {
-        if(imginst.imageObject.instanceContextMenu)
-          currentContextMenu = imginst.imageObject.instanceContextMenu;
-          currentContextObject = imginst;
-      }
-    }
-  }
-  imageSelected = this;
-}
-
-var firstFrame = true;
-
-function frameHandler(event) {
-}
-
-function loadImages(images_to_load) {
-  while(images_to_load.length > 0) {
-    var img = images_to_load.pop();
-    imagesLoaded.push(img);
-    addImage(img.src,img.id);
-    img.raster = new Raster(img.id);
-    console.log(img.isSymbol);
-    if(img.isSymbol === true) {   // needs true comparison
-      img.symbol = new Symbol(img.raster);
-      img.raster.remove();  //dont need this cluttering the document
-      img.raster = img.symbol.place();
-      img.instances = 0;
-    }
-    if(img.pos) {
-      //if(typeof img.pos == 'aper.point')
-      console.log("Pos:" + img.pos);
-      img.raster.position = img.pos;
-    } else  // Move the raster to the center of the view
-      img.raster.remove();  //dont need this cluttering the document
-    if(img.scale)
-      img.raster.scale(image.scale);
-    img.raster.onMouseDown = imageMouseDown;
-  }
-}
-
+// global hooks for created objects
 function getInstances() {
   return imageInstances;
 }
@@ -107,7 +50,102 @@ function getLines() {
   return lines;
 }
 
-view.on('frame', frameHandler);
+// helper to add hidden image to document before reference as paper image
+function addImage(source, id) {
+  var img = document.createElement("img");
+  img.src = source;
+  img.id = id;
+  img.hidden = true;
+  var src = document.getElementById("body");
+  src.appendChild(img);
+}
+
+// onmousedown callback for images that are cloneable, dragable or have context menu
+function imageMouseDown(event) {
+  if(rightButtonCheck(event)) {  // this will set rightButton global
+    console.log("Right button down");
+  }
+  console.log("image mouse down");
+  // look to see if this object is the raster for one of the master images
+  var imgobj;
+  for(var i in imagesLoaded) {
+    imgobj = imagesLoaded[i];
+    if(this == imgobj.raster) {  //master image found
+      if(rightButton) {
+        if(imgobj.hasOwnProperty('contextMenu'))  // if not defined then stay with default
+          currentContextMenu = imgobj.contextMenu;
+          currentContextObject = {imageObject:imgobj,raster:imgobj.raster};  //to match image instance object
+          return;   // just show context menu now - see context menu callback below
+      }
+      if(imgobj.hasOwnProperty('dragClone')) {  // if not defined then assume false
+        if(imgobj.dragClone === true) {   // this image object can be dragged, so it should have isSymbol set true also
+          //console.log("Symbol:" + imgobj.symbol);
+          imageSelected = imgobj.symbol.place();
+          imageSelected.position = this.position;
+          imageSelected.scale(0.5);
+          imageSelected.onMouseDown = imageMouseDown;
+          imageInstances.push({imageObject:imgobj, raster:imageSelected, id:imgobj.instances});
+          imgobj.instances += 1;
+        }
+      }
+      return;  // master image found, so no need to look at clones in imageInstances
+    }
+  }
+  // no master image found, so maybe this is a clone
+  for(i in imageInstances) {
+    var imginst = imageInstances[i];
+    if(this == imginst.raster) {  // clone image found
+      if(rightButton) {
+        imgobj = imginst.imageObject;
+        if(imgobj.hasOwnProperty('instanceContextMenu')) {   // if not defined then stay with default
+           currentContextMenu = imginst.imageObject.instanceContextMenu;
+           currentContextObject = imginst;
+           return; // clone image not selected for right click
+        }
+      }
+      imageSelected = this;
+      return;  //found so done looking
+    }
+  }
+}
+
+/**
+ * Called from external script via window.globals to add images to the document with behaviour parameters
+ * @param {array} images_to_load is array of image objects having parameters src, id, [isSymbol:bool, dragClone:bool, contextMenu:object, instanceContextMenu:object, pos:point, scale:float]
+ */
+function loadImages(images_to_load) {
+  while(images_to_load.length > 0) {  // continue till empty - not sure if this is valid
+    var imgobj = images_to_load.pop();
+    imagesLoaded.push(imgobj);  // record master images
+    addImage(imgobj.src,imgobj.id);  // add image to document
+    imgobj.raster = new Raster(imgobj.id);  // make this a paper image
+    //console.log(img.isSymbol);
+    if(imgobj.hasOwnProperty('isSymbol')) {  // this image can appear many times as instances
+      if(imgobj.isSymbol === true) {   // needs true comparison
+        imgobj.symbol = new Symbol(imgobj.raster);
+        imgobj.raster.remove();  //dont need this cluttering the document
+        imgobj.raster = imgobj.symbol.place();
+        imgobj.instances = 0;
+      }
+    }
+    if(imgobj.hasOwnProperty('pos')) {   // a position given so it will be visible
+      //console.log("Pos:" + img.pos);
+      imgobj.raster.position = imgobj.pos;
+    } else {  // no position so dont show yet
+      imgobj.raster.remove();  //dont need this cluttering the document
+    }
+    if(imgobj.hasOwnProperty('scale')) {
+      imgobj.raster.scale(image.scale);
+    }
+    var listen_to_mouse = imgobj.hasOwnProperty('contextMenu');
+    if(imgobj.hasOwnProperty('dragClone')) {  // if not defined then assume false
+      if(imgobj.dragClone === true)
+        listen_to_mouse = true;
+    }
+    if(listen_to_mouse)
+      imgobj.raster.onMouseDown = imageMouseDown;  // needed for drag or context
+  }
+}
 
 function lineMouseDown(event) {
   if(rightButtonCheck(event)) {
