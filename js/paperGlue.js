@@ -22,14 +22,15 @@
 //note:objects here are all somewhere within the paper scope
 // Tp make visibile to window, declare as window.object
 
-var lines = [];
+var lineInstances = {};
+var lineNextID = 0;
 var lineSelected = null;
 var imageSelected = null;
 var lineSelectMode = 0;
 var snapQuantum = 40;
 var rightButton = false;
 var imagesLoaded = [];
-var imageInstances = [];  //images that have been cloned from sybols in imagesLoaded.
+var imageInstances = {};  //images that have been cloned from sybols in imagesLoaded.
 var defaultContextMenu = [ {label:'view', callback:viewCall},{label:'open',callback:openCall} ];
 var currentContextMenu = defaultContextMenu;
 var currentContextObject = null;
@@ -42,17 +43,17 @@ console.log("PaperGlue functions to window globals");
 // window global are use for cross scope communications
 var globals = window.globals;
 globals.loadImages = loadImages;
-globals.getInstances = getInstances;
-globals.getLines = getLines;
+globals.getImages = getImageInstances;
+globals.getLines = getLineInstances;
 globals.setSnapQuantum = setSnapQuantum;
 
 // global hooks for created objects
-function getInstances() {
+function getImageInstances() {
   return imageInstances;
 }
 
-function getLines() {
-  return lines;
+function getLineInstances() {
+  return lineInstances;
 }
 
 /** Set quantum for snap on lines and images
@@ -221,33 +222,6 @@ function loadImages(images_to_load) {
   }
 }
 
-// onmousedown callback for two point paths
-function lineMouseDown(event) {
-  if(rightButtonCheck(event)) {
-    console.log("Right button down");
-    if(globals.hasOwnProperty('lineContextMenu')) {
-      currentContextMenu = globals.lineContextMenu;
-      holdContext = true;  // cross browser solution to default mouse up reset
-    } else
-      currentContextMenu = defaultContextMenu;
-    return false;
-  }
-  console.log("link mouse down");
-  lineSelected = this;
-  var line_select_fraction = (event.point - this.segments[0].point).length/this.length;
-  if(line_select_fraction < 0.25) {  //drag start of link
-    lineSelectMode = 1;
-  } else if (line_select_fraction > 0.75) {  // drag end of link
-    lineSelectMode = 0;
-  } else {
-    lineSelectMode = 2;   // drag whole link
-  }
-  console.log("Selected fraction:" + line_select_fraction);
-  console.log("Line select mode:" + lineSelectMode);
-  console.log("Selected pos:" + lineSelected.position);
-  return false;
-}
-
 window.contextMenuCallback = function(menu_index){
   console.log('context menu call for item:' + menu_index);
   if(currentContextMenu !== null) {
@@ -356,6 +330,33 @@ function newLine() {
   lineSelectMode = 0;  // drag last point
 }
 
+// onmousedown callback for two point paths
+function lineMouseDown(event) {
+  if(rightButtonCheck(event)) {
+    console.log("Right button down");
+    if(globals.hasOwnProperty('lineContextMenu')) {
+      currentContextMenu = globals.lineContextMenu;
+      holdContext = true;  // cross browser solution to default mouse up reset
+    } else
+      currentContextMenu = defaultContextMenu;
+      return false;
+    }
+    console.log("link mouse down");
+    lineSelected = this;
+    var line_select_fraction = (event.point - this.segments[0].point).length/this.length;
+    if(line_select_fraction < 0.25) {  //drag start of link
+      lineSelectMode = 1;
+    } else if (line_select_fraction > 0.75) {  // drag end of link
+      lineSelectMode = 0;
+    } else {
+      lineSelectMode = 2;   // drag whole link
+    }
+    console.log("Selected fraction:" + line_select_fraction);
+    console.log("Line select mode:" + lineSelectMode);
+    console.log("Selected pos:" + lineSelected.position);
+    return false;
+}
+
 // univeral mouse drag function can drag lines or images or create rubber band new line
 function onMouseDrag(event) {
   if(rightButton)  // no drag for right button
@@ -400,8 +401,8 @@ function onMouseUp(event) {
   if(!!lineSelected) {
     // for undo it will be necessary to look for previous position if any
     // point needs to be cloned to dereference
-    doRecordAdd({action:'pathMove',obj:lineSelected,pos:[lineSelected.firstSegment.point.clone(),lineSelected.lastSegment.point.clone()]});
-    validatePath(lineSelected);
+    line_id = validatePath(lineSelected);
+    doRecordAdd({action:'pathMove',id:line_id,pos:[lineSelected.firstSegment.point.clone(),lineSelected.lastSegment.point.clone()]});
     lineSelected = null;
     // continue through to path addition or removal
   } else if(!!imageSelected) {
@@ -415,20 +416,32 @@ function onMouseUp(event) {
   }
 }
 
-function validatePath(path) {
-  if(path.length >= snapQuantum) {
-    snap(path);
-    if(lines.indexOf(path) == -1)  //this path doesn't exist
-      lines.push(path);
-  } else {  // length of line is too short
-    removeLine(path);
+function getLineID(path) {
+  for(var i = 0; i < lineNextID;i++) {
+    if(lineInstances.hasOwnProperty(i))
+      return i;
   }
+  return lineNextID;
 }
 
-function removeLine(path) {
+function validatePath(path) {
+  var id = getLineID(lineSelected);
+  if(path.length >= snapQuantum) {
+    snap(path);
+    if(!lineInstances.hasOwnProperty(id)) { //this path doesn't exist
+      lineInstances[id]=path;
+      lineNextID++;
+    }
+  } else {  // length of line is too short
+    removeLine(id);
+  }
+  return id;
+}
+
+function removeLine(id) {
   path.remove();
-  if(lines.indexOf(path) != -1)  // this path does exist
-    lines.pop(path);
+  if(lineInstances.hasOwnProperty(id))  // this path does exist
+    delete lineInstances[id];
 }
 
 function doRecordAdd(action) {
@@ -462,11 +475,11 @@ function undo() {
     doRecordIndex--;
     var last_do = doRecord[doRecordIndex];
     console.log("Undoing " + last_do.action + " which as pos:" + last_do.pos);
-    var obj = last_do.obj;
+    var id = last_do.id;
     for(var i = doRecordIndex - 1; i >= 0; i--) {
       var prev_do = doRecord[i];
       console.log(i + " do is " + prev_do.action + " has pos:" + prev_do.pos);
-      if(prev_do.obj == obj) {
+      if(prev_do.id == id) {
         console.log("Found previous move");
         switch(last_do.action) {
           case 'pathMove':
@@ -490,7 +503,7 @@ function undo() {
     // nothing found, so assume can delete
     switch(last_do.action) {
       case 'pathMove':
-        removeLine(obj);
+        removeLine(lineInstance[last_do.id]);
         break;
       case 'imageMove':
         if(doRecordIndex > 0) {  // if this is a symbol then there should be a symbolPlace as previous do
@@ -509,24 +522,25 @@ function redo() {
   if(doRecordIndex >= doRecord.length)
     return;  // nothing to undo
   var to_do = doRecord[doRecordIndex];
+  var obj;
   console.log("Redoing " + to_do.action);
-  var obj = to_do.obj;
   switch(to_do.action) {
     case 'pathMove':
-      console.log(lines.length);
-      if(lines.indexOf(obj) == -1) {
+      console.log(lineInstances.length);
+      if(!lineInstances.hasOwnProperty(to_do.id)) {
         console.log("obj nolonger exists - remaking");
         newLine();
         lineSelected.add(to_do.pos[0]);
         lineSelected.add(to_do.pos[1]);
-        validatePath(lineSelected);
-        to_do.obj = lineSelected;   //********following to_do's will reference wrong line!!
+        var id = validatePath(lineSelected);
       } else {
+        obj = lineInstances[to_do.id];
         obj.firstSegment.point = to_do.pos[0];
         obj.lastSegment.point = to_do.pos[1];
       }
       break;
     case 'imageMove':
+      obj = lineInstances[to_do.id];
       obj.position = to_do.pos;
       break;
     case 'symbolPlace':

@@ -4,7 +4,7 @@ var wireLinks = [];
 
 var objectMenu = [ {label:'name', propCall:imgGetNameCall},{label:'pos',propCall:imgGetPosCall} ];
 var objectInstanceMenu = [ {label:'name', propCall:imgGetInstanceNameCall},{label:'pos',propCall:imgGetPosCall} ];
-var first_image = {src:"img/verodes.png", id:"verodes", isSymbol:true, dragClone:true, contextMenu:objectMenu, instanceContextMenu:objectInstanceMenu, pos:view.center };
+var first_image = {src:"img/con_Block_5.08mm_12.png", id:"verodes", isSymbol:true, dragClone:true, contextMenu:objectMenu, instanceContextMenu:objectInstanceMenu, pos:view.center };
 //
 // var oldOnLoad = window.globals.onload;
 // console.log("Settings window.globals");
