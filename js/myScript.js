@@ -68,24 +68,47 @@ function linkMouseDown(event) {
   console.log("Selected pos:" + linkSelected.position);
 }
 
+window.viewCall = function(){
+  console.log('view called');
+  hideContextMenu('contextMenu');
+};
+
+window.openCall = function() {
+  console.log('open called');
+  hideContextMenu('contextMenu');
+};
+
+var defaultMenu = [ {label:'view', callback:'viewCall()'},{label:'open',callback:'openCall()'} ];
+
 function onContextMenu(event) {
   console.log("Call for context menu");
-  showMenu('contextMenu',event);
+  showContextMenu('contextMenu',event,defaultMenu);
   return false;
 }
 
-// from http://www.codeproject.com/Tips/630793/Context-Menu-on-Right-Click-in-Webpage
-function showMenu(control, e) {
+// mostly from http://www.codeproject.com/Tips/630793/Context-Menu-on-Right-Click-in-Webpage
+function showContextMenu(control, e, menu) {
   var posx = e.clientX +window.pageXOffset +'px'; //Left Position of Mouse Pointer
   var posy = e.clientY + window.pageYOffset + 'px'; //Top Position of Mouse Pointer
-  document.getElementById(control).style.position = 'absolute';
-  document.getElementById(control).style.display = 'inline';
-  document.getElementById(control).style.left = posx;
-  document.getElementById(control).style.top = posy;
+  var el = document.getElementById(control);
+  el.style.position = 'absolute';
+  el.style.display = 'inline';
+  el.style.left = posx;
+  el.style.top = posy;
+  var tbl = el.children[0];  //assumes menu has table as first
+  tbl.innerHTML = "";
+  for(var mi in menu) {
+    var m = menu[mi];
+    console.log(m);
+    tbl.innerHTML += '<tr><td ><div  class="ContextItem" onmouseup=' + m.callback + '>' + m.label + '</div></td></tr>';
+  }
 }
-function hideMenu(control) {
 
-  document.getElementById(control).style.display = 'none';
+function hideContextMenu(control) {
+  var el = document.getElementById(control);
+  el.style.display = 'none';
+  var tbl = el.children[0];  //assumes menu has table as first
+  tbl.innerHTML = "";
 }
 
 window.oncontextmenu = onContextMenu;
@@ -104,7 +127,7 @@ function rightButtonCheck(event) {
     rightButton = (event.button == 2);
   }
   if(!rightButton)
-    hideMenu('contextMenu');
+    hideContextMenu('contextMenu');
   return rightButton;
 }
 
