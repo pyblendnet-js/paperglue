@@ -68,13 +68,14 @@ function linkMouseDown(event) {
   console.log("Selected pos:" + linkSelected.position);
 }
 
-function onContextMenu() {
+function onContextMenu(event) {
   console.log("Call for context menu");
+  showMenu('contextMenu',event);
   return false;
 }
 
 // from http://www.codeproject.com/Tips/630793/Context-Menu-on-Right-Click-in-Webpage
-function ShowMenu(control, e) {
+function showMenu(control, e) {
   var posx = e.clientX +window.pageXOffset +'px'; //Left Position of Mouse Pointer
   var posy = e.clientY + window.pageYOffset + 'px'; //Top Position of Mouse Pointer
   document.getElementById(control).style.position = 'absolute';
@@ -82,7 +83,7 @@ function ShowMenu(control, e) {
   document.getElementById(control).style.left = posx;
   document.getElementById(control).style.top = posy;
 }
-function HideMenu(control) {
+function hideMenu(control) {
 
   document.getElementById(control).style.display = 'none';
 }
@@ -102,6 +103,8 @@ function rightButtonCheck(event) {
   } else if (event.button) {
     rightButton = (event.button == 2);
   }
+  if(!rightButton)
+    hideMenu('contextMenu');
   return rightButton;
 }
 
