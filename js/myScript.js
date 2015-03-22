@@ -1,3 +1,6 @@
+//note:objects here are all somewhere within the paper scope
+// Tp make visibile to window, declare as window.object
+
 var wireLinks = [];
 var path;
 var linkSelected = null;
@@ -68,17 +71,17 @@ function linkMouseDown(event) {
   console.log("Selected pos:" + linkSelected.position);
 }
 
-window.viewCall = function(){
-  console.log('view called');
+window.viewCall = function(arg){
+  console.log('view called:' + arg);
   hideContextMenu('contextMenu');
 };
 
-window.openCall = function() {
-  console.log('open called');
+window.openCall = function(caller) {  //window. to allow access by context menu
+  console.log('open called from:' + caller.innerHTML);
   hideContextMenu('contextMenu');
 };
 
-var defaultMenu = [ {label:'view', callback:'viewCall()'},{label:'open',callback:'openCall()'} ];
+var defaultMenu = [ {label:'view', callback:'viewCall(0)'},{label:'open',callback:'openCall(this)'} ];
 
 function onContextMenu(event) {
   console.log("Call for context menu");
@@ -95,7 +98,7 @@ function showContextMenu(control, e, menu) {
   el.style.display = 'inline';
   el.style.left = posx;
   el.style.top = posy;
-  var tbl = el.children[0];  //assumes menu has table as first
+  var tbl = el.children[0];  //assumes menu has table as first child
   tbl.innerHTML = "";
   for(var mi in menu) {
     var m = menu[mi];
