@@ -6,23 +6,34 @@
   <!-- Load the Paper.js library -->
   <script type="text/javascript" src="js/paper.js"></script>
   <!-- Load external PaperScript and associate it with myCanvas -->
+  <script type="text/paperscript" src="js/paperglue.js" canvas="myCanvas">
+  </script>
   <script type="text/paperscript" src="js/myScript.js" canvas="myCanvas">
+  <!-- should have the same scope as per https://github.com/paperjs/paper.js/issues/153 -->
   </script>
   <script>
+    window.globals = { onload:null }; // for interscope comms
+
     function showPaper() {
       console.log("paper="+paper);
       console.log("paper.projects[0]="+paper.projects[0]);
       console.log("paper.tools[0]="+paper.tools[0]);
     }
   </script>
-  </head>
-<body id="body" >
+  <script>
+  function onload() {
+    console.log("body loaded");
+    //window.globals.onload();  //no use since it may not be added to globals yet
+  }
+    </script>
+    </head>
+<body id="body" onload="onload();" >
   <div onmouseup="showPaper();" class="detailItem">Show paper scope</div>
   <!--<image src="img/verodes.png"/>-->
   <canvas id="myCanvas" resize></canvas>
   <div style="display:none; " id="contextMenu">
     <table  border="0" cellpadding="0" cellspacing="0"
-    style="border: thin solid #808080; cursor: default;" width="100px"
+    style="border: thin solid #808080; cursor: default; white-space: nowrap" width="100px"
     bgcolor="White">
     <!-- <tr>
       <td >
