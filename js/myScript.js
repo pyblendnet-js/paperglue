@@ -71,23 +71,30 @@ function linkMouseDown(event) {
   console.log("Selected pos:" + linkSelected.position);
 }
 
-window.viewCall = function(arg){
-  console.log('view called:' + arg);
+window.contextMenuCallback = function(menu_index){
+  console.log('context menu call for item:' + menu_index);
+  if(currentContextMenu !== null)
+    currentContextMenu[menu_index].callback();
   hideContextMenu('contextMenu');
 };
 
-window.openCall = function(caller) {  //window. to allow access by context menu
-  console.log('open called from:' + caller.innerHTML);
-  hideContextMenu('contextMenu');
-};
+function viewCall(){
+  console.log('view called');
+}
 
-var defaultMenu = [ {label:'view', callback:'viewCall(0)'},{label:'open',callback:'openCall(this)'} ];
+function openCall(){
+  console.log('open called');
+}
+
+var defaultMenu = [ {label:'view', callback:viewCall},{label:'open',callback:openCall} ];
 
 function onContextMenu(event) {
   console.log("Call for context menu");
   showContextMenu('contextMenu',event,defaultMenu);
   return false;
 }
+
+var currentContextMenu = null;
 
 // mostly from http://www.codeproject.com/Tips/630793/Context-Menu-on-Right-Click-in-Webpage
 function showContextMenu(control, e, menu) {
@@ -100,10 +107,11 @@ function showContextMenu(control, e, menu) {
   el.style.top = posy;
   var tbl = el.children[0];  //assumes menu has table as first child
   tbl.innerHTML = "";
+  currentContextMenu = menu;
   for(var mi in menu) {
     var m = menu[mi];
     console.log(m);
-    tbl.innerHTML += '<tr><td ><div  class="ContextItem" onmouseup=' + m.callback + '>' + m.label + '</div></td></tr>';
+    tbl.innerHTML += '<tr><td ><div  class="ContextItem" onmouseup="contextMenuCallback(' + mi + ')" >' + m.label + '</div></td></tr>';
   }
 }
 
