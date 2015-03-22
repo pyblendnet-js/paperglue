@@ -343,6 +343,10 @@ function onMouseDown(event) {
     return false;
   }
   // other wise start a new line
+  newLine();
+}
+
+function newLine() {
   console.log("Start new path");
   lineSelected = new Path();
   lineSelected.strokeColor = 'black';
@@ -395,7 +399,8 @@ function onMouseUp(event) {
   }
   if(!!lineSelected) {
     // for undo it will be necessary to look for previous position if any
-    doRecordAdd({action:'pathMove',obj:lineSelected,pos:[lineSelected.firstSegment.point,lineSelected.lastSegment.point]});
+    // point needs to be cloned to dereference
+    doRecordAdd({action:'pathMove',obj:lineSelected,pos:[lineSelected.firstSegment.point.clone(),lineSelected.lastSegment.point.clone()]});
     validatePath(lineSelected);
     lineSelected = null;
     // continue through to path addition or removal
@@ -416,10 +421,14 @@ function validatePath(path) {
     if(lines.indexOf(path) == -1)  //this path doesn't exist
       lines.push(path);
   } else {  // length of line is too short
-    path.remove();
-    if(lines.indexOf(path) != -1)  // this path does exist
-      lines.pop(path);
+    removeLine(path);
   }
+}
+
+function removeLine(path) {
+  path.remove();
+  if(lines.indexOf(path) != -1)  // this path does exist
+    lines.pop(path);
 }
 
 function doRecordAdd(action) {
@@ -431,30 +440,49 @@ function doRecordAdd(action) {
 }
 
 function onKeyDown(event) {
+  if(event.key == 'control' || event.key == 'shift' || event.key == 'alt')
+    return;
   console.log(event);
   console.log(event.key);
-  if(event.key == 'backspace') {
-    undo();
+  if(event.key == 'z') {
+    if(event.modifiers.control) {
+      console.log("cntrlZ");
+      if(event.modifiers.shift)
+        redo();
+      else
+        undo();
+    }
+  }
 }
 
 function undo() {
     if(doRecord.length <= 0 || doRecordIndex === 0)
       return;  // nothing to undo
+    console.log("doRecordIndex: " + doRecordIndex);
     doRecordIndex--;
     var last_do = doRecord[doRecordIndex];
-    console.log("Undoing " + last_do.action);
+    console.log("Undoing " + last_do.action + " which as pos:" + last_do.pos);
     var obj = last_do.obj;
     for(var i = doRecordIndex - 1; i >= 0; i--) {
       var prev_do = doRecord[i];
-      console.log(i + " do is " + prev_do.action);
+      console.log(i + " do is " + prev_do.action + " has pos:" + prev_do.pos);
       if(prev_do.obj == obj) {
+        console.log("Found previous move");
         switch(last_do.action) {
           case 'pathMove':
+            console.log("Obj pos1:",obj.firstSegment.point);
+            console.log("Obj pos2:",obj.lastSegment.point);
+            console.log("Obj pos:",obj.position);
             obj.firstSegment.point = prev_do.pos[0];
             obj.lastSegment.point = prev_do.pos[1];
+            console.log("Return path to " + prev_do.pos);
+            console.log("Obj pos1:",obj.firstSegment.point);
+            console.log("Obj pos2:",obj.lastSegment.point);
+            console.log("Obj pos:",obj.position);
             break;
           case 'imageMove':
             obj.position = prev_do.pos;
+            console.log("Return img to " + prev_do.pos);
         }
         return;
       }
@@ -462,18 +490,48 @@ function undo() {
     // nothing found, so assume can delete
     switch(last_do.action) {
       case 'pathMove':
-        obj.remove();
+        removeLine(obj);
         break;
       case 'imageMove':
         if(doRecordIndex > 0) {  // if this is a symbol then there should be a symbolPlace as previous do
           last_do = doRecord[doRecordIndex-1];
           if(last_do.action == 'symbolPlace') {
-            console.log("Remove symbol from instances")
+            console.log("Remove symbol from instances");
             symbolRemove(last_do.src, last_do.id);
             doRecordIndex--;
           }
         }
         break;
     }
+}
+
+function redo() {
+  if(doRecordIndex >= doRecord.length)
+    return;  // nothing to undo
+  var to_do = doRecord[doRecordIndex];
+  console.log("Redoing " + to_do.action);
+  var obj = to_do.obj;
+  switch(to_do.action) {
+    case 'pathMove':
+      console.log(lines.length);
+      if(lines.indexOf(obj) == -1) {
+        console.log("obj nolonger exists - remaking");
+        newLine();
+        lineSelected.add(to_do.pos[0]);
+        lineSelected.add(to_do.pos[1]);
+        validatePath(lineSelected);
+        to_do.obj = lineSelected;   //********following to_do's will reference wrong line!!
+      } else {
+        obj.firstSegment.point = to_do.pos[0];
+        obj.lastSegment.point = to_do.pos[1];
+      }
+      break;
+    case 'imageMove':
+      obj.position = to_do.pos;
+      break;
+    case 'symbolPlace':
+      symbolPlace(to_do.imageObject);
+      break;
   }
+  doRecordIndex++;
 }
