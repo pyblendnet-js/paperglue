@@ -34,12 +34,15 @@ var imageInstances = [];  //images that have been cloned from sybols in imagesLo
 var defaultContextMenu = [ {label:'view', callback:viewCall},{label:'open',callback:openCall} ];
 var currentContextMenu = defaultContextMenu;
 var currentContextObject = null;
+var holdContext = false;  // don't reset contextMenu till after mouseUp
+
 
 console.log("PaperGlue functions to window globals");
 // window global are use for cross scope communications
-window.globals.loadImages = loadImages;
-window.globals.getInstances = getInstances();
-window.globals.getLines = getLines();
+var globals = window.globals;
+globals.loadImages = loadImages;
+globals.getInstances = getInstances();
+globals.getLines = getLines();
 
 // global hooks for created objects
 function getInstances() {
@@ -73,9 +76,11 @@ function imageMouseDown(event) {
     if(this == imgobj.raster) {  //master image found
       if(rightButton) {
         if(imgobj.hasOwnProperty('contextMenu'))  // if not defined then stay with default
+          console.log("Attaching image context menu");
           currentContextMenu = imgobj.contextMenu;
           currentContextObject = {imageObject:imgobj,raster:imgobj.raster};  //to match image instance object
-          return;   // just show context menu now - see context menu callback below
+          holdContext = true;  // cross browser solution to default mouse up reset
+          return false;   // just show context menu now - see context menu callback below
       }
       if(imgobj.hasOwnProperty('dragClone')) {  // if not defined then assume false
         if(imgobj.dragClone === true) {   // this image object can be dragged, so it should have isSymbol set true also
@@ -88,7 +93,7 @@ function imageMouseDown(event) {
           imgobj.instances += 1;
         }
       }
-      return;  // master image found, so no need to look at clones in imageInstances
+      return false;  // master image found, so no need to look at clones in imageInstances
     }
   }
   // no master image found, so maybe this is a clone
@@ -100,11 +105,12 @@ function imageMouseDown(event) {
         if(imgobj.hasOwnProperty('instanceContextMenu')) {   // if not defined then stay with default
            currentContextMenu = imginst.imageObject.instanceContextMenu;
            currentContextObject = imginst;
-           return; // clone image not selected for right click
+           holdContext = true;  // cross browser solution to default mouse up reset
+           return false; // clone image not selected for right click
         }
       }
       imageSelected = this;
-      return;  //found so done looking
+      return false;  //found so done looking
     }
   }
 }
@@ -147,16 +153,23 @@ function loadImages(images_to_load) {
   }
 }
 
+// onmousedown callback for two point paths
 function lineMouseDown(event) {
   if(rightButtonCheck(event)) {
     console.log("Right button down");
-    return;
+    if(globals.hasOwnProperty('lineContextMenu')) {
+      currentContextMenu = globals.lineContextMenu;
+      holdContext = true;  // cross browser solution to default mouse up reset
+    } else
+      currentContextMenu = defaultContextMenu;
+    return false;
   }
   console.log("link mouse down");
   linkSelected = this;
   linkSelectFraction = (event.point - this.segments[0].point).length/this.length;
   console.log("Selected fraction:" + linkSelectFraction);
   console.log("Selected pos:" + linkSelected.position);
+  return false;
 }
 
 window.contextMenuCallback = function(menu_index){
@@ -241,17 +254,17 @@ function rightButtonCheck(event) {
 }
 
 function onMouseDown(event) {
-
+  console.log("Basic Mouse down");
   if(rightButtonCheck(event)) {
     console.log("Right button down");
-    return;
+    if(holdContext === false)  // cross browser solution to default mouse up reset
+      currentContextMenu = defaultContextMenu;
+    return false;
   }
-
   if(!!linkSelected) {
     console.log("Link selected");
-    return;
+    return false;
   }
-  console.log("Mouse down");
   path = new Path();
   path.strokeColor = 'black';
   path.strokeWidth = 10;
