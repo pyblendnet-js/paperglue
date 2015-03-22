@@ -23,10 +23,9 @@
 // Tp make visibile to window, declare as window.object
 
 var lines = [];
-var path;
-var linkSelected = null;
+var lineSelected = null;
 var imageSelected = null;
-var linkSelectFraction = 0.5;
+var lineSelectMode = 0;
 var snapQuantum = 40;
 var rightButton = false;
 var imagesLoaded = [];
@@ -35,14 +34,17 @@ var defaultContextMenu = [ {label:'view', callback:viewCall},{label:'open',callb
 var currentContextMenu = defaultContextMenu;
 var currentContextObject = null;
 var holdContext = false;  // don't reset contextMenu till after mouseUp
+var doRecord = [];  // record of all clonings and moves  {action:string,src:imageobject,obj:raster or path,pos:point}
+var doRecordIndex = 0;  // points to next do location
 
 
 console.log("PaperGlue functions to window globals");
 // window global are use for cross scope communications
 var globals = window.globals;
 globals.loadImages = loadImages;
-globals.getInstances = getInstances();
-globals.getLines = getLines();
+globals.getInstances = getInstances;
+globals.getLines = getLines;
+globals.setSnapQuantum = setSnapQuantum;
 
 // global hooks for created objects
 function getInstances() {
@@ -53,6 +55,16 @@ function getLines() {
   return lines;
 }
 
+/** Set quantum for snap on lines and images
+  @param {float} typically greater than 1
+ */
+function setSnapQuantum(q) {
+  if(q < 0.000001)
+    snapQuantum = 0.000001;
+  else
+    snapQuantum = q;
+}
+
 // helper to add hidden image to document before reference as paper image
 function addImage(source, id) {
   var img = document.createElement("img");
@@ -61,6 +73,34 @@ function addImage(source, id) {
   img.hidden = true;
   var src = document.getElementById("body");
   src.appendChild(img);
+}
+
+// finds an instance of an image clone based on id, raster or imageObject
+// If imageObject then returns a list of matching objects, otherwise first instance
+function findImageInstance(search_by,search_key) {
+  var objs = [];
+  for(var i in imageInstances) {
+    var inst = imageInstances[i];
+    switch(search_by) {
+      case 'id':
+        if(inst.id == search_key)
+          return inst;
+        break;
+      case 'raster':
+        if(inst.raster == search_key)
+          return inst;
+        break;
+      case 'imageObject':
+          if(inst.imgobj == search_key)
+            objs.push(inst);
+          break;
+      default:
+        return 'null';
+    }
+  }
+  if(search_by == 'imageObject')
+    return objs;
+  return null;
 }
 
 // onmousedown callback for images that are cloneable, dragable or have context menu
@@ -85,12 +125,8 @@ function imageMouseDown(event) {
       if(imgobj.hasOwnProperty('dragClone')) {  // if not defined then assume false
         if(imgobj.dragClone === true) {   // this image object can be dragged, so it should have isSymbol set true also
           //console.log("Symbol:" + imgobj.symbol);
-          imageSelected = imgobj.symbol.place();
+          symbolPlace(imgobj);
           imageSelected.position = this.position;
-          imageSelected.scale(0.5);
-          imageSelected.onMouseDown = imageMouseDown;
-          imageInstances.push({imageObject:imgobj, raster:imageSelected, id:imgobj.instances});
-          imgobj.instances += 1;
         }
       }
       return false;  // master image found, so no need to look at clones in imageInstances
@@ -115,6 +151,37 @@ function imageMouseDown(event) {
   }
 }
 
+// uses master image raster to create clone
+function symbolPlace(imgobj) {
+  imageSelected = imgobj.symbol.place();
+  imageSelected.scale(0.5);
+  imageSelected.onMouseDown = imageMouseDown;
+  img_id = imgobj.nextID;
+  imageInstances.push({imageObject:imgobj, raster:imageSelected, id:img_id});
+  doRecordAdd({action:'symbolPlace',src:imgobj,id:img_id});
+  imgobj.instances += 1;
+  imgobj.nextID += 1;
+}
+
+// find img_id for imgobj in imageInstances
+function symbolRemove(imgobj, img_id) {
+  console.log("Attempting to remove instance of " + imgobj.id + " with " + img_id);
+  for(var i in imageInstances) {
+    var inst = imageInstances[i];
+    console.log("Instance#" + i + " = " + inst.imageObject.id + " has id " + inst.id);
+    if(inst.imageObject == imgobj) {
+      console.log("Instance imageobjects match");
+      if(inst.id == img_id) {
+        console.log("Instance id match");
+        imgobj--;
+        inst.raster.remove();
+        imageInstances.slice(i,1);
+        return;
+      }
+    }
+  }
+}
+
 /**
  * Called from external script via window.globals to add images to the document with behaviour parameters
  * @param {array} images_to_load is array of image objects having parameters src, id, [isSymbol:bool, dragClone:bool, contextMenu:object, instanceContextMenu:object, pos:point, scale:float]
@@ -132,6 +199,7 @@ function loadImages(images_to_load) {
         imgobj.raster.remove();  //dont need this cluttering the document
         imgobj.raster = imgobj.symbol.place();
         imgobj.instances = 0;
+        imgobj.nextID = 0;
       }
     }
     if(imgobj.hasOwnProperty('pos')) {   // a position given so it will be visible
@@ -165,10 +233,18 @@ function lineMouseDown(event) {
     return false;
   }
   console.log("link mouse down");
-  linkSelected = this;
-  linkSelectFraction = (event.point - this.segments[0].point).length/this.length;
-  console.log("Selected fraction:" + linkSelectFraction);
-  console.log("Selected pos:" + linkSelected.position);
+  lineSelected = this;
+  var line_select_fraction = (event.point - this.segments[0].point).length/this.length;
+  if(line_select_fraction < 0.25) {  //drag start of link
+    lineSelectMode = 1;
+  } else if (line_select_fraction > 0.75) {  // drag end of link
+    lineSelectMode = 0;
+  } else {
+    lineSelectMode = 2;   // drag whole link
+  }
+  console.log("Selected fraction:" + line_select_fraction);
+  console.log("Line select mode:" + lineSelectMode);
+  console.log("Selected pos:" + lineSelected.position);
   return false;
 }
 
@@ -253,6 +329,7 @@ function rightButtonCheck(event) {
   return rightButton;
 }
 
+// default mouse down event handler - most browser will bubble to this from the other mouseDown handlers
 function onMouseDown(event) {
   console.log("Basic Mouse down");
   if(rightButtonCheck(event)) {
@@ -261,41 +338,47 @@ function onMouseDown(event) {
       currentContextMenu = defaultContextMenu;
     return false;
   }
-  if(!!linkSelected) {
-    console.log("Link selected");
+  if(!!lineSelected || !!imageSelected) {     // an existing line has been selected
+    console.log("Something selected");
     return false;
   }
-  path = new Path();
-  path.strokeColor = 'black';
-  path.strokeWidth = 10;
-  path.strokeCap = 'round';
-  path.onMouseDown = lineMouseDown;
+  // other wise start a new line
+  console.log("Start new path");
+  lineSelected = new Path();
+  lineSelected.strokeColor = 'black';
+  lineSelected.strokeWidth = 10;
+  lineSelected.strokeCap = 'round';
+  lineSelected.onMouseDown = lineMouseDown;
+  lineSelectMode = 0;  // drag last point
 }
 
+// univeral mouse drag function can drag lines or images or create rubber band new line
 function onMouseDrag(event) {
-  if(rightButton)
+  if(rightButton)  // no drag for right button
     return;
-  if(!!linkSelected) {
+  if(!!lineSelected) {   // link selected so drag existing
     console.log("Link selected");
-    if(linkSelectFraction < 0.25) {  //drag start of link
-      linkSelected.firstSegment.point += event.delta;
-    } else if (linkSelectFraction > 0.75) {  // drag end of link
-      linkSelected.lastSegment.point += event.delta;
-    } else {
-      linkSelected.position += event.delta;   // drag whole link
+    switch(lineSelectMode) {  //chosen in onlinemousedown
+      case 0: //move last point
+        if(lineSelected.segments.length < 2) {
+          lineSelected.add(event.point);
+        } else {
+          lineSelected.lastSegment.point += event.delta;
+        }
+        break;
+      case 1: //move first point
+        lineSelected.firstSegment.point += event.delta;
+        break;
+      default: // move all
+        lineSelected.position += event.delta;   // drag whole link
     }
     return;
-  } else if(!!imageSelected) {
+  } else if(!!imageSelected) {   // drag image
     imageSelected.position += event.delta;
-  } else {
-     if(path.segments.length < 2) {
-       path.add(event.point);
-     } else {
-       path.lastSegment.point = event.point;
-     }
-   }
+  }
 }
 
+// snaps both ends of the lines to grid quantum
 function snap(p) {
   var rp = p.firstSegment.point/snapQuantum;
   p.firstSegment.point = rp.round()*snapQuantum;
@@ -303,29 +386,94 @@ function snap(p) {
   p.lastSegment.point = rp.round()*snapQuantum;
 }
 
+// universal mouse up handler - mainly just tidy up
 function onMouseUp(event) {
   console.log("Mouse up");
   if(rightButton) {
     rightButton = false;
     return;
   }
-  if(!!linkSelected) {
-    path = linkSelected;
-    snap(linkSelected);
-    linkSelected = null;
+  if(!!lineSelected) {
+    // for undo it will be necessary to look for previous position if any
+    doRecordAdd({action:'pathMove',obj:lineSelected,pos:[lineSelected.firstSegment.point,lineSelected.lastSegment.point]});
+    validatePath(lineSelected);
+    lineSelected = null;
+    // continue through to path addition or removal
   } else if(!!imageSelected) {
     var rp = imageSelected.position/snapQuantum;
     imageSelected.position = rp.round()*snapQuantum;
+    var imginst = findImageInstance('raster',imageSelected);
+    console.log("instance found with id:"+imginst.id);  // need to keep id as well - might be null for master objects in layout mode
+    // keeping the obj as record is fine for undo but not so good for redo if the object gets deleted further back
+    doRecordAdd({action:'imageMove',obj:imageSelected,pos:imageSelected.position});
     imageSelected = null;
-    return;
   }
-  if(path.length > 10) {
+}
+
+function validatePath(path) {
+  if(path.length >= snapQuantum) {
     snap(path);
     if(lines.indexOf(path) == -1)  //this path doesn't exist
       lines.push(path);
-  } else {
+  } else {  // length of line is too short
     path.remove();
     if(lines.indexOf(path) != -1)  // this path does exist
       lines.pop(path);
+  }
+}
+
+function doRecordAdd(action) {
+  if(doRecordIndex >= doRecord.length)
+    doRecord.push(action);
+  else
+    doRecord.splice(doRecordIndex,0,action);
+  doRecordIndex++;
+}
+
+function onKeyDown(event) {
+  console.log(event);
+  console.log(event.key);
+  if(event.key == 'backspace') {
+    undo();
+}
+
+function undo() {
+    if(doRecord.length <= 0 || doRecordIndex === 0)
+      return;  // nothing to undo
+    doRecordIndex--;
+    var last_do = doRecord[doRecordIndex];
+    console.log("Undoing " + last_do.action);
+    var obj = last_do.obj;
+    for(var i = doRecordIndex - 1; i >= 0; i--) {
+      var prev_do = doRecord[i];
+      console.log(i + " do is " + prev_do.action);
+      if(prev_do.obj == obj) {
+        switch(last_do.action) {
+          case 'pathMove':
+            obj.firstSegment.point = prev_do.pos[0];
+            obj.lastSegment.point = prev_do.pos[1];
+            break;
+          case 'imageMove':
+            obj.position = prev_do.pos;
+        }
+        return;
+      }
+    }
+    // nothing found, so assume can delete
+    switch(last_do.action) {
+      case 'pathMove':
+        obj.remove();
+        break;
+      case 'imageMove':
+        if(doRecordIndex > 0) {  // if this is a symbol then there should be a symbolPlace as previous do
+          last_do = doRecord[doRecordIndex-1];
+          if(last_do.action == 'symbolPlace') {
+            console.log("Remove symbol from instances")
+            symbolRemove(last_do.src, last_do.id);
+            doRecordIndex--;
+          }
+        }
+        break;
+    }
   }
 }
