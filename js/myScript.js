@@ -210,6 +210,29 @@ function openActionsWindow() {
     myWindow.stop();
 }
 
+dragFlag = false;
+
+function mouseDown(e) {
+  e.stopPropagation();
+  dragFlag = true;
+  var rect = this.getBoundingClientRect();
+  mouseX = e.clientX - rect.left;
+  mouseY = e.clientY - rect.top;
+}
+
+function mouseUp(e) {
+  e.stopPropagation();
+  dragFlag = false;
+}
+
+function mouseMove(e) {
+  //console.log(e);
+  if(dragFlag) {
+    this.style.left = (e.clientX-mouseX) + 'px';
+    this.style.top = (e.clientY-mouseY) + 'px';
+  }
+}
+
 function openImgPropDialog() {
   var fontsize = window.innerWidth/80;
   var obj = paperGlue.getCurrentContextObject();
@@ -218,6 +241,9 @@ function openImgPropDialog() {
   console.log("Prop:"+Object.keys(obj));
   var Dlg = document.getElementById('Overlay');
   Dlg.style.visibility = 'visible';
+  Dlg.onmousedown=mouseDown;
+  Dlg.onmousemove=mouseMove;
+  Dlg.onmouseup=mouseUp;
   //Dlg.style.fontSize = fontsize;
   //Dlg.style = "font-size:"+fontsize+"px;visibility:visible;";
   var fs = 'style="font-size:'+fontsize+'px;"';
