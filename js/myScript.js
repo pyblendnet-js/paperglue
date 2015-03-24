@@ -176,7 +176,7 @@ function openActionsWindow() {
 
 function openPropDialog() {
   var obj = paperGlue.getCurrentContextObject();
-  paperGlue.showImageCursors(obj);
+  paperGlue.showImageCursors(obj,false);
   console.log("Opening property dialog:",obj.id);
   console.log("Prop:"+Object.keys(obj));
   var Dlg = document.getElementById('Overlay');
@@ -213,7 +213,7 @@ function dialogReturn(reply) {
   paperGlue.hideCursor();
   if(reply === 'apply') {
     var obj = paperGlue.getCurrentContextObject();
-    paperGlue.showImageCursors(obj);
+    paperGlue.showImageCursors(obj,false);
   }
 }
 
