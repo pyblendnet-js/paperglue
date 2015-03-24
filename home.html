@@ -54,6 +54,14 @@
     }
     window.globals.dialogReturn(reply);
   }
+
+  function setCurrentLineColor(c) {
+    window.globals.paperGlue.setCurrentLineColor(c);
+    var Dlg = document.getElementById('Overlay');
+    Dlg.style.visibility = 'hidden';
+    window.globals.paperGlue.setModalOpen(false);
+    window.globals.paperGlue.enableKeyFocus(true);
+  }
   </script>
   <style>
       .button {
@@ -155,6 +163,7 @@
 <div id="Overlay" >
   <div>
     <div id="DlgContent">Content Goes Here</div>
+    <div id="replyButtons">
     <input type="button"
         value="Apply"
       onclick="DlgHide('apply')" />
@@ -164,6 +173,7 @@
     <input type="button"
         value="Cancel"
       onclick="DlgHide('cancel')" />
+    </div>
   </div>
 </div>
 </body>

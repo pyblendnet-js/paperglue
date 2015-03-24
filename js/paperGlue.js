@@ -97,8 +97,28 @@ function setLineThickness(t) {
   lineThickness = t;
 }
 
-function setLineColor(c) {
-  lineLColor = c;
+function getLineColor(id) {
+  if(lineInstances.hasOwnProperty(id)) {
+    if(lineInstances[id].hasOwnProperty('color'))
+      return lineInstances[id].color;
+  }
+  return '#000000';
+}
+
+function setCurrentLineColor(c) {
+  if(!!currentContextObject) {
+    var id = currentContextObject.id;
+    doRecordAdd({action:'lineColor',id:id,type:'line',oldColor:lineColor,color:c});
+    setLineColor(id,c);
+  }
+}
+
+function setLineColor(id,c) {
+  if(lineInstances.hasOwnProperty(id)) {
+    lineInstances[id].path.strokeColor = c;
+    lineInstances[id].color = c;
+  }
+  lineColor = c;
 }
 
 // helper to add hidden image to document before reference as paper image
@@ -745,14 +765,13 @@ function lineMouseDown(event) {
   mouseDownPosition = event.point;
   if(rightButtonCheck(event)) {
     console.log("Right button down");
-    var ids = findKey(lineInstances,'line',this);
-    if(ids.length > 0)
+    var ids = findKey(lineInstances,'path',this);
+    if(ids.length > 0) {
       selectItem(ids[0],this);
-    if(globals.hasOwnProperty('lineContextMenu')) {
-      currentContextMenu = globals.lineContextMenu;
+      currentContextObject = {id:ids[0],type:'line',inst:this};  //to match image instance object
+      setContextMenu("lineInstanceMenu");
       holdContext = true;  // cross browser solution to default mouse up reset
-    } else
-      currentContextMenu = defaultContextMenu;
+    }
     return false;
   }
     lineSelected = this;
@@ -977,7 +996,7 @@ function moveCurrentImage(x,y,r) {
 
 function getLineID(path) {
   for(var id in lineInstances) {
-    if(lineInstances[id].line == path) {
+    if(lineInstances[id].path == path) {
       console.log('Found existing line with id:', id);
       return id;
     }
@@ -1005,7 +1024,9 @@ function validatePath(path, force_id) {
   if(snapLine(path,round_only)) {
     if(line_id === null) { //this path doesn't exist
       console.log('Creating new line with id:',next_id);
-      lineInstances[next_id] = {line:path};
+      lineInstances[next_id] = {path:path};
+      if(lineColor != 'black')
+        lineInstances[next_id].color = lineColor;
       //console.log(lineInstances[next_id]);
       //console.log(lineInstances[0]);
       if(next_id == nextID)
@@ -1030,7 +1051,7 @@ function validatePath(path, force_id) {
 
 function removeLine(id) {
   if(lineInstances.hasOwnProperty(id))  // this path does exist
-    lineInstances[id].line.remove();  // should remove from screen
+    lineInstances[id].path.remove();  // should remove from screen
   delete lineInstances[id];  // removes from list
 }
 
@@ -1443,7 +1464,7 @@ function undo() {
           console.log('No instance of line id:' + last_do.id);
           break;
         }
-        var path = lineInstances[last_do.id].line;
+        var path = lineInstances[last_do.id].path;
         // console.log("Obj pos1:",path.firstSegment.point);
         // console.log("path pos2:",path.lastSegment.point);
         // console.log("path pos:",path.position);
@@ -1457,6 +1478,9 @@ function undo() {
           // console.log("path pos2:",path.lastSegment.point);
           // console.log("path pos:",path.position);
         }
+        break;
+      case 'lineColor':
+        setLineColor(last_do.id,last_do.oldColor);
         break;
       case 'imageMove':
         raster = imageInstances[last_do.id].raster;
@@ -1537,15 +1561,18 @@ function redo() {
         //console.log(to_do.pos[1]);
         lineSelected.add(to_do.pos[1][0]);
         lineSelected.add(to_do.pos[1][1]);
-        //console.line("line:" + lineSelected);
+        //console.path("line:" + lineSelected);
         // need to reuse old id
         var id = validatePath(lineSelected,to_do.id);  // adds to lineInstances
         lineSelected = null;
       } else {
-        var path = lineInstances[to_do.id].line;
+        var path = lineInstances[to_do.id].path;
         path.firstSegment.point = to_do.pos[1][0];
         path.lastSegment.point = to_do.pos[1][1];
       }
+      break;
+    case 'lineColor':
+      setLineColor(to_do.id,to_do.color);
       break;
     case 'imageMove':
       imgobj = imageInstances[to_do.id];
@@ -1768,7 +1795,9 @@ var exports = {
   getDoRecord:getDoRecord,
   setSnap:setSnap,
   setLineThickness:setLineThickness,
+  getLineColor:getLineColor,
   setLineColor:setLineColor,
+  setCurrentLineColor:setCurrentLineColor,
   keyHandler:null,
   enableKeyFocus:enableKeyFocus,
   removeAll:removeAll,

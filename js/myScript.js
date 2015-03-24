@@ -14,12 +14,14 @@ var symbolInstanceMenu = [ {label:'name', propCall:imgGetInstanceNameCall},
                            {label:'pos',propCall:imgGetPosCall},
                            {label:'snap',propCall:getSnapModeCall,callback:toggleSnap},
                            {label:'properties',callback:openImgPropDialog} ];
+var lineInstanceMenu = [ {label:'color', propCall:lineGetColor, callback:setLineColor}];
 var newAreaMenu = [ {label:'set area#', propCall:getAreaCount, callback:setArea}];
 var areaMenu = [ {label:'area', propCall:getAreaNameCall},
                  {label:'rect', propCall:getAreaRectCall},
                  {label:'properties',callback:openAreaPropDialog}];
 window.globals.menuLookup = { symbolMenu:symbolMenu,
                               symbolInstanceMenu:symbolInstanceMenu,
+                              lineInstanceMenu:lineInstanceMenu,
                               newAreaMenu:newAreaMenu,
                               areaMenu:areaMenu
                             };
@@ -233,7 +235,12 @@ function mouseMove(e) {
   }
 }
 
-function openDialogCommon() {
+function openDialogCommon(show_reply_buttons) {
+  var rb = document.getElementById('replyButtons');
+  if(typeof show_reply_buttons === 'undefined' || show_reply_buttons)
+    rb.style.display = 'inline';
+  else
+    rb.style.display = 'none';
   paperGlue.enableKeyFocus(false);
   var Dlg = document.getElementById('Overlay');
   Dlg.style.visibility = 'visible';
@@ -399,6 +406,46 @@ function areaDialogReturn(reply) {
   paperGlue.enableKeyFocus(true);
 }
 
+function lineGetColor(obj) {
+  var lc = paperGlue.getLineColor(obj.id);
+  for(var c in ega) {
+    var nc = ega[c];
+    if(nc === lc)
+      return c;
+  }
+  return lc;
+}
+
+var ega = { black:'#000000',
+            brown:'#B08000',
+            red:'#FF0000',
+            orange:'#FFA000',
+            yellow:'#FFFF00',
+            green:'#40FF40',
+            blue:'#4040FF',
+            violet:'#FF00FF',
+            grey:'#808080',
+            white:'#FFFFFF' };
+
+function setLineColor() {
+  openDialogCommon(false);
+  var fontsize = window.innerWidth/80;
+  console.log("Opening color select dialog");
+  var fs = 'style="font-size:'+fontsize+'px;"';
+  var p = '<table ' + fs + '>';
+
+  var f = 'white';
+  for(var c in ega) {
+    var cf = "setCurrentLineColor('"+ega[c]+"')";
+    p += '<tr><td><button style="color:'+f+';background-color:'+ega[c]+'" onclick="'+cf+'">'+c+'</button></td></tr>';
+    f = 'black';
+  }
+  p += '</table>';
+  //console.log(p);
+  var content = document.getElementById('DlgContent');
+  content.innerHTML = p;
+  return false;  //do not hide cursors yet
+}
 
 //window.globals.keyhandler = keyDown;  // requests paperglue to pass event here
 window.globals.listActions = openActionsWindow;
