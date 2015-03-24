@@ -561,6 +561,14 @@ function showArea(id) {
   area.add(rect.bottomLeft);
   area.closed = true;
   a.path = area;
+  var text = new PointText({
+  point: rect.topLeft + [20,20,],
+  content: id,
+  justification: 'center',
+  fontSize: 15,
+  fillColor: areaColor
+  });
+  a.text = text;
 }
 
 function showAllAreas() {
@@ -583,6 +591,10 @@ function hideAllAreas() {
         console.log("Area:"+a.rect);
       }
       a.path = null;
+      if(!!a.text) {
+        a.text.remove();
+      }
+      a.text = null;
     }
   }
   areasVisible = false;
@@ -832,6 +844,7 @@ function validatePath(path, force_id) {
       doRecordAdd({action:'lineMove',id:line_id,type:'line',pos:[lineSelectedPosition,np] });
     }
   } else {  // length of line is too short
+    console.log("Zero length line");
     if(line_id === null) { //this path doesn't exist
       path.remove();
     } else {
