@@ -1,12 +1,13 @@
 //note:objects in paperglue are in the paper scope
+var paperGlue;  // see initApp below
 
 var wireLinks = [];
 
 var objectMenu = [ {label:'name', propCall:imgGetNameCall},
                    {label:'pos',propCall:imgGetPosCall},
                    {label:'properties',callback:openPropDialog},
-                   {label:'setCenter',callback:setCenterToCursor},
-                   {label:'setOrigin',callback:setOriginToCursor}
+                   {label:'setCenter',propCall:imgGetCenterCall,callback:setCenterToCursor},
+                   {label:'setOrigin',propCall:imgGetOriginCall,callback:setOriginToCursor}
                  ];
 var objectInstanceMenu = [ {label:'name', propCall:imgGetInstanceNameCall},
                            {label:'pos',propCall:imgGetPosCall},{label:'properties',callback:openPropDialog} ];
@@ -30,10 +31,11 @@ if(typeof window.globals.paperGlue === 'undefined')  { // means myScript got her
 // see http://eloquentjavascript.net/10_modules.html on the subject of slow module loads
 
 function initApp() {
-  var pg = window.globals.paperGlue;
-  pg.init();  // sets up extra layers
-  pg.loadImages([first_image]);
-  pg.setSnap([5,5,10,10]);
+  console.log("Initialising application");
+  paperGlue = window.globals.paperGlue;  //to access paperGlue commands
+  paperGlue.init();  // sets up extra layers
+  paperGlue.loadImages([first_image]);
+  paperGlue.setSnap([5,5,10,10]);
 }
 
 function drawGrid(spacing) {
@@ -87,6 +89,18 @@ function imgGetPosCall(obj){
   console.log('pos called');
   console.log(Object.keys(obj));
   return obj.raster.position;
+}
+
+function imgGetCenterCall(obj){
+  console.log('pos called');
+  console.log(Object.keys(obj));
+  return obj.src.center;
+}
+
+function imgGetOriginCall(obj){
+  console.log('pos called');
+  console.log(Object.keys(obj));
+  return obj.src.origin;
 }
 
 function createActionTableBody() {
@@ -152,7 +166,7 @@ function openActionsWindow() {
     var tb = myWindow.document.getElementById("actionTableBodyDiv");
     console.log(tb.attributes);
     var ss = "overflow:scroll;height:"+window.innerHeight+"px;width:100%;overflow:auto;maxHeight:80%;";
-    console.log("Stlye;"+ss);
+    console.log("Style:"+ss);
     tb.style = ss;
     tb.style.maxHeight = "400px";
     console.log(tb.attributes);
@@ -161,7 +175,8 @@ function openActionsWindow() {
 }
 
 function openPropDialog() {
-  var obj = window.globals.paperGlue.getCurrentContextObject();
+  var obj = paperGlue.getCurrentContextObject();
+  paperGlue.showImageCursors(obj);
   console.log("Opening property dialog:",obj.id);
   console.log("Prop:"+Object.keys(obj));
   var Dlg = document.getElementById('Overlay');
@@ -194,19 +209,24 @@ function dialogReturn(reply) {
   var r = parseFloat(rfield.value);
   //console.log("X:"+x);
   if(reply !== 'cancel')
-    window.globals.paperGlue.moveCurrentImage(x,y,r);
+    paperGlue.moveCurrentImage(x,y,r);
+  paperGlue.hideCursor();
+  if(reply === 'apply') {
+    var obj = paperGlue.getCurrentContextObject();
+    paperGlue.showImageCursors(obj);
+  }
 }
 
 function setCenterToCursor() {
-  window.globals.paperGlue.setCenterToCursor();
+  paperGlue.setCenterToCursor();
 }
 
 function setOriginToCursor() {
-  window.globals.paperGlue.setOriginToCursor();
+  paperGlue.setOriginToCursor();
 }
 
 //window.globals.keyhandler = keyDown;  // requests paperglue to pass event here
 window.globals.listActions = openActionsWindow;
 window.globals.dialogReturn = dialogReturn;
-console.log("Globals:");
-console.log(Object.keys(window.globals) ); //.onload();  //no use since it may not be added to globals yet
+//console.log("Globals:");
+//console.log(Object.keys(window.globals) ); //.onload();  //no use since it may not be added to globals yet

@@ -42,7 +42,8 @@ var holdContext = false;  // don't reset contextMenu till after mouseUp
 var doRecord = [];  // record of all clonings and moves  {action:string,src:src,raster:image or line:path,pos:point}
 var doRecordIndex = 0;  // points to next do location
 var recordPath = "testSave.json";
-var cursorPos = [0,0];
+var cursorPos = [];  // mouse, raster, origin, center
+var cursorColors = ['#f00','#ff0','#88f','#8f8'];
 //var ua = navigator.appName.toLowerCase();
 //console.log("Browser details:"+ua);  - not a lot of use
 
@@ -106,14 +107,16 @@ function findImageInstance(search_by,search_key) {
   return null;
 }
 
-function drawCross(pos, size) {
+function drawCross(pos, size, color) {
   var s = size / 2;
   var p = new Path();
-  p.strokeColor = 'red';
+  p.strokeColor = color;
+  p.strokeWidth = 4;
   p.add(new Point(pos.x-s, pos.y));
   p.add(new Point(pos.x+s, pos.y));
   p = new Path();
-  p.strokeColor = 'red';
+  p.strokeColor = color;
+  p.strokeWidth = 4;
   p.add(new Point(pos.x, pos.y-s));
   p.add(new Point(pos.x, pos.y+s));
 }
@@ -136,18 +139,43 @@ function init() {
   //console.log("ActiveLayer&:"+project.activeLayer);
 }
 
+function hideCursor() {
+  cursorLayer.removeChildren();
+}
+
+function showCursor(ci) {
+  //console.log("Event:"+event);
+  //console.log("Image mouse down at:"+mouseDownPosition);
+  console.log("Show cursor#" + ci + " @pos:" + cursorPos[ci]);
+  drawCross(cursorPos[ci]+[2,2],20,'#000');
+  drawCross(cursorPos[ci],20,cursorColors[ci]);
+}
+
+function showImageCursors(obj) {
+  hideCursor();
+  project._activeLayer = cursorLayer;
+  var imgobj =obj.src;
+  var raster = obj.raster;
+  cursorPos[0] = mouseDownPosition;
+  showCursor(0);
+  cursorPos[1] = raster.position;
+  showCursor(1);
+  if(imgobj.hasOwnProperty('center')) {
+    cursorPos[2] = raster.position - imgobj.center.rotate(raster.rotation);
+    showCursor(2);
+  }
+  if(imgobj.hasOwnProperty('origin')) {
+    cursorPos[3] = raster.position - imgobj.origin.rotate(raster.rotation);
+    showCursor(3);
+  }
+  project._activeLayer = baseLayer;
+}
+
 // onmousedown callback for images that are cloneable, dragable or have context menu
 function imageMouseDown(event) {
   mouseDownPosition = event.point;
   if(rightButtonCheck(event)) {  // this will set rightButton global
     //console.log("Right button down");
-    cursorLayer.removeChildren();
-    project._activeLayer = cursorLayer;
-    //console.log("Event:"+event);
-    //console.log("Image mouse down at:"+mouseDownPosition);
-    cursorPos = mouseDownPosition;
-    drawCross(mouseDownPosition,20);
-    project._activeLayer = baseLayer;
   }
   //console.log("ActiveLayer:"+project.activeLayer);
   console.log("image mouse down");
@@ -160,7 +188,9 @@ function imageMouseDown(event) {
     id = imkeys[i];
     console.log("id:"+id);
     imgobj = imagesLoaded[id];
+
     if(this == imgobj.raster) {  //master image found
+      showImageCursors(imgobj);
       if(rightButton) {
         if(imgobj.hasOwnProperty('contextMenu'))  // if not defined then stay with default
           console.log("Attaching image context menu");
@@ -187,6 +217,7 @@ function imageMouseDown(event) {
     if(this == imginst.raster) {  // clone image found
       if(rightButton) {
         imgobj = imginst.src;
+        showImageCursors(imgobj);
         if(imgobj.hasOwnProperty('instanceContextMenu')) {   // if not defined then stay with default
            currentContextMenu = imginst.src.instanceContextMenu;
            // needed to add id to currentContectObject
@@ -324,7 +355,7 @@ function hideContextMenu(control) {
   var tbl = el.children[0];  //assumes menu has table as first
   tbl.innerHTML = "";
   currentContextMenu = defaultContextMenu;
-  cursorLayer.removeChildren();
+  //cursorPos[0] = currentContextObject.raster.position;
 }
 
 window.oncontextmenu = onContextMenu;
@@ -437,6 +468,8 @@ function snapPoint(p) {
 
 // snaps both ends of the line path to grid quantum
 function snapLine(p) {
+  if(typeof p.firstSegment === 'undefined')
+    return;
   console.log("Before:" + p.firstSegment.point);
   console.log("Snap Rect:" + snapRect);
   p.firstSegment.point = snapPoint(p.firstSegment.point);
@@ -465,19 +498,23 @@ function onMouseUp(event) {
     console.log("instance found with id:"+img_id);  // need to keep id as well - might be null for master objects in layout mode
     var imgobj = imageInstances[img_id].src;
     var offset;
-    if(imgobj.hasOwnProperty('origin'))
-      imageSelected.position = snapPoint(imageSelected.position-imgobj.origin) + imgobj.origin;
-    else
+    if(imgobj.hasOwnProperty('origin')) {
+      var oo = imgobj.origin.rotate(imageSelected.rotation);
+      imageSelected.position = snapPoint(imageSelected.position-oo) + oo;
+    } else
       imageSelected.position = snapPoint(imageSelected.position);
     if(imageSelected.position == imageSelectedPosition) { // no movement or no prior position it being null
+      var dorec = {action:'imageRotate',id:img_id,type:'image'};
       // use mouseDownPosition or event.position to find the closest point of rotation in object
       var rotation = Math.round(imageSelected.rotation);
-      if(imgobj.hasOwnProperty('center'))
-        imageSelected.rotate(90,imageSelected.position-imgobj.center);  //(new Point(30,30)));  // need to look up source to find centre of rotation - could also have 45 deg mode
-      else
+      if(imgobj.hasOwnProperty('center')) {
+        imageSelected.rotate(90,imageSelected.position-imgobj.center.rotate(imageSelected.rotation));  //(new Point(30,30)));  // need to look up source to find centre of rotation - could also have 45 deg mode
+        dorec.pos = [imageSelectedPosition,imageSelected.position];
+      } else
         imageSelected.rotate(90);  // need to look up source to find centre of rotation - could also have 45 deg mode
       imageSelected.rotation = Math.round(imageSelected.rotation);  // prevent error creaping in
-      doRecordAdd({action:'imageRotate',id:img_id,type:'image',rot:[rotation,imageSelected.rotation]});
+      dorec.rot = [rotation,imageSelected.rotation];
+      doRecordAdd(dorec);
     } else {
       // keeping the obj as record is fine for undo but not so good for redo if the object gets deleted further back
       doRecordAdd({action:'imageMove',id:img_id,type:'image',pos:[imageSelectedPosition,imageSelected.position]});
@@ -488,9 +525,9 @@ function onMouseUp(event) {
 
 function moveCurrentImage(x,y,r) {
   var im = currentContextObject.raster;
-  //console.log("pos:"+im.position);
+  console.log("Move from pos:"+im.position+" to "+x+","+y+","+r);
   var p = new Point(x,y);
-  if(x !== im.position.x && y !== im.position.y) {
+  if(x !== im.position.x || y !== im.position.y) {
     //console.log(p);
     doRecordAdd({action:'imageMove',id:currentContextObject.id,type:'image',pos:[im.position,p]});
     //console.log(doRecord[doRecordIndex-1].pos);
@@ -498,7 +535,7 @@ function moveCurrentImage(x,y,r) {
   }
   if(r !== im.rotation) {
     var rot = Math.round(r);
-    doRecordAdd({action:'imageRotate',id:currentContextObject.id,type:'image',rot:[im.rotation,rot]});
+    doRecordAdd({action:'imageRotate',id:currentContextObject.id,type:'image',rot:[im.rotation,rot],});
     im.rotation = rot;
   }
 }
@@ -835,16 +872,20 @@ function undo() {
             break;
           }
         }
-        if(last_do.pos != 'undefined'){  // check it has a pos
+        if(typeof last_do.pos != 'undefined'){  // check it has a pos
           raster.position = last_do.pos[0];
           console.log("Return img position to " + last_do.pos);
         }
         break;
       case 'imageRotate':
         raster = imageInstances[last_do.id].raster;
+        if(typeof last_do.pos != 'undefined'){  // check it has a pos
+          raster.position = last_do.pos[0];  // required for non centered rotation
+        }
         if(typeof last_do.rot != 'undefined'){  // check it has a rot
           if(!last_do.rot[0]) {
             raster.rotation = 0;
+            console.log("Raster rot:"+ raster.rotation);
           } else {
             raster.rotation = last_do.rot[0];
             console.log("Return img rotation to " + last_do.rot[0]);
@@ -862,6 +903,7 @@ function redo() {
   console.log(Object.keys(to_do));
   console.log("Redoing " + to_do.action);
   var raster;
+  var imgobj;
   switch(to_do.action) {
     case 'lineMove':
       console.log(Object.keys(lineInstances).length);
@@ -882,11 +924,15 @@ function redo() {
       }
       break;
     case 'imageMove':
-      raster = imageInstances[to_do.id].raster;
+      imgobj = imageInstances[to_do.id];
+      raster = imgobj.raster;
       raster.position = to_do.pos[1];
       break;
    case 'imageRotate':
-      raster = imageInstances[to_do.id].raster;
+      imgobj = imageInstances[to_do.id];
+      raster = imgobj.raster;
+      if(to_do.hasOwnProperty('pos'))
+        raster.position = to_do.pos[1];  // required if rotation not about center
       raster.rotation = to_do.rot[1];
       break;
     case 'symbolPlace':
@@ -1002,7 +1048,9 @@ function setCenterToCursor() {
     var src = currentContextObject.src;
     if(currentContextObject.hasOwnProperty('raster')) {
       var raster = currentContextObject.raster;
-      src.center = raster.position - cursorPos;
+      var dp = raster.position - cursorPos[0];
+      src.center = dp.rotate(-raster.rotation);
+      cursorPos[2] = cursorPos[0];
       console.log("Center:" + src.center);
     }
   }
@@ -1013,7 +1061,9 @@ function setOriginToCursor() {
     var src = currentContextObject.src;
     if(currentContextObject.hasOwnProperty('raster')) {
       var raster = currentContextObject.raster;
-      src.origin = cursorPos - raster.position;
+      var dp = raster.position - cursorPos[0];
+      src.origin = dp.rotate(-raster.rotation);
+      cursorPos[3] = cursorPos[0];
       console.log("Origin:" + src.origin);
     }
   }
@@ -1039,7 +1089,10 @@ var exports = {
   getCurrentContextObject:getCurrentContextObject,
   moveCurrentImage:moveCurrentImage,
   setCenterToCursor:setCenterToCursor,
-  setOriginToCursor:setOriginToCursor
+  setOriginToCursor:setOriginToCursor,
+  showCursor:showCursor,
+  hideCursor:hideCursor,
+  showImageCursors:showImageCursors
 };
 globals.paperGlue = exports;
 
