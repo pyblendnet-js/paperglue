@@ -117,17 +117,27 @@ function drawCross(pos, size) {
   p.add(new Point(pos.x, pos.y+s));
 }
 
+function init() {
 // there may or maynot be an activeLayer when this code is run
-// so force a base layer to exist
-var baseLayer = new Layer();  //for some reason no layer exists yet
-console.log("ActiveLayer&:"+project.activeLayer);
-console.log("Layers&:"+project.layers);
-var cursorLayer = new Layer();
-console.log("ActiveLayer&:"+project.activeLayer);
-project.activeLayer = baseLayer;
-console.log("Layers&:"+project.layers);
-console.log("ActiveLayer&:"+project.activeLayer);
-
+  baseLayer = project.activeLayer;  //for some reason no layer exists yet
+  console.log("ActiveLayer&:"+project.activeLayer);
+  console.log("Layers&:"+project.layers);
+  cursorLayer = new Layer();
+  console.log("ActiveLayer&:"+project.activeLayer);
+  console.log("ActiveLayer&:"+project._activeLayer);
+  console.log("project:"+Object.keys(project));
+  // if(typeof Project.setActiveLayer === 'undefined') {
+  //   var setActiveLayer = function(l) {
+  //     this._activeLayer = l;
+  //   }
+  //   console.log("Adding setActiveLayer to paper.js");
+  //   Project.setActiveLayer = setActiveLayer;
+  //  }
+  project._activeLayer = baseLayer;
+  console.log("Layers&:"+project.layers);
+  console.log("ActiveLayer&:"+project.activeLayer);
+  console.log("baseLayer&:"+baseLayer);
+}
 
 // onmousedown callback for images that are cloneable, dragable or have context menu
 function imageMouseDown(event) {
@@ -135,12 +145,12 @@ function imageMouseDown(event) {
   if(rightButtonCheck(event)) {  // this will set rightButton global
     console.log("Right button down");
     console.log("Layers:"+project.layers);
-    project.activeLayer = cursorLayer;
+    project._activeLayer = cursorLayer;
     console.log("ActiveLayer:"+project.activeLayer);
     console.log("Event:"+event);
     console.log("Image mouse down at:"+mouseDownPosition);
     drawCross(mouseDownPosition,20);
-    project.activeLayer = baseLayer;
+    project._activeLayer = baseLayer;
   }
   console.log("ActiveLayer:"+project.activeLayer);
   console.log("image mouse down");
@@ -990,6 +1000,7 @@ console.log("PaperGlue functions to window globals");
 // window global are use for cross scope communications
 var globals = window.globals;
 var exports = {
+  init:init,
   loadImages:loadImages,
   getImages:getImageInstances,
   getLines:getLineInstances,

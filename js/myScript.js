@@ -25,8 +25,10 @@ if(typeof window.globals.paperGlue === 'undefined')  { // means myScript got her
 // see http://eloquentjavascript.net/10_modules.html on the subject of slow module loads
 
 function initApp() {
-  window.globals.paperGlue.loadImages([first_image]);
-  window.globals.paperGlue.setSnap([5,5,10,10]);
+  var pg = window.globals.paperGlue;
+  pg.init();  // sets up extra layers
+  pg.loadImages([first_image]);
+  pg.setSnap([5,5,10,10]);
 }
 
 function drawGrid(spacing) {
