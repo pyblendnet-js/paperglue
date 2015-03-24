@@ -65,6 +65,7 @@ var doRecordIndex = 0;  // points to next do location
 var recordPath = "recordSave.json";
 var imgListPath = "imgList.json";
 var cursorPos = [];  // mouse, raster, origin, center
+var cursorImage = null;  // to allow cursor hide in selectItem
 var cursorColors = ['#f00','#ff0','#88f','#8f8'];
 //var ua = navigator.appName.toLowerCase();
 //console.log("Browser details:"+ua);  - not a lot of use
@@ -212,6 +213,7 @@ function hideCursor() {
   cursorLayer.removeChildren();
   cursorLayer.position = [0,0];
   //console.log("cursorLayer:"+cursorLayer.position);
+  cursorImage = null;
 }
 
 function showCursor(ci) {
@@ -232,6 +234,7 @@ function showImageCursors(obj,show_mouse_cursor) {
   else
     imgobj = obj.src;     // this is a clone from master symbol
   var raster = obj.raster;
+  cursorImage = obj;
   cursorPos[0] = mouseDownPosition;
   if(show_mouse_cursor)
     showCursor(0);
@@ -435,6 +438,9 @@ function nameImage(name,id) {
   }
 }
 
+/* Callback for generated context menu
+  as set in loadCurrentContextMenu
+*/
 window.contextMenuCallback = function(menu_index){
   console.log('context menu call for item:' + menu_index);
   if(currentContextMenu !== null) {
@@ -458,15 +464,29 @@ function openCall(){
   console.log('open called');
 }
 
+function stopEvent(event){
+ if(typeof event.preventDefault !== 'undefined')
+  event.preventDefault();
+ if(typeof event.stopPropagation !== 'undefined')
+  event.stopPropagation();
+}
+
+/* Will be linked to  window.onContextMenu
+*/
 function onContextMenu(event) {
   console.log("Call for context menu");
-  if(modalOpen || !currentContextMenu)
+  stopEvent(event);
+  if(modalOpen || !currentContextMenu) {
+    console.log("Modal or no currentContextMenu");
     return false;
+  }
   showContextMenu('contextMenu',event);  // standard context menu
+  console.log("Console menu display complete");
   return false;
 }
 
 // mostly from http://www.codeproject.com/Tips/630793/Context-Menu-on-Right-Click-in-Webpage
+// called by onContextMenu above
 function showContextMenu(control, e) {
   var posx = e.clientX +window.pageXOffset +'px'; //Left Position of Mouse Pointer
   var posy = e.clientY + window.pageYOffset + 'px'; //Top Position of Mouse Pointer
@@ -480,6 +500,10 @@ function showContextMenu(control, e) {
   loadCurrentContextMenu(tbl);
 }
 
+/* Call to generate and show the contextmenu for the current object if any
+    called by showContextMenu and also for control key + arrows for stepped moves,
+    to show the changed positions.
+*/
 function loadCurrentContextMenu(tbl) {
   tbl.innerHTML = "";
   //console.log("window width:"+window.innerWidth);
@@ -802,12 +826,22 @@ function selectItem(id,item) {
   if(!controlPressed) {   //if control pressed then do not clear previous
     for(var sid in selectedItems) {
       selectedItems[sid].selected = false;
+      if(!!cursorImage && (selectedItems[sid] === cursorImage.raster))
+        hideCursor();
     }
     selectedItems = [];  // leaves the problem for the garbage collector
   } else
     currentContextMenu = null;  // no context menu for multi selection
-  selectedItems[id] = item;
-  item.selected = true;
+  if(selectedItems.hasOwnProperty(id)) {  //already selected so toggle
+    selectedItems[id].selected = false;
+    if(!!cursorImage && (selectedItems[id] === cursorImage.raster))
+      hideCursor();
+    delete selectedItems[id];
+    item.selected = false;
+  } else {
+    selectedItems[id] = item;
+    item.selected = true;
+  }
 }
 
 // onmousedown callback for two point paths
@@ -1146,9 +1180,10 @@ function validatePath(path, force_id) {
         nextID++;
       line_id = next_id;
     }
-    if(typeof force_id == 'undefined') {  // don't record redos
+    if(typeof force_id == 'undefined') {  // else don't record redos
       var np = [lineSelected.firstSegment.point.clone(),lineSelected.lastSegment.point.clone()];
       doRecordAdd({action:'lineMove',id:line_id,type:'line',pos:[lineSelectedPosition,np] });
+      selectItem(line_id,path);
     }
   } else {  // length of line is too short
     console.log("Zero length line");
@@ -1925,8 +1960,8 @@ function areaSelect() {
     var bounds = imgobj.raster.bounds;
     console.log("Bounds"+bounds);
     if(rect.contains(bounds.topLeft) && rect.contains(bounds.bottomRight)) {
-      selectedItems[id] = imgobj.raster;
-      selectedPos[id] = imgobj.raster.position;
+      selectedItems[iid] = imgobj.raster;
+      selectedPos[iid] = imgobj.raster.position;
       imgobj.raster.selected = true;
     }
   }
