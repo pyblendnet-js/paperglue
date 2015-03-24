@@ -39,21 +39,8 @@ var currentContextObject = null;
 var holdContext = false;  // don't reset contextMenu till after mouseUp
 var doRecord = [];  // record of all clonings and moves  {action:string,src:src,raster:image or line:path,pos:point}
 var doRecordIndex = 0;  // points to next do location
+var recordPath = "testSave.json";
 
-
-console.log("PaperGlue functions to window globals");
-// window global are use for cross scope communications
-var globals = window.globals;
-globals.loadImages = loadImages;
-globals.getImages = getImageInstances;
-globals.getLines = getLineInstances;
-globals.setSnapQuantum = setSnapQuantum;
-globals.keyHandler = null;
-if(globals.hasOwnProperty("onPaperLoad"))  { // myScript couldn't find loadImages so provided a call to repeat the request
-  console.log("PaperGlue loaded now so can use onPaperLoad to load images.")
-  globals.onPaperLoad();
-}
-// that was a bit messy and my be avoided if I used requirejs or browserify - though I suspect that paper.js will not like it.
 
 // global hooks for created objects
 function getImageInstances() {
@@ -78,7 +65,7 @@ function setSnapQuantum(q) {
 // helper to add hidden image to document before reference as paper image
 function addImage(source, id) {
   var img = document.createElement("img");
-  img.src = source;
+  img.src = source;  // this will cause a GET call from the browser
   img.id = id;
   img.hidden = true;
   var src = document.getElementById("body");
@@ -181,22 +168,21 @@ function symbolPlace(imgid, force_id) {
   imageSelected.scale(0.5);
   imageSelected.onMouseDown = imageMouseDown;
   var img_id;
-  if(typeof force_id === 'undefined')
-    img_id = nextID;
-  else
-    img_id = force_id;  // used by redo to accept old id
-  imageInstances[img_id] = {src:imgobj, raster:imageSelected};
-  doRecordAdd({action:'symbolPlace',id:img_id,type:'image',src:imgobj.id});
+  if(typeof force_id === 'undefined') {
+    imageInstances[nextID] = {src:imgobj, raster:imageSelected};
+    doRecordAdd({action:'symbolPlace',id:nextID,type:'image',src:imgobj.id});
+    nextID += 1;
+  } else {  // used by redo to accept old id - so need to record do action
+    imageInstances[force_id] = {src:imgobj, raster:imageSelected};
+  }
   imgobj.instances += 1;
-  nextID += 1;
 }
 
 // find img_id for imgobj in imageInstances
-function symbolRemove(imgobj, img_id) {
-  console.log("Attempting to remove instance of " + imgobj.id + " with " + img_id);
-  var inst = imageInstances[img_id];
+function symbolRemove(id) {
+  var inst = imageInstances[id];
   inst.raster.remove();
-  delete imageInstances[img_id];
+  delete imageInstances[id];
 }
 
 /**
@@ -513,7 +499,7 @@ function onKeyDown(event) {
       event.stopPropagation();
       propagate = false;
     }
-  } else if(event.key) {
+  } else if(event.key == 'x') {
     if(event.modifiers.control) {
       console.log("cntrlX");
       if(event.modifiers.shift) {  // prune unnecessary edits
@@ -526,12 +512,108 @@ function onKeyDown(event) {
       event.stopPropagation();
       propagate = false;
     }
+  } else if(event.key == 's') {
+    if(event.modifiers.control) {
+      console.log("cntrlS");
+      if(event.modifiers.shift) {  // save as
+
+      } else {
+        save();
+      }
+      event.preventDefault();
+      event.stopPropagation();
+      propagate = false;
+    }
+  } else if(event.key == 'o') {
+    if(event.modifiers.control) {
+      console.log("cntrlO");
+      if(event.modifiers.shift) {  // load from
+
+      } else {
+        load();
+      }
+      event.stopPropagation();
+      propagate = false;
+    }
   }
   if(propagate && (typeof globals.keyhandler == 'function')) {
     console.log("Passing key upwards");
     propagate = globals.keyhandler(event);
   }
   return propagate;
+}
+
+function save() {
+  var dolist = pruneDo();
+  console.log("Try to save");
+  console.log("Globals:" + Object.keys(window.globals));
+  console.log("SendData:",typeof window.globals.sendData);
+  if(window.location.protocol == 'file:') {
+    // might try to impletement local storage some day
+  } else if(typeof window.globals.sendData === 'function') {
+    //window.globals.onReply = onReply(response);
+    var save_data = {command:'save',path:recordPath,data:JSON.stringify(dolist)};
+    window.globals.sendData(JSON.stringify(save_data));
+  }
+}
+
+function load() {
+  console.log("Load:",typeof window.globals.load);
+  if(window.location.protocol == 'file:') {
+    // might try to impletement local storage some day
+  } else if(typeof window.globals.sendData === 'function') {
+    window.globals.onReply = onLoadReply;
+    var load_data = {command:'load',path:recordPath};
+    window.globals.sendData(JSON.stringify(load_data));
+  }
+}
+
+function onLoadReply(res) {
+  console.log("Onreply:"+res);
+  if(false) { //res.indexof('500') === 0) {  //starts with error code
+  //   console.log("Report error:"+res);
+  } else {
+     console.log("attempting to parse json object");
+    try {
+      var reply_obj = JSON.parse(res);
+      console.log(reply_obj);
+      if(reply_obj.type == 'file') {
+        try {
+          var newRecord = JSON.parse(reply_obj.data);
+          console.log("New record has" + newRecord.length + " actions");
+           removeAll();
+          doRecord = newRecord;
+          doRecordIndex = 0;
+          doAll();
+        } catch(e2) {
+          console.log("Error parsing file data"+e2);
+        }
+      }
+    } catch(e1) {
+      console.logI("Error parsing reply"+e1);
+    }
+  }
+}
+
+function removeLines() {
+  var lineIDs = Object.keys(lineInstances);
+  console.log("Removing images:"+lineIDs.length);
+  for(var i in lineIDs) {
+    removeLine(lineIDs[i]);
+  }
+}
+
+function removeSymbols() {
+  var symbolIDs = Object.keys(imageInstances);
+  console.log("Removing lines:"+symbolIDs.length);
+  for(var i in symbolIDs) {
+    symbolRemove(symbolIDs[i]);
+  }
+}
+
+function removeAll(){
+  removeLines();
+  removeSymbols();
 }
 
 function undo() {
@@ -565,7 +647,8 @@ function undo() {
           var prev_do = doRecord[doRecordIndex-1];
           if(prev_do.action == 'symbolPlace') {  // this was the first drag
             console.log("Remove symbol from instances");
-            symbolRemove(prev_do.src, prev_do.id);
+            console.log("Attempting to remove instance of " + prev_do.src + " with " + prev_do.id);
+            symbolRemove(prev_do.id);
             doRecordIndex--;  // skip back over symbol places too
             break;
           }
@@ -636,6 +719,12 @@ function redo() {
   return true;  // something done
 }
 
+function doAll() {
+  while(doRecordIndex < doRecord.length) {
+    redo();
+  }
+}
+
 function pruneDo() {
   // returned current do record pruned down to minimum actions necessary to repeat result
   // also used for system save.
@@ -694,10 +783,26 @@ function pruneDo() {
         }
 
     }
-    console.log("AFTER");
-    for(i in prunedDo) {
-      console.log("#"+i+"="+prunedDo[i].action+" to "+prunedDo[i].id);
-    }
+  }
+  console.log("AFTER");
+  for(i in prunedDo) {
+    console.log("#"+i+"="+prunedDo[i].action+" to "+prunedDo[i].id);
   }
   return prunedDo;
 }
+
+// think this needs to be at the bottom so under scripts find things fully loaded
+console.log("PaperGlue functions to window globals");
+// window global are use for cross scope communications
+var globals = window.globals;
+globals.loadImages = loadImages;
+globals.getImages = getImageInstances;
+globals.getLines = getLineInstances;
+globals.setSnapQuantum = setSnapQuantum;
+globals.keyHandler = null;
+if(typeof globals.onPaperLoad == 'function')  { // myScript couldn't find loadImages so provided a call to repeat the request
+  console.log("PaperGlue loaded now so can use onPaperLoad to load images.");
+  console.log(typeof globals.loadImages);
+  globals.onPaperLoad();
+}
+// that was a bit messy and my be avoided if I used requirejs or browserify - though I suspect that paper.js will not like it.

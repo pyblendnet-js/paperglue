@@ -5,6 +5,8 @@
   <meta content="utf-8" http-equiv="encoding">
   <!-- Load the Paper.js library -->
   <script type="text/javascript" src="js/paper.js"></script>
+  <script>  window.globals = { }; // for interscope comms </script> 
+  <script type="text/javascript" src="js/nodeComms.js"></script>
   <!-- Load external PaperScript and associate it with myCanvas -->
   <script type="text/paperscript" src="js/paperglue.js" canvas="myCanvas">
   </script>
@@ -12,7 +14,6 @@
   <!-- should have the same scope as per https://github.com/paperjs/paper.js/issues/153 -->
   </script>
   <script>  // type="text/paperscript" canvas="myCanvas">
-    window.globals = { onload:null }; // for interscope comms
 
     function showPaper() {
       console.log("paper="+paper);

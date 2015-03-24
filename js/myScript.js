@@ -20,8 +20,8 @@ var first_image = {src:"img/con_Block_5.08mm_12.png", id:"conBlock1", isSymbol:t
 
 //view.on('frame', frameHandler);
 
-console.log(window.innerWidth);
-console.log(window.outerWidth);
+//console.log("innerWidth:"+window.innerWidth);
+//console.log("outerWidth:"+window.outerWidth);
 //console.log(window.showPaper);
 //console.log(myCanvas);
 drawStripBoard(10,100,34);
@@ -29,15 +29,14 @@ console.log(Object.keys(window));
 console.log(Object.keys(window.globals));
 console.log(typeof window.globals.loadImages);
 if(typeof window.globals.loadImages === 'undefined')  { // means myScript got here first and paperGlue was not ready
-  console.log("paperGlue not ready yet to load images.")
-  window.globals.onPaperLoad = initImages();  // paperGlue will call this when it is ready
+  console.log("paperGlue not ready yet to load images.");
+  window.globals.onPaperLoad = initImages;  // paperGlue will call this when it is ready
 } else {
-  console.log("PaperGlue already loaded so can load images.")
+  console.log("PaperGlue already loaded so can load images.");
   initImages();  // paperglue is already ready so can loadImages now
 }
 // that was a bit messy and my be avoided if I used requirejs or browserify - though I suspect that paper.js will not like it.
 // see http://eloquentjavascript.net/10_modules.html on the subject of slow module loads
-
 
 function initImages() {
   window.globals.loadImages([first_image]);
@@ -84,7 +83,7 @@ function drawStripBoard(spacing,length,width) {
     }
   }
   var lr = project.layers[0];
-  console.log(lr._children.length);
+  //console.log("Layer counter:"+lr._children.length);
   var top_layer = lr.rasterize();
   lr.removeChildren();
   lr.addChild(top_layer);
