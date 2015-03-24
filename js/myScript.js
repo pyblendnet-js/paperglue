@@ -3,7 +3,7 @@
 var wireLinks = [];
 
 var objectMenu = [ {label:'name', propCall:imgGetNameCall},{label:'pos',propCall:imgGetPosCall} ];
-var objectInstanceMenu = [ {label:'name', propCall:imgGetInstanceNameCall},{label:'pos',propCall:imgGetPosCall} ];
+var objectInstanceMenu = [ {label:'name', propCall:imgGetInstanceNameCall},{label:'pos',propCall:imgGetPosCall},{label:'properties',callback:openPropDialog} ];
 var first_image = {src:"img/con_Block_5.08mm_12.png", id:"conBlock1", isSymbol:true, dragClone:true, contextMenu:objectMenu, instanceContextMenu:objectInstanceMenu, pos:view.center };
 
 console.log("Starting myScript");
@@ -74,6 +74,7 @@ function imgGetInstanceNameCall(obj){
 
 function imgGetPosCall(obj){
   console.log('pos called');
+  console.log(Object.keys(obj));
   return obj.raster.position;
 }
 
@@ -148,7 +149,42 @@ function openActionsWindow() {
     myWindow.stop();
 }
 
+function openPropDialog() {
+  var obj = window.globals.paperGlue.getCurrentContextObject();
+  console.log("Opening property dialog:",obj.id);
+  console.log("Prop:"+Object.keys(obj));
+  var Dlg = document.getElementById('Overlay');
+  Dlg.style.visibility = 'visible';
+  var p = '<table><tr><td>ID</td><td>'+obj.id+'</td></tr>';
+  if(obj.hasOwnProperty('raster')) {
+    p += '<tr><td>X</td><td>';
+    p += '<input id="xpos" type="number" value="'+obj.raster.position.x+'"/></td></tr>';
+    p += '<tr><td>Y</td><td>';
+    p += '<input id="ypos" type="number" value="'+obj.raster.position.y+'"/></td></tr>';
+  }
+  // var ks = Object.keys(obj);
+  // for(var ki in ks ) {
+  //   var k = ks[ki];
+  //   p += '<tr><td>'+k+'</td><td>'+obj[k]+'</td></tr>';
+  // }
+  p += '</table>';
+  var content = document.getElementById('DlgContent');
+  content.innerHTML = p;
+}
+
+function dialogReturn(reply) {
+  var xfield = document.getElementById('xpos');
+  var yfield = document.getElementById('ypos');
+  var x = parseFloat(xfield.value);
+  var y = parseFloat(yfield.value);
+  console.log("X:"+x);
+  if(reply === 'ok')
+    window.globals.paperGlue.moveCurrentImage(x,y);
+}
+
+
 //window.globals.keyhandler = keyDown;  // requests paperglue to pass event here
 window.globals.listActions = openActionsWindow;
+window.globals.dialogReturn = dialogReturn;
 console.log("Globals:");
 console.log(Object.keys(window.globals) ); //.onload();  //no use since it may not be added to globals yet

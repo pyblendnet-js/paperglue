@@ -48,9 +48,10 @@
     Dlg.style.visibility = 'visible';
   }
 
-  function DlgHide(Message) {
+  function DlgHide(reply) {
     var Dlg = document.getElementById('Overlay');
     Dlg.style.visibility = 'hidden';
+    window.globals.dialogReturn(reply);
   }
 
   </script>
@@ -65,11 +66,13 @@
         position: absolute;
         left: 90px;
         top: 120px;
-        width:200px;
-        height:90px;
+        padding: 2px;
         text-align:center;
         border: solid;
         background-color: lightgray;
+      }
+      #Overlay td {
+        padding:2px;
       }
     </style>
 
@@ -140,15 +143,13 @@
 </div>
 <div id="Overlay" >
   <div>
-    <p id="DlgContent">Content Goes Here</p>
-    <input id="btnYes"
-         type="button"
-        value="Yes"
-      onclick="DlgHide('Yes')" />
-    <input id="btnNo"
-         type="button"
-        value="No"
-      onclick="DlgHide('No')" />
+    <div id="DlgContent">Content Goes Here</div>
+    <input type="button"
+        value="Ok"
+      onclick="DlgHide('ok')" />
+    <input type="button"
+        value="Cancel"
+      onclick="DlgHide('cancel')" />
   </div>
 </div>
 </body>

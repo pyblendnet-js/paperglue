@@ -126,7 +126,7 @@ function imageMouseDown(event) {
         if(imgobj.hasOwnProperty('contextMenu'))  // if not defined then stay with default
           console.log("Attaching image context menu");
           currentContextMenu = imgobj.contextMenu;
-          currentContextObject = {src:imgobj,raster:imgobj.raster};  //to match image instance object
+          currentContextObject = {id:id,src:imgobj,raster:imgobj.raster};  //to match image instance object
           holdContext = true;  // cross browser solution to default mouse up reset
           return false;   // just show context menu now - see context menu callback below
       }
@@ -150,7 +150,8 @@ function imageMouseDown(event) {
         imgobj = imginst.src;
         if(imgobj.hasOwnProperty('instanceContextMenu')) {   // if not defined then stay with default
            currentContextMenu = imginst.src.instanceContextMenu;
-           currentContextObject = imginst;
+           // needed to add id to currentContectObject
+           currentContextObject = {id:id,src:imginst.src,raster:imginst.raster};
            holdContext = true;  // cross browser solution to default mouse up reset
            return false; // clone image not selected for right click
         }
@@ -435,6 +436,16 @@ function onMouseUp(event) {
     }
     imageSelected = null;
   }
+}
+
+function moveCurrentImage(x,y) {
+  var im = currentContextObject.raster;
+  //console.log("pos:"+im.position);
+  var p = new Point(x,y);
+  //console.log(p);
+  doRecordAdd({action:'imageMove',id:currentContextObject.id,type:'image',pos:[im.position,p]});
+  //console.log(doRecord[doRecordIndex-1].pos);
+  im.position = p;
 }
 
 function getLineID(path) {
@@ -927,6 +938,10 @@ function getDoRecord() {
   return doRecord;
 }
 
+function getCurrentContextObject() {
+  return currentContextObject;
+}
+
 // think this needs to be at the bottom so under scripts find things fully loaded
 console.log("PaperGlue functions to window globals");
 // window global are use for cross scope communications
@@ -940,7 +955,9 @@ var exports = {
   setLineThickness:setLineThickness,
   setLineColor:setLineColor,
   keyHandler:null,
-  remove_all:removeAll
+  remove_all:removeAll,
+  getCurrentContextObject:getCurrentContextObject,
+  moveCurrentImage:moveCurrentImage
 };
 globals.paperGlue = exports;
 
