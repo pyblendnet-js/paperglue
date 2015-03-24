@@ -219,11 +219,18 @@ function openActionsWindow() {
     myWindow.stop();
 }
 
-dragFlag = false;
+var tempMouseUp;
+var dialogDiv;
+var idRow;
 
 function mouseDown(e) {
   e.stopPropagation();
-  dragFlag = true;
+  //dragFlag = true;
+  idRow = this;
+  this.onmousemove = mouseMove;
+  var bdy = document.getElementById('body');
+  tempMouseup = bdy.onmouseup;
+  bdy.onmouseup = mouseUp;
   var rect = this.getBoundingClientRect();
   mouseX = e.clientX - rect.left;
   mouseY = e.clientY - rect.top;
@@ -231,15 +238,14 @@ function mouseDown(e) {
 
 function mouseUp(e) {
   e.stopPropagation();
-  dragFlag = false;
+  idRow.onmousemove = null;
+  this.onmouseup = tempMouseup;
 }
 
 function mouseMove(e) {
-  //console.log(e);
-  if(dragFlag) {
-    this.style.left = (e.clientX-mouseX) + 'px';
-    this.style.top = (e.clientY-mouseY) + 'px';
-  }
+  dialogDiv.style.left = (e.clientX-mouseX) + 'px';
+  dialogDiv.style.top = (e.clientY-mouseY) + 'px';
+  //console.log('Move');
 }
 
 function openDialogCommon(show_reply_buttons) {
@@ -249,41 +255,51 @@ function openDialogCommon(show_reply_buttons) {
   else
     rb.style.display = 'none';
   paperGlue.enableKeyFocus(false);
-  var Dlg = document.getElementById('Overlay');
-  Dlg.style.visibility = 'visible';
-  Dlg.onmousedown=mouseDown;
-  Dlg.onmousemove=mouseMove;
-  Dlg.onmouseup=mouseUp;
+  dialogDiv = document.getElementById('Overlay');
+  dialogDiv.style.visibility = 'visible';
   paperGlue.setModalOpen(true);  //make dialog modalish
-  //Dlg.style.fontSize = fontsize;
-  //Dlg.style = "font-size:"+fontsize+"px;visibility:visible;";
+  //dialogDiv.style.fontSize = fontsize;
+  //dialogDiv.style = "font-size:"+fontsize+"px;visibility:visible;";
+}
+
+function closeDialog() {
+  dialogDiv.style.visibility = 'hidden';
+  paperGlue.setModalOpen(false);
+  paperGlue.enableKeyFocus(true);
+}
+
+function openDialogPropCommon(id) {
+  openDialogCommon();
+  console.log("Opening property dialog:",id);
+  var fontsize = window.innerWidth/80;
+  var fs = 'style="font-size:'+fontsize+'px;"';
+  var p = '<table ' + fs + '><tr id="idRow"><td>ID</td><td>'+id+'</td></tr>';
+  return p;
+}
+
+function setDialogMove(id) {
+  var row = document.getElementById(id);
+  row.onmousedown=mouseDown;
 }
 
 function openImgPropDialog() {
-  openDialogCommon();
   var obj = paperGlue.getCurrentContextObject();
   paperGlue.showImageCursors(obj,false);
-  console.log("Opening property dialog:",obj.id);
-  console.log("Prop:"+Object.keys(obj));
-
-  var fontsize = window.innerWidth/80;
-  var fs = 'style="font-size:'+fontsize+'px;"';
-  var p = '<table ' + fs + '><tr><td>ID</td><td>'+obj.id+'</td></tr>';
-  // if(obj.hasOwnProperty('raster')) {
+  var p = openDialogPropCommon(obj.id);
   if(obj.type === 'symbol') {
     p += '<tr><td>Name</td><td>';
     var nm = obj.src.id + "#" + obj.id;
     if(obj.inst.hasOwnProperty('name')) {
       nm = obj.inst.name;
     }
-    p += '<input '+fs+' id="name" type="text" value="'+nm+'"/></td></tr>';
+    p += '<input id="name" type="text" value="'+nm+'"/></td></tr>';
   } // otherwise symbol
   p += '<tr><td>X</td><td>';
-  p += '<input '+fs+' id="xpos" type="number" value="'+obj.raster.position.x+'"/></td></tr>';
+  p += '<input id="xpos" type="number" value="'+obj.raster.position.x+'"/></td></tr>';
   p += '<tr><td>Y</td><td>';
-  p += '<input '+fs+' id="ypos" type="number" value="'+obj.raster.position.y+'"/></td></tr>';
+  p += '<input id="ypos" type="number" value="'+obj.raster.position.y+'"/></td></tr>';
   p += '<tr><td>Rot</td><td>';
-  p += '<input '+fs+' id="rot" type="number" value="'+obj.raster.rotation+'"/></td></tr>';
+  p += '<input id="rot" type="number" value="'+obj.raster.rotation+'"/></td></tr>';
   //}
   // var ks = Object.keys(obj);
   // for(var ki in ks ) {
@@ -293,6 +309,7 @@ function openImgPropDialog() {
   p += '</table>';
   var content = document.getElementById('DlgContent');
   content.innerHTML = p;
+  setDialogMove("idRow");
   return false;  //do not hide cursors yet
 }
 
@@ -304,7 +321,9 @@ function dialogReturn(reply) {
     return;
   }
   // otherwise hope this is an image or symbol
-  var nmfield = document.getElementById('name');
+  var nmfield = null;
+  if(obj.type === 'symbol') 
+    nmfield = document.getElementById('name');
   var xfield = document.getElementById('xpos');
   var yfield = document.getElementById('ypos');
   var rfield = document.getElementById('rot');
@@ -363,27 +382,22 @@ function getAreaRectCall(obj){
 }
 
 function openAreaPropDialog() {
-  openDialogCommon();
-  var fontsize = window.innerWidth/80;
   var obj = paperGlue.getCurrentContextObject();
-  console.log("Opening property dialog:",obj.id);
-  console.log("Prop:"+Object.keys(obj));
-  var fs = 'style="font-size:'+fontsize+'px;"';
-  var p = '<table ' + fs + '><tr><td>ID</td><td>'+obj.id+'</td></tr>';
+  var p = openDialogPropCommon(obj.id);
   var a = obj.inst;
-    p += '<tr><td>Name</td><td>';
-    var nm = "area#" + obj.id;
-    if(a.hasOwnProperty('name'))
-      nm = a.name;
-    p += '<input '+fs+' id="name" type="text" value="'+nm+'"/></td></tr>';
-    p += '<tr><td>X</td><td>';
-    p += '<input '+fs+' id="xpos" type="number" value="'+a.rect.x+'"/></td></tr>';
-    p += '<tr><td>Y</td><td>';
-    p += '<input '+fs+' id="ypos" type="number" value="'+a.rect.y+'"/></td></tr>';
-    p += '<tr><td>W</td><td>';
-    p += '<input '+fs+' id="width" type="number" value="'+a.rect.width+'"/></td></tr>';
-    p += '<tr><td>H</td><td>';
-    p += '<input '+fs+' id="height" type="number" value="'+a.rect.height+'"/></td></tr>';
+  p += '<tr><td>Name</td><td>';
+  var nm = "area#" + obj.id;
+  if(a.hasOwnProperty('name'))
+    nm = a.name;
+  p += '<input id="name" type="text" value="'+nm+'"/></td></tr>';
+  p += '<tr><td>X</td><td>';
+  p += '<input id="xpos" type="number" value="'+a.rect.x+'"/></td></tr>';
+  p += '<tr><td>Y</td><td>';
+  p += '<input id="ypos" type="number" value="'+a.rect.y+'"/></td></tr>';
+  p += '<tr><td>W</td><td>';
+  p += '<input id="width" type="number" value="'+a.rect.width+'"/></td></tr>';
+  p += '<tr><td>H</td><td>';
+  p += '<input id="height" type="number" value="'+a.rect.height+'"/></td></tr>';
   //}
   // var ks = Object.keys(obj);
   // for(var ki in ks ) {
@@ -393,6 +407,7 @@ function openAreaPropDialog() {
   p += '</table>';
   var content = document.getElementById('DlgContent');
   content.innerHTML = p;
+  setDialogMove('idRow');
   return false;  //do not hide cursors yet
 }
 
@@ -461,5 +476,6 @@ function setLineColor() {
 //window.globals.keyhandler = keyDown;  // requests paperglue to pass event here
 window.globals.listActions = openActionsWindow;
 window.globals.dialogReturn = dialogReturn;
+paperGlue.closeDialog = closeDialog;
 //console.log("Globals:");
 //console.log(Object.keys(window.globals) ); //.onload();  //no use since it may not be added to globals yet

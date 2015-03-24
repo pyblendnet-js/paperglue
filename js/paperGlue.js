@@ -47,6 +47,7 @@ var areaStrokeThickness = 2;
 var snapRect = [5,5,10,10];   // offset x,y and then quantum x, y
 var snapDefault = true;
 var lineThickness = 3;
+var defaultLineColor = 'black';
 var lineColor = 'black';
 var mouseDownPosition;
 var rightButton = false;
@@ -113,7 +114,10 @@ function getLineColor(id) {
 function setCurrentLineColor(c) {
   if(!!currentContextObject) {
     var id = currentContextObject.id;
-    doRecordAdd({action:'lineColor',id:id,type:'line',oldColor:lineColor,color:c});
+    var do_rec = {action:'lineColor',id:id,type:'line',color:c};
+    if(lineColor != defaultLineColor)  // applies to future lines
+      do_rec.oldValue = lineColor;
+    doRecordAdd(do_rec);
     setLineColor(id,c);
   }
 }
@@ -155,7 +159,7 @@ function findKey(dict,search_by,search_key) {
 function findInstance(obj,search_by,search_key,first_only) {
   // search through obj.search_by == search_key
   // if first_only is true then return first match
-  console.log("Find instance of "+search_by+ " in "+Object.keys(obj).length);
+  console.log("Find instance of "+search_by+ " in "+Object.keys(obj).length + " instances");
   if(search_key === 'id') {
     if(obj.hasOwnProperty(search_key)) {
       return search_key;
@@ -278,7 +282,7 @@ function onImageMouseDown(event) {
           console.log("Attaching image context menu");
           setContextMenu(imgobj.contextMenu);
           // currentContextObject object has some redundant info but seems simpler to use this way
-          currentContextObject = {id:id,type:'symbol',inst:imgobj,src:imgobj,raster:imgobj.raster};  //to match image instance object
+          currentContextObject = {id:id,type:'image',inst:imgobj,src:imgobj,raster:imgobj.raster};  //to match image instance object
           selectItem(id,imgobj.raster);
           imageSelected = this;
           holdContext = true;  // cross browser solution to default mouse up reset
@@ -433,7 +437,7 @@ function nameCurrentImage(name) {
 function nameImage(name,id) {
   var imgobj = imageInstances[id];
   console.log("ID:"+id);
-  if(name === id) {
+  if(name === id) {  // no need for name if it is the same as id
     if(imgobj.hasOwnProperty('name'))
       delete imgobj.name;
   } else {
@@ -635,8 +639,10 @@ function setArea() {
                            roundPoint(areaSelected.segments[2].point));
   areaInstances[nextID] = {rect:rect};
   doRecordAdd({action:'setArea',id:nextID,type:'area',rect:rect });
-  if(areasVisible)
+  if(areasVisible) {
     showArea(nextID);
+    selectItem(nextID,areaInstances[nextID].path);
+  }
   nextID++;
   hideArea();
 }
@@ -652,7 +658,7 @@ function nameCurrentArea(name) {
       return;  // nothing to do
     oldname = a.name;
   }
-  doRecordAdd({action:'rename',id:id,type:'area',oldName:oldname,newName:name});
+  doRecordAdd({action:'rename',id:id,type:'area',oldValue:oldname,name:name});
   nameArea(name,id);
 }
 
@@ -677,7 +683,7 @@ function moveCurrentArea(rect) {
      a.rect.width === rect.width && a.rect.height === rect.height) {
     return;  // nothing to do
   }
-  doRecordAdd({action:'move',id:id,type:'area',oldRect:a.rect,newRect:newRect});
+  doRecordAdd({action:'move',id:id,type:'area',oldValue:a.rect,rect:rect});
   moveArea(rect,id);
 }
 
@@ -793,7 +799,7 @@ function areaMoved(path,prev_pos) {
     var inst = areaInstances[aid];
     // keeping the obj as record is fine for undo but not so good for redo if the object gets deleted further back
     var new_rect = new Rectangle(roundPoint(path.firstSegment.point),roundPoint(path.segments[2].point));
-    doRecordAdd({action:'move',id:aid,type:'area',oldRect:inst.rect,newRect:new_rect});
+    doRecordAdd({action:'move',id:aid,type:'area',oldValue:inst.rect,rect:new_rect});
     inst.rect = new_rect;
   }
 }
@@ -994,8 +1000,10 @@ function snapPoint(p,round_only) {
 
 // snaps both ends of the line path to grid quantum
 function snapLine(p,round_only) {
-  if(typeof p.firstSegment === 'undefined')
+  if(typeof p === 'undefined')  // not sure why this happens
     return;
+    if(typeof p.firstSegment === 'undefined')
+      return;
   //console.log("Before:" + p.firstSegment.point);
   //console.log("Snap Rect:" + snapRect);
   p.firstSegment.point = snapPoint(p.firstSegment.point,round_only);
@@ -1010,8 +1018,9 @@ function snapLine(p,round_only) {
 function onMouseUp(event) {
   console.log("Mouse up");
   stopEvent(event);
-  if(modalOpen)
+  if(modalOpen) {
     return false;
+  }
   if(editMode) {
     if(!!imageSelected) {
       console.log("Opacity was:" + imageSelected.opacity);
@@ -1020,6 +1029,7 @@ function onMouseUp(event) {
     if(rightButton) {
       if(selectedMove) {
         for(var sid in selectedItems) {
+          console.log("validate moved for:"+sid);
           var item = selectedItems[sid];
           var prev_pos = selectedPos[sid];
           if(lineInstances.hasOwnProperty(sid)) {
@@ -1115,7 +1125,7 @@ function imageMoved(img,prev_pos,spot_rotate) {
     } else {
       correctPosition(img,src,round_only);
       // keeping the obj as record is fine for undo but not so good for redo if the object gets deleted further back
-      doRecordAdd({action:'imageMove',id:img_id,type:'symbol',pos:[prev_pos,img.position]});
+      doRecordAdd({action:'imageMove',id:img_id,type:'symbol',oldValue:prev_pos,pos:img.position});
     }
   }
 }
@@ -1137,15 +1147,15 @@ function correctPosition(raster,src,round_only) {
 function rotateImage(id,raster,src,angle) {
   var dorec = {action:'imageRotate',id:id,type:'symbol'};
   // use mouseDownPosition or event.position to find the closest point of rotation in object
-  var rotation = Math.round(raster.rotation);
+  var prev_rotation = Math.round(raster.rotation);
+  var prev_pos = raster.position;
   if(src.hasOwnProperty('center')) {
-    var prev_pos = raster.position;
     raster.rotate(angle,raster.position-src.center.rotate(raster.rotation));  //(new Point(30,30)));  // need to look up source to find centre of rotation - could also have 45 deg mode
-    dorec.pos = [prev_pos,raster.position];
   } else
     raster.rotate(angle);  // need to look up source to find centre of rotation - could also have 45 deg mode
   raster.rotation = Math.round(raster.rotation);  // prevent error creaping in
-  dorec.rot = [rotation,raster.rotation];
+  dorec.pos = [raster.position,raster.rotation];
+  dorec.oldValue =[prev_pos,prev_rotation];
   doRecordAdd(dorec);
 }
 
@@ -1198,7 +1208,7 @@ function validatePath(path, force_id) {
     if(line_id === null) { //this path doesn't exist
       console.log('Creating new line with id:',next_id);
       lineInstances[next_id] = {path:path};
-      if(lineColor != 'black')
+      if(lineColor != defaultLineColor)
         lineInstances[next_id].color = lineColor;
       //console.log(lineInstances[next_id]);
       //console.log(lineInstances[0]);
@@ -1208,7 +1218,10 @@ function validatePath(path, force_id) {
     }
     if(typeof force_id == 'undefined') {  // else don't record redos
       var np = [lineSelected.firstSegment.point.clone(),lineSelected.lastSegment.point.clone()];
-      doRecordAdd({action:'lineMove',id:line_id,type:'line',pos:[lineSelectedPosition,np] });
+      var do_rec = {action:'lineMove',id:line_id,type:'line',pos:np };
+      if(!!lineSelectedPosition)
+        do_rec.oldValue = lineSelectedPosition;
+      doRecordAdd(do_rec);
       selectItem(line_id,path);
       currentContextObject = {id:line_id,type:'line',inst:lineInstances[line_id]};  //to match image instance object
     }
@@ -1230,10 +1243,10 @@ function removeLine(id, record) {
     if(record) {
       var lp = [line.path.firstSegment.point.clone(),line.path.lastSegment.point.clone()];
       //console.log("Np:"+np[0]+","+np[1]);
-      var action_record = {action:'lineDelete',id:id,type:'line',pos:[lp,null] };
+      var do_rec = {action:'lineDelete',id:id,type:'line',oldValue:lp };
       if(line.hasOwnProperty('color'))
-        action_record.color = line.color;
-      doRecordAdd(action_record);  // zero length line
+        do_rec.color = line.color;
+      doRecordAdd(do_rec);  // zero length line
     }
     line.path.remove();  // should remove from screen
     delete lineInstances[id];  // removes from list
@@ -1260,10 +1273,14 @@ var modPressDelay = 800;  //delay in ms since mod key pressed for modified actio
 function onKeyDown(event) {   //note: this is the paper.js handler - do not confuse with html
   if(modalOpen) {
     console.log("Modal key:"+ event.key);
+    if(event.key === 'escape' && globals.paperGlue.closeDialog !== 'undefined') {
+      window.globals.paperGlue.closeDialog();
+      return false;
+    }
     return true;  //this allows dialogs to receive key strokes
   }
   if(!keyFocus) {
-    //console.log("Paper  glue ignoring keys");
+    console.log("Paper  glue ignoring keys");
     return false;
   }
   stopEvent(event);
@@ -1351,9 +1368,15 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
         break;
     }
     if(!!delta) {
-      moveObject(currentContextObject,delta,!event.shiftPressed);
+      //console.log("Delta:"+delta);
+      if(currentContextObject.type === 'symbol') {
+        incMoveSymbol(currentContextObject,delta,!event.shiftPressed);
+      } else if(currentContextObject.type === 'area') {
+        incMoveArea(currentContextObject,delta,!event.shiftPressed);
+      }
       propagate = false;
-      loadCurrentContextMenu(currentContextTable);
+      if(typeof currentContextTable !== 'undefined')
+        loadCurrentContextMenu(currentContextTable);
     }
   } else {
     switch(event.key) {
@@ -1392,29 +1415,43 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
   return propagate;
 }
 
-function moveObject(obj,direction,snap) {
+function incMoveSymbol(obj,direction,snap) {
   objPosition = obj.raster.position;
+  var img_id = findInstance(imageInstances,'raster',obj.raster,true);
   if(snap) {
     obj.raster.position += [direction[0]*snapRect[2],direction[1]*snapRect[3]];
-    var img_id = findInstance(imageInstances,'raster',obj.raster,true);
     if(!!img_id) {
-      console.log("instance found with id:"+img_id);  // need to keep id as well - might be null for master objects in layout mode
+      //console.log("instance found with id:"+img_id);  // need to keep id as well - might be null for master objects in layout mode
       //var src = imageInstances[img_id].src;  // could have used obj.src
       var round_only = !snapDefault;
       if(img_id !== null) {
-        var inst = lineInstances[img_id];
+        var inst = imageInstances[img_id];
         if(inst.hasOwnProperty('snap'))
           round_only = !inst.snap;
       }
       correctPosition(obj.raster,obj.src,round_only);
-      doRecordAdd({action:'imageMove',id:img_id,type:'symbol',pos:[objPosition,obj.position]});
     }
   } else {
     obj.raster.position += direction;
   }
-  console.log("Object moved to:"+obj.raster.position);
+  doRecordAdd({action:'imageMove',id:img_id,type:'symbol',oldValue:objPosition,pos:obj.raster.position});
+  //console.log("Object moved to:"+obj.raster.position);
   // if(typeof window.globals.updateStatus === 'function')
   //   window.globals.updateStatus();
+}
+
+function incMoveArea(obj,direction,snap) {
+  objRect = obj.inst.rect;
+  var inst = obj.inst;
+  var area_id = findInstance(areaInstances,'path',inst.path,true);
+  var delta = direction;
+  if(snap) {
+    delta[0] *= snapRect[2];
+    delta[1] *= snapRect[3];
+  }
+  inst.rect = new Rectangle(objRect.topLeft+delta,objRect.bottomRight+delta);
+  showArea(area_id);
+  doRecordAdd({action:'areaMove',id:area_id,type:'area',oldValue:objRect,pos:inst.rect});
 }
 
 function save() {
@@ -1539,7 +1576,9 @@ function correctPosPoints(do_record) {
     var to_do = do_record[di];
     if(to_do.hasOwnProperty('pos')) {
       console.log("Fix pos");
-      fixPos(to_do.pos);  // check for paper.js object JSON conversion problems
+      to_do.pos = parseLine(to_do.pos);  // check for paper.js object JSON conversion problems
+      if(to_do.hasOwnProperty('oldValue'))
+        to_do.oldValue = parseLine(to_do.oldValue);
     }
     else if(to_do.hasOwnProperty('rect')) {
       console.log("Fix rect");
@@ -1562,7 +1601,10 @@ function parsePoint(ord) {
     return ord;  // no change
 }
 
+// JSON doesn't know how to create a paper.Point
 function parseLine(arr) {
+  if(!arr)
+    return null;
   console.log("Type;"+(typeof arr));
   console.log(arr.length);
   if(arr.length === 2) {
@@ -1571,14 +1613,6 @@ function parseLine(arr) {
     return parsePoint(arr);
   }
   return arr;  // no change needed
-}
-
-// JSON doesn't know how to create a paper.Point
-function fixPos(pos) {
-  if(pos[0] !== null)  // not null
-    pos[0] = parseLine(pos[0]);
-  pos[1] = parseLine(pos[1]);
-  console.log(pos[1]);
 }
 
 function parseRect(ord) {
@@ -1652,19 +1686,23 @@ function undo() {
         // console.log("Obj pos1:",path.firstSegment.point);
         // console.log("path pos2:",path.lastSegment.point);
         // console.log("path pos:",path.position);
-        if(!last_do.pos[0]) {  // no previous existance
+        if(!last_do.hasOwnProperty('oldValue') || !last_do.oldValue) {  // no previous existance
           removeLine(last_do.id);
         } else {
-          path.firstSegment.point = last_do.pos[0][0];
-          path.lastSegment.point = last_do.pos[0][1];
-          console.log("Return path to " + last_do.pos[0]);
+          path.firstSegment.point = last_do.oldValue[0];
+          path.lastSegment.point = last_do.oldValue[1];
+          console.log("Return path to " + last_do.oldValue);
           // console.log("path pos1:",path.firstSegment.point);
           // console.log("path pos2:",path.lastSegment.point);
           // console.log("path pos:",path.position);
         }
         break;
-      case 'lineColor':
-        setLineColor(last_do.id,last_do.oldColor);
+      case 'lineColor':  // also applies to all new lines
+        if(last_do.hasOwnProperty('oldValue'))
+          lineColor = last_do.oldValue;
+        else
+          lineColor = defaultLineColor;
+        setLineColor(last_do.id,lineColor);
         break;
       case 'imageMove':
         raster = imageInstances[last_do.id].raster;
@@ -1679,29 +1717,25 @@ function undo() {
           }
         }
         if(typeof last_do.pos != 'undefined'){  // check it has a pos
-          raster.position = last_do.pos[0];
-          console.log("Return img position to " + last_do.pos);
+          raster.position = last_do.oldValue;
+          console.log("Return img position to " + last_do.oldValue);
         }
         break;
       case 'imageRotate':
         raster = imageInstances[last_do.id].raster;
-        if(typeof last_do.pos != 'undefined'){  // check it has a pos
-          raster.position = last_do.pos[0];  // required for non centered rotation
-        }
-        if(typeof last_do.rot != 'undefined'){  // check it has a rot
-          if(!last_do.rot[0]) {
-            raster.rotation = 0;
-            console.log("Raster rot:"+ raster.rotation);
-          } else {
-            raster.rotation = last_do.rot[0];
-            console.log("Return img rotation to " + last_do.rot[0]);
-          }
+        if(typeof last_do.oldValue != 'undefined'){  // check it has a pos
+          raster.position = last_do.oldValue[0];  // required for non centered rotation
+          raster.rotation = last_do.oldValue[1];
+          console.log("Return img rotation to " + raster.rotation + "at pos " + raster.position);
         }
         break;
       case 'lineDelete':
-        remakeLine(last_do,0);
-        if(last_do.hasOwnProperty('color'))
+        remakeLine(last_do,last_do.oldValue);
+        if(last_do.hasOwnProperty('color')) {
+          var c = lineColor;
           setLineColor(last_do.id,last_do.color);
+          lineColor = c;  // undelete should not change linecolor
+        }
         break;
       case 'symbolDelete':
         console.log("replace image:" + last_do.id);
@@ -1715,13 +1749,13 @@ function undo() {
         break;
       case 'rename':
         if(last_do.type === 'area')
-          nameArea(last_do.oldName,last_do.id);
+          nameArea(last_do.oldValue,last_do.id);
         else
-          nameImage(last_do.oldName,last_do.id);
+          nameImage(last_do.oldValue,last_do.id);
         break;
       case 'move':
         if(last_do.type === 'area')
-          moveArea(last_do.oldRect,last_do.id);
+          moveArea(last_do.oldValue,last_do.id);
         break;
       case 'areaDelete':
         areaInstances[last_do.id] = {rect:last_do.rect};
@@ -1732,11 +1766,11 @@ function undo() {
     }
 }
 
-function remakeLine(to_do,posi) {
+function remakeLine(to_do,pos) {
   newLine();  //set lineSelected
-  //console.log(to_do.pos[1]);
-  lineSelected.add(to_do.pos[posi][0]);
-  lineSelected.add(to_do.pos[posi][1]);
+  //console.log(to_do.pos);
+  lineSelected.add(pos[0]);
+  lineSelected.add(pos[1]);
   //console.path("line:" + lineSelected);
   // need to reuse old id
   var id = validatePath(lineSelected,to_do.id);  // adds to lineInstances
@@ -1757,11 +1791,11 @@ function redo() {
       console.log(Object.keys(lineInstances).length);
       if(!lineInstances.hasOwnProperty(to_do.id)) {
         console.log("path id " + to_do.id + " nolonger exists - remaking");
-        remakeLine(to_do,1);
+        remakeLine(to_do,to_do.pos);
       } else {
         var path = lineInstances[to_do.id].path;
-        path.firstSegment.point = to_do.pos[1][0];
-        path.lastSegment.point = to_do.pos[1][1];
+        path.firstSegment.point = to_do.pos[0];
+        path.lastSegment.point = to_do.pos[1];
       }
       break;
     case 'lineColor':
@@ -1770,14 +1804,14 @@ function redo() {
     case 'imageMove':
       imgobj = imageInstances[to_do.id];
       raster = imgobj.raster;
-      raster.position = to_do.pos[1];
+      raster.position = to_do.pos;
+      console.log("Moving to "+ to_do.pos);
       break;
     case 'imageRotate':
       imgobj = imageInstances[to_do.id];
       raster = imgobj.raster;
-      if(to_do.hasOwnProperty('pos'))
-        raster.position = to_do.pos[1];  // required if rotation not about center
-      raster.rotation = to_do.rot[1];
+      raster.position = to_do.pos[0];  // required if rotation not about center
+      raster.rotation = to_do.pos[1];
       break;
     case 'symbolPlace':
       symbolPlace(to_do.src_id,to_do.id);
@@ -1787,7 +1821,7 @@ function redo() {
       if(to_do.action == 'imageMove') {
         doRecordIndex++;
         raster = imageInstances[to_do.id].raster;
-        raster.position = to_do.pos[1];
+        raster.position = to_do.pos;
       }
       break;
     case 'lineDelete':
@@ -1803,13 +1837,13 @@ function redo() {
       break;
     case 'rename':
       if(to_do.type === 'area')
-        nameArea(to_do.newName,to_do.id);
+        nameArea(to_do.name,to_do.id);
       else
-        nameImage(to_do.newName,to_do.id);
+        nameImage(to_do.name,to_do.id);
       break;
     case 'move':
       if(to_do.type === 'area')
-        moveArea(to_do.newRect,to_do.id);
+        moveArea(to_do.rect,to_do.id);
       break;
     case 'areaDelete':
       removeAreaInstance(to_do.id,false);
@@ -1866,6 +1900,8 @@ function pruneDo() {
     } else {
       ids_found[to_do.id] = [to_do.action];  // this object covered one way or other - NOTE: push will convert everything to string without the + prefix but indexof only works with Strings
     }
+    if(to_do.hasOwnProperty('oldValue'))
+      delete to_do.oldValue;
     prunedDo.splice(0,0,to_do);
     console.log("Pruned adding:"+to_do.action + " for:"+to_do.id);
 
@@ -1876,7 +1912,7 @@ function pruneDo() {
     //       //console.log("path nolonger exists - so ignor");
     //       break;
     //     }
-    //     to_do.pos[0] = null;  // so that it knows to remove the line on an undo
+    //     to_do.oldValue = null;  // so that it knows to remove the line on an undo
     //     prunedDo.splice(0,0,to_do);
     //     break;
     //   case 'imageMove':
