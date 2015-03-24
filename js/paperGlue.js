@@ -745,7 +745,7 @@ function showAreaText(a,id) {
   a.text.justification = 'center';
   a.text.fontSize = 15;
   a.text.fillColor = areaColor;
-  currentContextObject = {id:id,type:'area',inst:a};  
+  currentContextObject = {id:id,type:'area',inst:a};
   selectItem(id,a.path);
 }
 
@@ -1050,7 +1050,7 @@ function onMouseUp(event) {
             setContextMenu("lineMenu");
             if(l.hasOwnProperty('path')) {
               selectItem(id,l.path);  //needs to happen after context select
-                currentContextObject = {id:id,type:'line',inst:l};  
+                currentContextObject = {id:id,type:'line',inst:l};
             }
           }
         }
@@ -1212,7 +1212,12 @@ function removeLine(id, record) {
   if(lineInstances.hasOwnProperty(id)) {  // this path does exist
     var line = lineInstances[id];
     if(record) {
-      doRecordAdd({action:'lineMove',id:id,type:'line',pos:[[0,0],[0,0]] });  // zero length line
+      var lp = [line.path.firstSegment.point.clone(),line.path.lastSegment.point.clone()];
+      //console.log("Np:"+np[0]+","+np[1]);
+      var action_record = {action:'lineDelete',id:id,type:'line',pos:[lp,null] };
+      if(line.hasOwnProperty('color'))
+        action_record.color = line.color;
+      doRecordAdd(action_record);  // zero length line
     }
     line.path.remove();  // should remove from screen
     delete lineInstances[id];  // removes from list
@@ -1335,19 +1340,15 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
   } else {
     switch(event.key) {
       case 'delete':
-        if(currentContextObject) {
-          console.log("Delete "+currentContextObject.id+"="+currentContextObject.type);
-          var id = currentContextObject.id;
-          switch(currentContextObject.type) {
-            case 'line':
+        if(confirm("Remove " + selectedItems.length + " items?")) {
+          for(var id in selectedItems) {
+            console.log("Delete "+id);
+            if(lineInstances.hasOwnProperty(id))
               removeLine(id,true);
-              break;
-            case 'symbol':
+            else if(imageInstances.hasOwnProperty(id))
               removeImage(id,true);
-              break;
-            case 'area':
+            else if(areaInstances.hasOwnProperty(id))
               removeAreaInstance(id,true);
-              break;
           }
         }
         currentContextObject = null;
@@ -1599,15 +1600,11 @@ function removeAll(){
 }
 
 function removeImage(id,record) {
-  if(!record || confirm("Do you really want to remove object ID =" + id + "?")) {
-    if(record) {
-      var obj = imageInstances[id];
-      doRecordAdd({action:'symbolDelete',id:id,src_id:obj.src.id,pos:obj.raster.position,rot:obj.raster.rotation});
-    }
-    symbolRemove(id);
-    return true;
+  if(record) {
+    var obj = imageInstances[id];
+    doRecordAdd({action:'symbolDelete',id:id,src_id:obj.src.id,pos:obj.raster.position,rot:obj.raster.rotation});
   }
-  return false;
+  symbolRemove(id);
 }
 
 function undo() {
@@ -1680,6 +1677,11 @@ function undo() {
           }
         }
         break;
+      case 'lineDelete':
+        remakeLine(last_do,0);
+        if(last_do.hasOwnProperty('color'))
+          setLineColor(last_do.id,last_do.color);
+        break;
       case 'symbolDelete':
         console.log("replace image:" + last_do.id);
         symbolPlace(last_do.src_id,last_do.id);
@@ -1709,6 +1711,17 @@ function undo() {
     }
 }
 
+function remakeLine(to_do,posi) {
+  newLine();  //set lineSelected
+  //console.log(to_do.pos[1]);
+  lineSelected.add(to_do.pos[posi][0]);
+  lineSelected.add(to_do.pos[posi][1]);
+  //console.path("line:" + lineSelected);
+  // need to reuse old id
+  var id = validatePath(lineSelected,to_do.id);  // adds to lineInstances
+  lineSelected = null;
+}
+
 function redo() {
   console.log("Redo");
   if(doRecordIndex >= doRecord.length)
@@ -1723,14 +1736,7 @@ function redo() {
       console.log(Object.keys(lineInstances).length);
       if(!lineInstances.hasOwnProperty(to_do.id)) {
         console.log("path id " + to_do.id + " nolonger exists - remaking");
-        newLine();
-        //console.log(to_do.pos[1]);
-        lineSelected.add(to_do.pos[1][0]);
-        lineSelected.add(to_do.pos[1][1]);
-        //console.path("line:" + lineSelected);
-        // need to reuse old id
-        var id = validatePath(lineSelected,to_do.id);  // adds to lineInstances
-        lineSelected = null;
+        remakeLine(to_do,1);
       } else {
         var path = lineInstances[to_do.id].path;
         path.firstSegment.point = to_do.pos[1][0];
@@ -1762,6 +1768,9 @@ function redo() {
         raster = imageInstances[to_do.id].raster;
         raster.position = to_do.pos[1];
       }
+      break;
+    case 'lineDelete':
+      removeLine(to_do.id,false);
       break;
     case 'symbolDelete':
       removeImage(to_do.id,false);   // delete is already in records
