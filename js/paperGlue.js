@@ -28,12 +28,21 @@ var lineSelected = null;
 var imageSelected = null;
 var imageSelectedPositiion = null;
 var lineSelectMode = 0;
+var areaSelected = null;
+var areaSelectMode = 0;
+var areaInstances = {};
+var areasVisible = false;
+var areaColor = 'blue';
+var newAreaColor = 'green';
+var minAreaSide = 10;
+var areaStrokeThickness = 2;
 var snapRect = [5,5,10,10];   // offset x,y and then quantum x, y
 var snapDefault = true;
 var lineThickness = 3;
 var lineColor = 'black';
 var mouseDownPosition;
 var rightButton = false;
+var customDefaultProps = {};
 var imagesLoaded = {};
 var imageInstances = {};  //images that have been cloned from sybols in imagesLoaded.
 var defaultContextMenu = [ {label:'view', callback:viewCall},{label:'open',callback:openCall} ];
@@ -202,6 +211,7 @@ function showImageCursors(obj,show_mouse_cursor) {
 // onmousedown callback for images that are cloneable, dragable or have context menu
 function imageMouseDown(event) {
   mouseDownPosition = event.point;
+  hideArea();
   if(rightButtonCheck(event)) {  // this will set rightButton global
     //console.log("Right button down");
   }
@@ -222,8 +232,7 @@ function imageMouseDown(event) {
       if(rightButton) {
         if(imgobj.hasOwnProperty('contextMenu')) {  // if not defined then stay with default
           console.log("Attaching image context menu");
-          currentContextMenu = window.globals.menuLookup[imgobj.contextMenu];
-          console.log("Context menu:"+currentContextMenu);
+          setContextMenu(imgobj.contextMenu);
           // currentContectObject object has some redundant info but seems simpler to use this way
           currentContextObject = {id:id,inst:imgobj,src:imgobj,raster:imgobj.raster};  //to match image instance object
           holdContext = true;  // cross browser solution to default mouse up reset
@@ -254,8 +263,7 @@ function imageMouseDown(event) {
       showImageCursors(imgobj,false);
       if(rightButton) {
         if(src.hasOwnProperty('instanceContextMenu')) {   // if not defined then stay with default
-           currentContextMenu = window.globals.menuLookup[src.instanceContextMenu];
-           console.log("Context menu:"+currentContextMenu);
+           setContextMenu(src.instanceContextMenu);
            // currentContectObject object has some redundant info but seems simpler to use this way
            currentContextObject = {id:id,inst:imgobj,src:src,raster:this};
            holdContext = true;  // cross browser solution to default mouse up reset
@@ -307,6 +315,10 @@ function symbolRemove(id) {
  * @param {array} images_to_load is array of image objects having parameters src, id, [isSymbol:bool, dragClone:bool, contextMenu:object, instanceContextMenu:object, pos:point, scale:float]
  */
 function loadImages(images_to_load, custom_default_props) {
+  if(typeof custom_default_props === 'undefined')
+    custom_default_props = customDefaultProps;
+  else
+    customDefaultProps = custom_default_props;
   while(images_to_load.length > 0) {  // continue till empty - not sure if this is valid
     var imgobj = images_to_load.pop();
     imgobj.initialProp = Object.keys(imgobj);
@@ -347,6 +359,16 @@ function loadImages(images_to_load, custom_default_props) {
     }
     imgobj.loadedProp = Object.keys(imgobj);
   }
+}
+
+function setContextMenu(context_type) {
+  currentContextMenu = defaultContextMenu;
+  if(window.globals.hasOwnProperty("menuLookup")) {
+    var choices = window.globals.menuLookup;
+    if(choices.hasOwnProperty(context_type))
+      currentContextMenu = window.globals.menuLookup[context_type];
+  }
+  console.log("Context menu:"+currentContextMenu);
 }
 
 window.contextMenuCallback = function(menu_index){
@@ -445,10 +467,12 @@ function rightButtonCheck(event) {
 // default mouse down event handler - most browser will bubble to this from the other mouseDown handlers
 function onMouseDown(event) {
   console.log("Basic Mouse down");
+  hideArea();
   if(rightButtonCheck(event)) {
     console.log("Right button down");
     if(holdContext === false)  // cross browser solution to default mouse up reset
       currentContextMenu = defaultContextMenu;
+    mouseDownPosition = event.point;
     return false;
   }
   if(!!lineSelected || !!imageSelected) {     // an existing line has been selected
@@ -467,6 +491,101 @@ function newLine() {
   lineSelected.strokeCap = 'round';
   lineSelected.onMouseDown = lineMouseDown;  // the call to use for mod
   lineSelectMode = 0;  // drag last point
+}
+
+function newArea() {
+  console.log("Start new area path");
+  areaSelected = new Path();
+  areaSelected.strokeColor = newAreaColor;
+  areaSelected.strokeWidth = areaStrokeThickness;
+  areaSelected.strokeCap = 'butt';
+  areaSelected.strokeJoin = 'mitre';
+  areaSelected.dashArray = [6,6];
+  //areaSelected.onMouseDown = lineMouseDown;  // the call to use for mod
+  areaSelectMode = 0;  // drag last point
+}
+
+function hideArea() {
+  if(!!areaSelected) {
+    // if(areasVisible) {
+    //   areaSelected.strokeColor = areaColor;
+    // } else {
+      areaSelected.remove();
+    //}
+  }
+  areaSelected = null;
+}
+
+function getAreaCount() {
+  return Object.keys(areaInstances).length;
+}
+
+function setArea() {
+  var rect = new Rectangle(roundPoint(areaSelected.segments[0].point),
+                           roundPoint(areaSelected.segments[2].point));
+  areaInstances[nextID] = {rect:rect};
+  doRecordAdd({action:'setArea',id:nextID,type:'area',rect:rect });
+  if(areasVisible)
+    showArea(nextID);
+  nextID++;
+  hideArea();
+}
+
+function removeArea(id) {
+  if(areaInstances.hasOwnProperty(id)) {  // this path does exist
+    var a = areaInstances[id];
+    console.log("Removing:"+a.rect);
+    if(a.hasOwnProperty('path')) {
+      if(!!a.path) {
+        a.path.remove();  // should remove from screen
+      }
+    }
+    delete areaInstances[id];  // removes from list
+  }
+}
+
+function showArea(id) {
+  var a = areaInstances[id];
+  var rect = a.rect;
+  console.log("Rect:"+rect);
+  var area = new Path();
+  area.strokeColor = areaColor;
+  area.strokeWidth = areaStrokeThickness;
+  area.strokeCap = 'butt';
+  area.strokeJoin = 'mitre';
+  area.dashArray = [6,6];
+  console.log("TopLeft:"+rect.topLeft);
+  area.add(rect.topLeft);
+  area.add(rect.topRight);
+  area.add(rect.bottomRight);
+  area.add(rect.bottomLeft);
+  area.closed = true;
+  a.path = area;
+}
+
+function showAllAreas() {
+  areasVisible = true;
+  var aks = Object.keys(areaInstances);
+  for(var ai in aks) {
+    var id = aks[ai];
+    console.log("Show area#" + id);
+    showArea(id);
+  }
+}
+
+function hideAllAreas() {
+  var aks = Object.keys(areaInstances);
+  for(var ai in aks) {
+    var a = areaInstances[aks[ai]];
+    if(a.hasOwnProperty("path")) {
+      if(!!a.path) {
+        a.path.remove();
+        console.log("Area:"+a.rect);
+      }
+      a.path = null;
+    }
+  }
+  areasVisible = false;
 }
 
 // onmousedown callback for two point paths
@@ -499,8 +618,33 @@ function lineMouseDown(event) {
 
 // univeral mouse drag function can drag lines or images or create rubber band new line
 function onMouseDrag(event) {
-  if(rightButton)  // no drag for right button
+  if(rightButton) {
+    var v = event.point - mouseDownPosition;
+    if(v.x > minAreaSide && v.y > minAreaSide) {
+      if(!areaSelected) {
+        newArea();
+        setContextMenu("areaMenu");
+      }
+      switch(areaSelectMode) {  //chosen in onlinemousedown
+        case 0: //move last point
+          if(areaSelected.segments.length < 4) {
+            areaSelected.add(mouseDownPosition);
+            areaSelected.add(mouseDownPosition);
+            areaSelected.add(mouseDownPosition);
+            areaSelected.add(mouseDownPosition);
+            areaSelected.closed = true;
+            areaSelectedPosition = null;  // to indicate it is new
+          }
+          areaSelected.segments[2].point += event.delta;
+          areaSelected.segments[1].point.y = areaSelected.segments[2].point.y;
+          areaSelected.segments[3].point.x = areaSelected.segments[2].point.x;
+          break;
+        case 1:
+          break;
+      }
+    }
     return;
+  }
   if(!!lineSelected) {   // link selected so drag existing
     //console.log("Link selected");
     switch(lineSelectMode) {  //chosen in onlinemousedown
@@ -944,12 +1088,12 @@ function onLoadReply(res) {
 }
 
 function parseRecord(jdata) {
-    try {
+    //try {
       console.log("Data="+jdata);
       var project_data = JSON.parse(jdata);
-      console.log("New record="+newRecord);
-      console.log(typeof newRecord);
-      console.log("New record has" + newRecord.length + " actions");
+      // console.log("New record="+newRecord);
+      // console.log(typeof newRecord);
+      // console.log("New record has" + newRecord.length + " actions");
       removeAll();
       imglist = project_data.imglist;
       // add any images not already loaded - does not check date
@@ -961,14 +1105,14 @@ function parseRecord(jdata) {
           continue;
         imgs_to_load.push(imglist[img_keys]);
       }
-      loadImages(imgs_to_load);
+      loadImages(imgs_to_load);  //will use previously set defaults
       doRecord = project_data.dolist;
       correctPosPoints(doRecord);
       doRecordIndex = 0;
       doAll();
-    } catch(e2) {
-      console.log("Error parsing file data"+e2);
-    }
+    // } catch(e2) {
+    //   console.log("Error parsing file data"+e2);
+    // }
 }
 
 function correctPosPoints(do_record) {
@@ -976,7 +1120,15 @@ function correctPosPoints(do_record) {
     var to_do = do_record[di];
     if(to_do.hasOwnProperty('pos')) {
       console.log("Fix pos");
-      fixPos(to_do.pos);  // check for left overs of JSON conversion problems
+      fixPos(to_do.pos);  // check for paper.js object JSON conversion problems
+    }
+    else if(to_do.hasOwnProperty('rect')) {
+      console.log("Fix rect");
+      to_do.rect = parseRect(to_do.rect);  // check for paper.js object JSON conversion problems
+    }
+    else if(to_do.hasOwnProperty('size')) {
+      console.log("Fix size");
+      to_do.size = parseRect(to_do.size);  // check for paper.js object JSON conversion problems
     }
     doRecord[di] = to_do;
   }
@@ -1008,6 +1160,22 @@ function fixPos(pos) {
     pos[0] = parseLine(pos[0]);
   pos[1] = parseLine(pos[1]);
   console.log(pos[1]);
+}
+
+function parseRect(ord) {
+  console.log(ord[0]);  // will be undefined for a real point
+  if(ord[0] === 'Rectangle')
+    return new Rectangle(ord[1],ord[2],ord[3],ord[4]);
+  else
+    return ord;  // no change
+}
+
+function parseSize(ord) {
+  console.log(ord[0]);  // will be undefined for a real point
+  if(ord[0] === 'Size')
+    return new Size(ord[1],ord[2]);
+  else
+    return ord;  // no change
 }
 
 function removeLines() {
@@ -1124,6 +1292,9 @@ function undo() {
         raster.position = last_do.pos;
         raster.rotation = last_do.rot;
         break;
+      case 'setArea':
+        removeArea(last_do.id);
+        break;
     }
 }
 
@@ -1181,6 +1352,11 @@ function redo() {
     case 'symbolDelete':
       var inst = imageInstances[to_do.id];
       removeImage(inst,false);   // delete is already in records
+      break;
+    case 'setArea':
+      areaInstances[to_do.id] = {rect:to_do.rect};
+      if(areasVisible)
+        showArea(to_do.id);
       break;
   }
   doRecordIndex++;
@@ -1292,6 +1468,8 @@ function setCenterToCursor() {
       src.center = roundPoint(dp.rotate(-raster.rotation));
       cursorPos[2] = cursorPos[0];
       console.log("Center:" + src.center);
+      if(!src.hasOwnProperty('origin'))   // probably the same if not set
+        src.origin = src.center;
     }
   }
   hideCursor();
@@ -1306,6 +1484,8 @@ function setOriginToCursor() {
       src.origin = roundPoint(dp.rotate(-raster.rotation));
       cursorPos[3] = cursorPos[0];
       console.log("Origin:" + src.origin);
+      if(!src.hasOwnProperty('center'))  // probably the same if not set
+        src.center = src.origin;
     }
   }
   hideCursor();
@@ -1336,7 +1516,11 @@ var exports = {
   hideCursor:hideCursor,
   showImageCursors:showImageCursors,
   getSnapDefault:getSnapDefault,
-  toggleSnap:toggleSnap
+  toggleSnap:toggleSnap,
+  getAreaCount:getAreaCount,
+  setArea:setArea,
+  show_areas:showAllAreas,
+  hide_areas:hideAllAreas
 };
 globals.paperGlue = exports;
 

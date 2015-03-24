@@ -34,7 +34,6 @@
   }
 
   function paperGlueCmd(cmd,arg) {
-
     window.globals.paperGlue[cmd](arg);
   }
 
@@ -92,6 +91,8 @@
   <button type="button" onclick="myScriptCmd('listActions');" class="button" width="300">List Content</button>
   <button type="button" onclick="paperGlueCmd('remove_all');" class="button" width="300">Remove All</button>
   <button type="button" onclick="DlgShow('A message');" class="button" width="300">Show dialog</button>
+  <button type="button" onclick="paperGlueCmd('show_areas');" class="button" width="300">Show Areas</button>
+  <button type="button" onclick="paperGlueCmd('hide_areas');" class="button" width="300">Hide Areas</button>
   <!--<image src="img/verodes.png"/>-->
   <div id="clientArea">
   <div id="canvasDiv" style="height:100%;background-color:blue">

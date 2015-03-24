@@ -14,7 +14,11 @@ var objectInstanceMenu = [ {label:'name', propCall:imgGetInstanceNameCall},
                            {label:'pos',propCall:imgGetPosCall},
                            {label:'snap',propCall:getSnapModeCall,callback:toggleSnap},
                            {label:'properties',callback:openPropDialog} ];
-window.globals.menuLookup = { objectMenu:objectMenu, objectInstanceMenu:objectInstanceMenu };
+var areaMenu = [ {label:'set area#', propCall:getAreaCount, callback:setArea}];
+window.globals.menuLookup = { objectMenu:objectMenu,
+                              objectInstanceMenu:objectInstanceMenu,
+                              areaMenu:areaMenu
+                            };
 var first_image = {src:"img/con_Block_5.08mm_12.png", scale:0.6, id:"conBlock1", isSymbol:true, dragClone:true, pos:view.center };
 var default_image_menus = { contextMenu:"objectMenu", instanceContextMenu:"objectInstanceMenu"};
 // other parameters:
@@ -253,6 +257,14 @@ function setCenterToCursor() {
 
 function setOriginToCursor() {
   paperGlue.setOriginToCursor();
+}
+
+function getAreaCount() {
+  return paperGlue.getAreaCount();
+}
+
+function setArea() {
+  paperGlue.setArea();
 }
 
 //window.globals.keyhandler = keyDown;  // requests paperglue to pass event here
