@@ -1259,13 +1259,14 @@ var modPressDelay = 800;  //delay in ms since mod key pressed for modified actio
 
 function onKeyDown(event) {   //note: this is the paper.js handler - do not confuse with html
   if(modalOpen) {
-    stopEvent(event);
-    return false;
+    console.log("Modal key:"+ event.key);
+    return true;  //this allows dialogs to receive key strokes
   }
   if(!keyFocus) {
     //console.log("Paper  glue ignoring keys");
     return false;
   }
+  stopEvent(event);
   var d = new Date();
   var nowMs = d.getTime();
   if(event.key == 'control' || event.key == 'shift' || event.key == 'alt') {
@@ -1309,6 +1310,7 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
           if(confirm("Remove events with no end effect?")) {
             doRecord = pruneDo();
             doRecordIndex = doRecord.length;
+            console.log("Do record index ="+doRecordIndex);
           }
         } else {  // undo and remove that particular redo
           undo();
@@ -1831,77 +1833,106 @@ function pruneDo() {
       console.log("#"+i+"="+doRecord[i].action+" to "+doRecord[i].id);
   }
   var prunedDo = [];  // a list of relevant do's.
-  var ids_found = [];   // objects already loaded into pruned list
+  var ids_found = {};   // action arrays of objects already loaded into pruned list
   for(var di = doRecordIndex-1; di >= 0; di--) {  // work backwards through do list
     //console.log("Do#"+di);
     var to_do = doRecord[di];
-    console.log("ids found:"+ids_found);
-    console.log(ids_found.indexOf(String(to_do.id)));
+    console.log("ids found:"+Object.keys(ids_found));
+    for(var idk in ids_found) {
+      console.log(idk + " = " + ids_found[idk]);
+    }
     //console.log(typeof to_do.id);
     //if(ids_found.length > 0)
-    console.log(typeof ids_found[0]);
-    if(ids_found.indexOf(String(to_do.id))>= 0) // this object already sorted
-      continue;
-    ids_found.push(to_do.id);  // this object covered one way or other - NOTE: push will convert everything to string without the + prefix but indexof only works with Strings
-    //console.log("Checking todo action:",to_do.action);
-    switch(to_do.action) {
-      case 'lineMove':
-        if(!lineInstances.hasOwnProperty(to_do.id)) {
-          //console.log("path nolonger exists - so ignor");
-          break;
-        }
-        to_do.pos[0] = null;  // so that it knows to remove the line on an undo
-        prunedDo.splice(0,0,to_do);
+    //console.log(typeof ids_found[0]);
+    switch(to_do.type) {
+      case 'symbol':
+        if(!imageInstances.hasOwnProperty(to_do.id))
+          continue;  // image nolonger exists
         break;
-      case 'imageMove':
-      case 'imageRotate':
-      case 'symbolPlace':
-        if(!imageInstances.hasOwnProperty(to_do.id)) {
-          //console.log("image nolonger exists - so ignor");
-          break;
-        }
-        //console.log("Checking todo action:",to_do.action);
-        var actions_found = {};
-        for(var dj = di; dj >= 0; dj--) {  // go backwards (including to_do) and find last of move and rotates and symbolplace
-          var will_do = doRecord[dj];
-          console.log("  Checking #"+dj+" willdo action:"+will_do.action+" for "+will_do.id);
-          if(to_do.id == will_do.id) {
-            //console.log("Actions found:",Object.keys(actions_found));
-            if(actions_found.hasOwnProperty(will_do.action)) {
-              //console.log("Duplicate");
-              continue;
-            }
-            //console.log("  Accept #"+dj+" willdo action:"+will_do.action+" to "+will_do.id);
-            actions_found[will_do.action] = will_do;
-            //console.log("af:",actions_found[a])
-            prunedDo.splice(0,0,will_do);
-            console.log("Pruned adding:"+will_do.action + " from index:"+dj);
-            if(will_do.action == 'symbolPlace')
-              break; // all done
-          }
-        }
+      case 'line':
+        if(!lineInstances.hasOwnProperty(to_do.id))
+          continue;
         break;
-      case 'symbolDelete':
-        // no need to keep this in pruned
-        break;
-      // only the last of these for an id are required
-      case 'rename':
-      case 'move':
-        if(to_do.type === 'area') {
-          if(areaInstances.hasOwnProperty(to_do.id))
-            break;  //nolonger exists
-        } else {  // images can also be renamed
-          if(imageInstances.hasOwnProperty(to_do.id))
-            break;  // nolonger exists
-        }
-        prunedDo.splice(0,0,to_do);
-        break;
-      case 'setArea':
-        if(areaInstances.hasOwnProperty(to_do.id))
-          break;  //nolonger exists
-        prunedDo.splice(0,0,to_do);
+      case 'area':
+        if(!areaInstances.hasOwnProperty(to_do.id))
+          continue;
         break;
     }
+    //if(ids_found.indexOf(String(to_do.id))>= 0) // this object already sorted
+    if(ids_found.hasOwnProperty(to_do.id)) {
+      if(ids_found[to_do.id].indexOf(to_do.action) >= 0)
+        continue;
+      ids_found[to_do.id].push(to_do.action);
+    } else {
+      ids_found[to_do.id] = [to_do.action];  // this object covered one way or other - NOTE: push will convert everything to string without the + prefix but indexof only works with Strings
+    }
+    prunedDo.splice(0,0,to_do);
+    console.log("Pruned adding:"+to_do.action + " for:"+to_do.id);
+
+    // //console.log("Checking todo action:",to_do.action);
+    // switch(to_do.action) {
+    //   case 'lineMove':
+    //     if(!lineInstances.hasOwnProperty(to_do.id)) {
+    //       //console.log("path nolonger exists - so ignor");
+    //       break;
+    //     }
+    //     to_do.pos[0] = null;  // so that it knows to remove the line on an undo
+    //     prunedDo.splice(0,0,to_do);
+    //     break;
+    //   case 'imageMove':
+    //   case 'imageRotate':
+    //   case 'symbolPlace':
+    //     if(!imageInstances.hasOwnProperty(to_do.id)) {
+    //       //console.log("image nolonger exists - so ignor");
+    //       break;
+    //     }
+    //     //console.log("Checking todo action:",to_do.action);
+    //     var actions_found = {};
+    //     for(var dj = di; dj >= 0; dj--) {  // go backwards (including to_do) and find last of move and rotates and symbolplace
+    //       var will_do = doRecord[dj];
+    //       console.log("  Checking #"+dj+" willdo action:"+will_do.action+" for "+will_do.id);
+    //       if(to_do.id == will_do.id) {
+    //         //console.log("Actions found:",Object.keys(actions_found));
+    //         if(actions_found.hasOwnProperty(will_do.action)) {
+    //           //console.log("Duplicate");
+    //           continue;
+    //         }
+    //         //console.log("  Accept #"+dj+" willdo action:"+will_do.action+" to "+will_do.id);
+    //         actions_found[will_do.action] = will_do;
+    //         //console.log("af:",actions_found[a])
+    //         prunedDo.splice(0,0,will_do);
+    //         console.log("Pruned adding:"+will_do.action + " from index:"+dj);
+    //         if(will_do.action == 'symbolPlace')
+    //           break; // all done
+    //       }
+    //     }
+    //     break;
+    //   case 'symbolDelete':
+    //     // no need to keep this in pruned
+    //     break;
+    //   // only the last of these for an id are required
+    //   case 'rename':
+    //   case 'move':
+    //     if(to_do.type === 'area') {
+    //       if(!areaInstances.hasOwnProperty(to_do.id))
+    //         break;  //nolonger exists
+    //     } else {  // images can also be renamed
+    //       if(!imageInstances.hasOwnProperty(to_do.id))
+    //         break;  // nolonger exists
+    //     }
+    //     prunedDo.splice(0,0,to_do);
+    //     break;
+    //   case 'setArea':
+    //     if(!areaInstances.hasOwnProperty(to_do.id))
+    //       break;  //nolonger exists
+    //     prunedDo.splice(0,0,to_do);
+    //     break;
+    //   case 'lineColor':
+    //     if(!lineInstance.hasOwnProperty(to_do.id))
+    //       break;
+    //     prunedDo.splice(0,0,to_do);
+    //     break;
+    //}
   }
   console.log("AFTER");
   for(i in prunedDo) {
@@ -1924,6 +1955,11 @@ function getLineInstances() {
 function getDoRecord() {
   //console.log("Returning do record:", doRecord.length);
   return doRecord;
+}
+
+function getDoIndex() {
+  //console.log("Returning do record index:", doRecordIndex);
+  return doRecordIndex;
 }
 
 function getCurrentContextObject() {
@@ -2025,6 +2061,7 @@ var exports = {
   getImages:getImageInstances,
   getLines:getLineInstances,
   getDoRecord:getDoRecord,
+  getDoIndex:getDoIndex,
   setSnap:setSnap,
   setLineThickness:setLineThickness,
   getLineColor:getLineColor,

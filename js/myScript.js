@@ -17,7 +17,7 @@ var symbolInstanceMenu = [ {label:'name', propCall:imgGetInstanceNameCall},
 var lineInstanceMenu = [ {label:'color', propCall:lineGetColor, callback:setLineColor}];
 var newAreaMenu = [ {label:'set area#', propCall:getAreaCount, callback:setArea},
                     {label:'select', callback:areaSelect }];
-var areaMenu = [ {label:'area', propCall:getAreaNameCall},
+var areaMenu = [ {label:'name', propCall:getAreaNameCall},
                  {label:'rect', propCall:getAreaRectCall},
                  {label:'properties',callback:openAreaPropDialog}];
 window.globals.menuLookup = { symbolMenu:symbolMenu,
@@ -144,6 +144,7 @@ function imgGetOriginCall(obj){
 
 function createActionTableBody() {
   var q = globals.paperGlue.getDoRecord();
+  var dri = globals.paperGlue.getDoIndex();
   var ihtml = "";
   for(var qi in q) {
     var dr = q[qi];
@@ -160,7 +161,12 @@ function createActionTableBody() {
       bl = 'FF';
     else
       bl = 'C0';
-    var rhtml = '<tr style="background-color:#F0F0' + bl + '""><td class="dtd" style="width:100px;border-left:0">'+dr.action+'</td><td class="dtd" style="width:30px;background-color:#FFE0E0">'+dr.id+'</td><td class="dtd" style="border-right:0">'+propstr+'</td></tr>';
+    var vl;
+    if(qi < dri)
+      vl = 'FF';
+    else
+      vl = 'C0';
+    var rhtml = '<tr style="background-color:#F0'+vl+bl + '"><td class="dtd" style="width:100px;border-left:0">'+dr.action+'</td><td class="dtd" style="width:30px;background-color:#E0'+vl+bl+'">'+dr.id+'</td><td class="dtd" style="border-right:0">'+propstr+'</td></tr>';
     //console.log(rhtml);
     ihtml += rhtml;
   }
@@ -264,9 +270,9 @@ function openImgPropDialog() {
   var fs = 'style="font-size:'+fontsize+'px;"';
   var p = '<table ' + fs + '><tr><td>ID</td><td>'+obj.id+'</td></tr>';
   // if(obj.hasOwnProperty('raster')) {
-  if(obj.type === 'image') {
+  if(obj.type === 'symbol') {
     p += '<tr><td>Name</td><td>';
-    var nm = obj.id;
+    var nm = obj.src.id + "#" + obj.id;
     if(obj.inst.hasOwnProperty('name')) {
       nm = obj.inst.name;
     }
@@ -345,7 +351,7 @@ function setArea() {
 
 function getAreaNameCall(obj){
   console.log('get name called');
-  var nm = "" + obj.id;
+  var nm = "Area#" + obj.id;
   if(obj.inst.hasOwnProperty('name'))
     nm += ":" + obj.inst.name;
   return nm;
@@ -366,7 +372,7 @@ function openAreaPropDialog() {
   var p = '<table ' + fs + '><tr><td>ID</td><td>'+obj.id+'</td></tr>';
   var a = obj.inst;
     p += '<tr><td>Name</td><td>';
-    var nm = obj.id;
+    var nm = "area#" + obj.id;
     if(a.hasOwnProperty('name'))
       nm = a.name;
     p += '<input '+fs+' id="name" type="text" value="'+nm+'"/></td></tr>';
