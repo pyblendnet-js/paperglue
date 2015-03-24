@@ -1834,29 +1834,36 @@ function setModalOpen(state) {
 function areaSelect() {
   var rect = new Rectangle(roundPoint(areaSelected.segments[0].point),
                            roundPoint(areaSelected.segments[2].point));
+  console.log("rect:"+rect);
   if(areasVisible) {
     for(var aid in areaInstances) {
       var a = areaInstances[aid];
-      if(rect.contains(a.rect.topleft) && rect.contains(a.rect.bottomright)) {
+      console.log("TopLeft:"+a.rect.topleft);
+      console.log("BottomRight:"+a.rect.bottomright);
+      if(rect.contains(a.rect.topLeft) && rect.contains(a.rect.bottomRight)) {
         if(a.hasOwnProperty('path'))
-          selectItem(aid,a.path);
+        selectedItems[id] = a.path;
+        a.path.selected = true;
       }
     }
   }
   for(var id in lineInstances) {
     var l = lineInstances[id];
     if(rect.contains(l.path.firstSegment.point) && rect.contains(l.path.lastSegment.point)) {
-      selectItem(id,l.path);
+      selectedItems[id] = l.path;
+      l.path.selected = true;
     }
   }
   for(var iid in imageInstances) {
     var imgobj = imageInstances[iid];
-    var bounds = imgobj.raster.bounds();
-    if(rect.contains(bounds.topleft) && rect.contains(bounds.bottomright)) {
-      selectItem(iid,imgobj.raster);
+    var bounds = imgobj.raster.bounds;
+    console.log("Bounds"+bounds);
+    if(rect.contains(bounds.topLeft) && rect.contains(bounds.bottomRight)) {
+      selectedItems[id] = imgobj.raster;
+      imgobj.raster.selected = true;
     }
   }
-
+  hideArea();
 }
 
 // think this needs to be at the bottom so under scripts find things fully loaded
