@@ -10,20 +10,19 @@ console.log("Starting myScript");
 drawStripBoard(10,100,34);
 console.log(Object.keys(window));
 console.log(Object.keys(window.globals));
-console.log(typeof window.globals.loadImages);
-if(typeof window.globals.loadImages === 'undefined')  { // means myScript got here first and paperGlue was not ready
-  console.log("paperGlue not ready yet to load images.");
-  window.globals.onPaperLoad = initImages;  // paperGlue will call this when it is ready
+if(typeof window.globals.paperGlue === 'undefined')  { // means myScript got here first and paperGlue was not ready
+  console.log("paperGlue not ready yet to init app.");
+  window.globals.onPaperGlueLoad = initApp;  // paperGlue will call this when it is ready
 } else {
-  console.log("PaperGlue already loaded so can load images.");
-  initImages();  // paperglue is already ready so can loadImages now
+  console.log("PaperGlue already loaded so can init app.");
+  initApp();  // paperglue is already ready so can loadImages now
 }
-window.globals.setSnap([5,5,10,10]);
 // that was a bit messy and my be avoided if I used requirejs or browserify - though I suspect that paper.js will not like it.
 // see http://eloquentjavascript.net/10_modules.html on the subject of slow module loads
 
-function initImages() {
-  window.globals.loadImages([first_image],"imagePallet");
+function initApp() {
+  window.globals.paperGlue.loadImages([first_image]);
+  window.globals.paperGlue.setSnap([5,5,10,10]);
 }
 
 function drawGrid(spacing) {
@@ -79,7 +78,7 @@ function imgGetPosCall(obj){
 }
 
 function createActionTableBody() {
-  var q = globals.getDoRecord();
+  var q = globals.paperGlue.getDoRecord();
   var ihtml = "";
   for(var qi in q) {
     var dr = q[qi];

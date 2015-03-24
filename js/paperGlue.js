@@ -65,36 +65,13 @@ function setLineColor(c) {
 }
 
 // helper to add hidden image to document before reference as paper image
-function addImage(source, id, dest) {
-  // optional dest location - if defined then does not hide
+function addImage(source, id) {
   var img = document.createElement("img");
   img.src = source;  // this will cause a GET call from the browser
   img.id = id;
-  img.alt = source;
-  if(typeof dest === 'undefined') {
-    img.hidden = true;
-    var src = document.getElementById('body');
-    src.appendChild(img);
-  } else {
-    var fig = '<figure onclick="figClicked('+"'"+img.id+"'"+')">' + img.outerHTML +'<figcaption>'+source+'</figcaption></figure>';
-    // alternative loading of figure
-    // var fig = document.createElement("figure");
-    // fig.onclick = '"figClicked()"';
-    // var cap = document.createElement("figcaption");
-    // cap.innerHTML = source;
-    // img.alt = source;
-    // fig.appendChild(img);
-    // fig.appendChild(cap);
-    var destel = document.getElementById(dest);
-    //destel.appendChild(fig);
-    destel.innerHTML += fig;
-    console.log("Fig:" + fig.outerHTML);
-  }
-  return img;
-}
-
-function figClicked() {
-  console.log("Figure clicked");
+  img.hidden = true;
+  var src = document.getElementById("body");
+  src.appendChild(img);
 }
 
 // finds an instance of an image clone based on id, raster or src
@@ -214,19 +191,18 @@ function symbolRemove(id) {
  * Called from external script via window.globals to add images to the document with behaviour parameters
  * @param {array} images_to_load is array of image objects having parameters src, id, [isSymbol:bool, dragClone:bool, contextMenu:object, instanceContextMenu:object, pos:point, scale:float]
  */
-function loadImages(images_to_load, frame) {
+function loadImages(images_to_load) {
   while(images_to_load.length > 0) {  // continue till empty - not sure if this is valid
     var imgobj = images_to_load.pop();
     imagesLoaded[imgobj.id]= imgobj;  // record master images
-    var local_img = addImage(imgobj.src,imgobj.id,frame);  // add image to document
+    addImage(imgobj.src,imgobj.id);  // add image to document
     imgobj.raster = new Raster(imgobj.id);  // make this a paper image
     //console.log(img.isSymbol);
     if(imgobj.hasOwnProperty('isSymbol')) {  // this image can appear many times as instances
       if(imgobj.isSymbol === true) {   // needs true comparison
         imgobj.symbol = new Symbol(imgobj.raster);
         imgobj.raster.remove();  //dont need this cluttering the document
-        if(typeof frame === 'undefined')
-          imgobj.raster = imgobj.symbol.place();
+        imgobj.raster = imgobj.symbol.place();
         imgobj.instances = 0;
       }
     }
@@ -244,12 +220,8 @@ function loadImages(images_to_load, frame) {
       if(imgobj.dragClone === true)
         listen_to_mouse = true;
     }
-    if(listen_to_mouse) {
-        imgobj.raster.onMouseDown = imageMouseDown;  // needed for drag or context
-    }
-    if(typeof frame !== 'undefined') {
-      local_img.onMouseDown = imageMouseDown;
-    }
+    if(listen_to_mouse)
+      imgobj.raster.onMouseDown = imageMouseDown;  // needed for drag or context
   }
 }
 
@@ -959,18 +931,22 @@ function getDoRecord() {
 console.log("PaperGlue functions to window globals");
 // window global are use for cross scope communications
 var globals = window.globals;
-globals.loadImages = loadImages;
-globals.getImages = getImageInstances;
-globals.getLines = getLineInstances;
-globals.getDoRecord = getDoRecord;
-globals.setSnap = setSnap;
-globals.setLineThickness = setLineThickness;
-globals.setLineColor = setLineColor;
-globals.keyHandler = null;
-globals.paperGlue = { remove_all:removeAll };
-if(typeof globals.onPaperLoad == 'function')  { // myScript couldn't find loadImages so provided a call to repeat the request
+var exports = {
+  loadImages:loadImages,
+  getImages:getImageInstances,
+  getLines:getLineInstances,
+  getDoRecord:getDoRecord,
+  setSnap:setSnap,
+  setLineThickness:setLineThickness,
+  setLineColor:setLineColor,
+  keyHandler:null,
+  remove_all:removeAll
+};
+globals.paperGlue = exports;
+
+if(typeof globals.onPaperGlueLoad == 'function')  { // myScript couldn't find loadImages so provided a call to repeat the request
   console.log("PaperGlue loaded now so can use onPaperLoad to load images.");
   console.log(typeof globals.loadImages);
-  globals.onPaperLoad();
+  globals.onPaperGlueLoad();
 }
 // that was a bit messy and my be avoided if I used requirejs or browserify - though I suspect that paper.js will not like it.

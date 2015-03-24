@@ -28,18 +28,29 @@
     //myScriptInit();
   }
 
-  function listActions() {
+  function myScriptCmd(cmd, arg) {
     console.log(Object.keys(window.globals) ); //.onload();  //no use since it may not be added to globals yet
-    window.globals.listActions();
+    window.globals[cmd](arg);
   }
 
-  function paperGlue(cmd) {
+  function paperGlueCmd(cmd,arg) {
 
-    window.globals.paperGlue[cmd]();
+    window.globals.paperGlue[cmd](arg);
   }
 
-  function figClicked(event) {
-    console.log("Figure clicked by:" + this + " because of:" + event);
+  function DlgShow(Message)
+  {
+    // Change the message.
+    var Msg = document.getElementById('DlgContent');
+    Msg.innerHTML = Message;
+    // Display the dialog box.
+    var Dlg = document.getElementById('Overlay');
+    Dlg.style.visibility = 'visible';
+  }
+
+  function DlgHide(Message) {
+    var Dlg = document.getElementById('Overlay');
+    Dlg.style.visibility = 'hidden';
   }
 
   </script>
@@ -48,22 +59,28 @@
         color: white;
         background-color: black;
       }
-      .toolKit {
-        float: right;
-        width: 20%;
-        overflow:scroll;
+
+      #Overlay {
+        visibility: hidden;
+        position: absolute;
+        left: 90px;
+        top: 120px;
+        width:200px;
+        height:90px;
+        text-align:center;
+        border: solid;
+        background-color: lightgray;
       }
-  </style>
+    </style>
+
 </head>
 <body id="body" onload="onload();" >
   <button type="button" onclick="hideCanvas();" class="button" width="300">hide Canvas</button>
-  <button type="button" onclick="listActions();" class="button" width="300">List Content</button>
+  <button type="button" onclick="myScriptCmd('listActions');" class="button" width="300">List Content</button>
   <button type="button" onclick="paperGlue('remove_all');" class="button" width="300">Remove All</button>
+  <button type="button" onclick="DlgShow('A message');" class="button" width="300">Show dialog</button>
   <!--<image src="img/verodes.png"/>-->
   <div id="clientArea">
-  <div id="imagePallet" class="toolKit">
-    <!-- <canvas id="imagePalletCanvas"></canvas> -->
-  </div>
   <div id="canvasDiv" style="height=100%;background-color:blue">
     <canvas id="myCanvas" resize></canvas>
   </div>
@@ -120,6 +137,19 @@
     </tr> -->
     </table>
 </div>
+</div>
+<div id="Overlay" >
+  <div>
+    <p id="DlgContent">Content Goes Here</p>
+    <input id="btnYes"
+         type="button"
+        value="Yes"
+      onclick="DlgHide('Yes')" />
+    <input id="btnNo"
+         type="button"
+        value="No"
+      onclick="DlgHide('No')" />
+  </div>
 </div>
 </body>
 </html>
