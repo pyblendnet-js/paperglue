@@ -42,7 +42,8 @@ var currentContextObject = null;
 var holdContext = false;  // don't reset contextMenu till after mouseUp
 var doRecord = [];  // record of all clonings and moves  {action:string,src_id:src.id,raster:image or line:path,pos:point}
 var doRecordIndex = 0;  // points to next do location
-var recordPath = "testSave.json";
+var recordPath = "recordSave.json";
+var imgListPath = "imgList.json";
 var cursorPos = [];  // mouse, raster, origin, center
 var cursorColors = ['#f00','#ff0','#88f','#8f8'];
 //var ua = navigator.appName.toLowerCase();
@@ -61,6 +62,19 @@ function setSnap(q) {
 
 function getSnapDefault() {
   return snapDefault;
+}
+
+function toggleSnap() {
+  var obj = currentContextObject.inst;
+  console.log(Object.keys(obj));
+  console.log("Toggle snap was:" + obj.snap);
+  if(obj.hasOwnProperty('snap'))
+    obj.snap = !obj.snap;
+  else
+    obj.snap = !snapDefault;
+  if(currentContextObject.hasOwnProperty('raster'))
+    obj.raster.position = snapPoint(obj.raster.position,!obj.snap);
+  console.log("Toggle snap now:" + obj.snap);
 }
 
 function setLineThickness(t) {
@@ -208,8 +222,10 @@ function imageMouseDown(event) {
       if(rightButton) {
         if(imgobj.hasOwnProperty('contextMenu')) {  // if not defined then stay with default
           console.log("Attaching image context menu");
-          currentContextMenu = imgobj.contextMenu;
-          currentContextObject = {id:id,src:imgobj,raster:imgobj.raster};  //to match image instance object
+          currentContextMenu = window.globals.menuLookup[imgobj.contextMenu];
+          console.log("Context menu:"+currentContextMenu);
+          // currentContectObject object has some redundant info but seems simpler to use this way
+          currentContextObject = {id:id,inst:imgobj,src:imgobj,raster:imgobj.raster};  //to match image instance object
           holdContext = true;  // cross browser solution to default mouse up reset
           showImageCursors(imgobj,true);
           return false;   // just show context menu now - see context menu callback below
@@ -238,9 +254,10 @@ function imageMouseDown(event) {
       showImageCursors(imgobj,false);
       if(rightButton) {
         if(src.hasOwnProperty('instanceContextMenu')) {   // if not defined then stay with default
-           currentContextMenu = src.instanceContextMenu;
-           // needed to add id to currentContectObject
-           currentContextObject = {id:id,src:src,raster:this};
+           currentContextMenu = window.globals.menuLookup[src.instanceContextMenu];
+           console.log("Context menu:"+currentContextMenu);
+           // currentContectObject object has some redundant info but seems simpler to use this way
+           currentContextObject = {id:id,inst:imgobj,src:src,raster:this};
            holdContext = true;  // cross browser solution to default mouse up reset
            return false; // clone image not selected for right click
         }
@@ -289,9 +306,10 @@ function symbolRemove(id) {
  * Called from external script via window.globals to add images to the document with behaviour parameters
  * @param {array} images_to_load is array of image objects having parameters src, id, [isSymbol:bool, dragClone:bool, contextMenu:object, instanceContextMenu:object, pos:point, scale:float]
  */
-function loadImages(images_to_load) {
+function loadImages(images_to_load, custom_default_props) {
   while(images_to_load.length > 0) {  // continue till empty - not sure if this is valid
     var imgobj = images_to_load.pop();
+    imgobj.initialProp = Object.keys(imgobj);
     imagesLoaded[imgobj.id]= imgobj;  // record master images
     addImage(imgobj.src,imgobj.id);  // add image to document
     imgobj.raster = new Raster(imgobj.id);  // make this a paper image
@@ -320,6 +338,14 @@ function loadImages(images_to_load) {
     }
     if(listen_to_mouse)
       imgobj.raster.onMouseDown = imageMouseDown;  // needed for drag or context
+    var default_keys = Object.keys(custom_default_props);
+    console.log("Image default props:"+default_keys);
+    for(var di in default_keys) {
+      dk = default_keys[di];
+      if(!imgobj.hasOwnProperty(dk))
+        imgobj[dk] = custom_default_props[dk];
+    }
+    imgobj.loadedProp = Object.keys(imgobj);
   }
 }
 
@@ -329,8 +355,10 @@ window.contextMenuCallback = function(menu_index){
     var menu_item = currentContextMenu[menu_index];
     if(menu_item.hasOwnProperty('callback')) {
       var callback = menu_item.callback;
-      if(typeof callback == 'function')
-        callback();
+      if(typeof callback == 'function') {
+        if(callback())
+          hideCursor();
+      }
     }
   }
   hideContextMenu('contextMenu');
@@ -576,7 +604,7 @@ function correctPosition(raster,src,round_only) {
   console.log("Before:"+raster.position);
   if(src.hasOwnProperty('origin')) {
     var oo = src.origin.rotate(raster.rotation);
-    raster.position = snapPoint(raster.position-oo,round_ony) + oo;
+    raster.position = snapPoint(raster.position-oo,round_only) + oo;
   } else {
     raster.position = snapPoint(raster.position,round_only);
   }
@@ -715,7 +743,7 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
   //console.log("Now:"+nowMs+" "+modPressDelay);
   //console.log("Now:"+(nowMs - controlPressMs));
   //console.log("Paperglue received:" + event.key);
-  console.log("Window keys:" + Object.keys(window));
+  //console.log("Window keys:" + Object.keys(window));
   var propagate = true;
   var delta = null;  // for arrow keys
   if(event.controlPressed) {
@@ -783,9 +811,11 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
         removeImage(currentContextObject,true);
         propagate = false;
         hideContextMenu('contextMenu');
+        hideCursor();
         break;
       case 'escape':
         hideContextMenu('contextMenu');
+        hideCursor();
         break;
     }
   }
@@ -829,7 +859,39 @@ function save() {
   console.log("Try to save");
   console.log("Globals:" + Object.keys(window.globals));
   console.log("SendData:",typeof window.globals.sendData);
-  var jdata = JSON.stringify(dolist);
+  // build reduced image list
+  var img_list = [];
+  console.log("Type:"+(typeof img_list));
+  var img_ids = Object.keys(imagesLoaded);
+  for(var ii in img_ids) {
+    var im = imagesLoaded[img_ids[ii]];
+    var img = {};
+    var img_keys = Object.keys(im);
+    console.log("Image keys:"+img_keys);
+    console.log("Initials keys:"+im.initialProp);
+    console.log("Loaded keys:"+im.loadedProp);
+
+    for(var iik in img_keys) {
+      var ik = img_keys[iik];
+      if(ik === 'loadedProp')
+        continue;
+      console.log(ik);
+      console.log("Loaded:"+im.loadedProp.indexOf(ik));
+      console.log("Initial:"+im.initialProp.indexOf(ik));
+      if((im.loadedProp.indexOf(ik) < 0) || (im.initialProp.indexOf(ik) >= 0))
+        img[ik] = im[ik];
+    }
+    console.log("Img:"+Object.keys(img));
+    img_list.push(img);
+    console.log("ImgList#:"+img_list);
+  }
+  console.log("ImgList:"+img_list);
+  var project_data = {imglist:img_list,dolist:doRecord};
+  console.log("project data:"+Object.keys(project_data));
+  console.log("project data:"+Object.keys(project_data.imglist[0]));
+  var jdata = JSON.stringify(project_data);
+  console.log("jdata:"+jdata);
+  console.log("project data imglist[0]:"+Object.keys(project_data.imglist[0]));
   if(window.location.protocol == 'file:') {
     // might try to impletement local storage some day
     console.log("Storage type:" + typeof(Storage));
@@ -884,12 +946,23 @@ function onLoadReply(res) {
 function parseRecord(jdata) {
     try {
       console.log("Data="+jdata);
-      var newRecord = JSON.parse(jdata);
+      var project_data = JSON.parse(jdata);
       console.log("New record="+newRecord);
       console.log(typeof newRecord);
       console.log("New record has" + newRecord.length + " actions");
       removeAll();
-      doRecord = newRecord;
+      imglist = project_data.imglist;
+      // add any images not already loaded - does not check date
+      img_keys = Object.keys(imglist);
+      var imgs_to_load = [];
+      for(var ii in img_keys) {
+        var ik = img_keys[ii];
+        if(imagesLoaded.hasOwnProperty(ik))
+          continue;
+        imgs_to_load.push(imglist[img_keys]);
+      }
+      loadImages(imgs_to_load);
+      doRecord = project_data.dolist;
       correctPosPoints(doRecord);
       doRecordIndex = 0;
       doAll();
@@ -1207,7 +1280,7 @@ function getDoRecord() {
 }
 
 function getCurrentContextObject() {
-  return currentContextObject;
+  return currentContextObject;  // remeber this is not an instance - contains id into instance
 }
 
 function setCenterToCursor() {
@@ -1261,7 +1334,9 @@ var exports = {
   setOriginToCursor:setOriginToCursor,
   showCursor:showCursor,
   hideCursor:hideCursor,
-  showImageCursors:showImageCursors
+  showImageCursors:showImageCursors,
+  getSnapDefault:getSnapDefault,
+  toggleSnap:toggleSnap
 };
 globals.paperGlue = exports;
 

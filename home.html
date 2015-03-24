@@ -78,7 +78,7 @@
       }
       #contextMenu {
         padding: 0;
-        fontSize:100px;
+        font-size:100px;
       }
 
       #overlay {
@@ -94,7 +94,7 @@
   <button type="button" onclick="DlgShow('A message');" class="button" width="300">Show dialog</button>
   <!--<image src="img/verodes.png"/>-->
   <div id="clientArea">
-  <div id="canvasDiv" style="height=100%;background-color:blue">
+  <div id="canvasDiv" style="height:100%;background-color:blue">
     <canvas id="myCanvas" resize></canvas>
   </div>
   <div id="actionTableDiv" style="display:none">
@@ -103,8 +103,8 @@
       .table{ /*height: 4em; */                   /* define the height */
         border:4px solid black;
       }
-      th{margin: 0;padding: 10px;border:1px solid grey;background-color: lightblue;font-size:14;text-overflow:ellipsis}
-      td{margin: 0;padding: 10px;border:1px solid black;font-size:14;text-overflow:ellipsis}
+      th{margin: 0;padding: 10px;border:1px solid grey;background-color: lightblue;font-size:14px;text-overflow:ellipsis}
+      td{margin: 0;padding: 10px;border:1px solid black;font-size:14px;text-overflow:ellipsis}
       tr:nth-child(odd){background-color:#F0F0E0;}  /*  no work for some reason */
     </style>
     <table id="actionTable" class="table">
@@ -118,7 +118,7 @@
       <tbody>
         <tr>
           <td colspan="3"  style="padding:0">
-            <div id="actionTableBodyDiv" style="overflow:scroll;height:200;width:100%;overflow:auto;margin=0;border:0,0,0,0">
+            <div id="actionTableBodyDiv" style="overflow:scroll;height:200px;width:100%;overflow:auto;margin:0;border:0">
               <table>
                 <tbody id="actionTableBody">
                 </tbody>

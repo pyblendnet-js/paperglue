@@ -14,7 +14,9 @@ var objectInstanceMenu = [ {label:'name', propCall:imgGetInstanceNameCall},
                            {label:'pos',propCall:imgGetPosCall},
                            {label:'snap',propCall:getSnapModeCall,callback:toggleSnap},
                            {label:'properties',callback:openPropDialog} ];
-var first_image = {src:"img/con_Block_5.08mm_12.png", scale:0.6, id:"conBlock1", isSymbol:true, dragClone:true, contextMenu:objectMenu, instanceContextMenu:objectInstanceMenu, pos:view.center };
+window.globals.menuLookup = { objectMenu:objectMenu, objectInstanceMenu:objectInstanceMenu };
+var first_image = {src:"img/con_Block_5.08mm_12.png", scale:0.6, id:"conBlock1", isSymbol:true, dragClone:true, pos:view.center };
+var default_image_menus = { contextMenu:"objectMenu", instanceContextMenu:"objectInstanceMenu"};
 // other parameters:
 //   origin = point in image which represents position
 //   center = point in image for rotation  e.g , center:[30,0]
@@ -37,7 +39,7 @@ function initApp() {
   console.log("Initialising application");
   paperGlue = window.globals.paperGlue;  //to access paperGlue commands
   paperGlue.init();  // sets up extra layers
-  paperGlue.loadImages([first_image]);
+  paperGlue.loadImages([first_image],default_image_menus);
   paperGlue.setSnap([5,5,10,10]);
 }
 
@@ -102,16 +104,16 @@ function imgGetPosCall(obj){
 }
 
 function getSnapModeCall(obj){
-  if(obj.hasOwnProperty('snap'))
-    return obj.snap;
-  return papergui.getSnapDefault();
+  console.log("GetSnapMode for:"+obj);
+  var inst = obj.inst;
+  if(inst.hasOwnProperty('snap'))
+    return inst.snap;
+  return paperGlue.getSnapDefault();
 }
 
-function toggleSnap(obj) {
-  if(obj.hasOwnProperty('snap'))
-    obj.snap = !obj.snap;
-  else
-    obj.snap = !paperGui.getSnapDefault();
+function toggleSnap() {
+  paperGlue.toggleSnap();
+  return true;
 }
 
 function imgGetCenterCall(obj){
@@ -225,6 +227,7 @@ function openPropDialog() {
   p += '</table>';
   var content = document.getElementById('DlgContent');
   content.innerHTML = p;
+  return false;  //do not hide cursors yet
 }
 
 function dialogReturn(reply) {
