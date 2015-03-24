@@ -156,13 +156,19 @@ function showCursor(ci) {
 function showImageCursors(obj,show_mouse_cursor) {
   hideCursor();
   project._activeLayer = cursorLayer;
-  var imgobj =obj.src;
+  console.log("Show cursors:"+Object.keys(obj));
+  var imgobj;
+  if(obj.hasOwnProperty('id'))
+    imgobj =obj;  // this is a image, possibly a master for clones
+  else
+    imgobj = obj.src;     // this is a clone from master symbol
   var raster = obj.raster;
   cursorPos[0] = mouseDownPosition;
   if(show_mouse_cursor)
     showCursor(0);
   cursorPos[1] = raster.position;
   showCursor(1);
+  console.log("Show cursors:"+Object.keys(imgobj));
   if(imgobj.hasOwnProperty('center')) {
     cursorPos[2] = raster.position - imgobj.center.rotate(raster.rotation);
     showCursor(2);
@@ -701,8 +707,10 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
       case 'x':
         console.log("cntrlX");
         if(event.shiftPressed) {  // prune unnecessary edits
-          doRecord = pruneDo();
-          doRecordIndex = doRecord.length;
+          if(confirm("Remove events with no end effect?")) {
+            doRecord = pruneDo();
+            doRecordIndex = doRecord.length;
+          }
         } else {  // undo and remove that particular redo
           undo();
           doRecord.splice(doRecordIndex,1);
@@ -1093,14 +1101,14 @@ function pruneDo() {
   for(var di = doRecordIndex-1; di >= 0; di--) {  // work backwards through do list
     //console.log("Do#"+di);
     var to_do = doRecord[di];
-    //console.log("ids found:"+ids_found);
-    //console.log(ids_found.indexOf(string(to_do.id)));
+    console.log("ids found:"+ids_found);
+    console.log(ids_found.indexOf(String(to_do.id)));
     //console.log(typeof to_do.id);
     //if(ids_found.length > 0)
-    //  console.log(typeof ids_found[0]);
-    if(ids_found.indexOf(String(to_do.id))>= 0)
+    console.log(typeof ids_found[0]);
+    if(ids_found.indexOf(String(to_do.id))>= 0) // this object already sorted
       continue;
-    ids_found.push(+to_do.id);  // this object covered one way or other - NOTE: push will convert everything to string without the + prefix
+    ids_found.push(to_do.id);  // this object covered one way or other - NOTE: push will convert everything to string without the + prefix but indexof only works with Strings
     //console.log("Checking todo action:",to_do.action);
     switch(to_do.action) {
       case 'lineMove':
@@ -1122,7 +1130,7 @@ function pruneDo() {
         var actions_found = {};
         for(var dj = di; dj >= 0; dj--) {  // go backwards (including to_do) and find last of move and rotates and symbolplace
           var will_do = doRecord[dj];
-          //console.log("  Checking #"+dj+" willdo action:"+will_do.action+" for "+will_do.id);
+          console.log("  Checking #"+dj+" willdo action:"+will_do.action+" for "+will_do.id);
           if(to_do.id == will_do.id) {
             //console.log("Actions found:",Object.keys(actions_found));
             if(actions_found.hasOwnProperty(will_do.action)) {
@@ -1133,11 +1141,15 @@ function pruneDo() {
             actions_found[will_do.action] = will_do;
             //console.log("af:",actions_found[a])
             prunedDo.splice(0,0,will_do);
-            if(will_do.action === 'symbolPlace')
+            console.log("Pruned adding:"+will_do.action + " from index:"+dj);
+            if(will_do.action == 'symbolPlace')
               break; // all done
           }
         }
-
+        break;
+      case 'symbolDelete':
+        // no need to keep this in pruned
+        break;
     }
   }
   console.log("AFTER");
