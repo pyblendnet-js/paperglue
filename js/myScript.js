@@ -28,7 +28,22 @@ drawStripBoard(10,100,34);
 console.log(Object.keys(window));
 console.log(Object.keys(window.globals));
 console.log(typeof window.globals.loadImages);
-window.globals.loadImages([first_image]);
+if(typeof window.globals.loadImages === 'undefined')  { // means myScript got here first and paperGlue was not ready
+  console.log("paperGlue not ready yet to load images.")
+  window.globals.onPaperLoad = initImages();  // paperGlue will call this when it is ready
+} else {
+  console.log("PaperGlue already loaded so can load images.")
+  initImages();  // paperglue is already ready so can loadImages now
+}
+// that was a bit messy and my be avoided if I used requirejs or browserify - though I suspect that paper.js will not like it.
+// see http://eloquentjavascript.net/10_modules.html on the subject of slow module loads
+
+
+function initImages() {
+  window.globals.loadImages([first_image]);
+}
+//window.globals.init = myScriptInit;
+
 //
 // window.onload = function() {
 //   console.log("Window loaded");

@@ -49,6 +49,11 @@ globals.getImages = getImageInstances;
 globals.getLines = getLineInstances;
 globals.setSnapQuantum = setSnapQuantum;
 globals.keyHandler = null;
+if(globals.hasOwnProperty("onPaperLoad"))  { // myScript couldn't find loadImages so provided a call to repeat the request
+  console.log("PaperGlue loaded now so can use onPaperLoad to load images.")
+  globals.onPaperLoad();
+}
+// that was a bit messy and my be avoided if I used requirejs or browserify - though I suspect that paper.js will not like it.
 
 // global hooks for created objects
 function getImageInstances() {
@@ -119,12 +124,13 @@ function imageMouseDown(event) {
   }
   console.log("image mouse down");
   // look to see if this object is the raster for one of the master images
+  var id;
   var imgobj;
   var imkeys = Object.keys(imagesLoaded);
   console.log(imkeys);
   for(var i in imkeys) {
-    var id = imkeys[i];
-    console.log("id:"+id)
+    id = imkeys[i];
+    console.log("id:"+id);
     imgobj = imagesLoaded[id];
     if(this == imgobj.raster) {  //master image found
       if(rightButton) {
@@ -147,7 +153,7 @@ function imageMouseDown(event) {
     }
   }
   // no master image found, so maybe this is a clone
-  var id = findImageInstance("raster",this);
+  id = findImageInstance("raster",this);
   if(!!id) {
     var imginst = imageInstances[id];
     if(this == imginst.raster) {  // clone image found
@@ -510,8 +516,13 @@ function onKeyDown(event) {
   } else if(event.key) {
     if(event.modifiers.control) {
       console.log("cntrlX");
-      doRecord = pruneDo();
-      doRecordIndex = doRecord.length;
+      if(event.modifiers.shift) {  // prune unnecessary edits
+        doRecord = pruneDo();
+        doRecordIndex = doRecord.length;
+      } else {  // undo and remove that particular redo
+        undo();
+        doRecord.splice(doRecordIndex,1);
+      }
       event.stopPropagation();
       propagate = false;
     }
@@ -628,16 +639,23 @@ function redo() {
 function pruneDo() {
   // returned current do record pruned down to minimum actions necessary to repeat result
   // also used for system save.
-  //for(var i in doRecord) {
-  //    console.log("#"+i+"="+doRecord[i].action+" to "+doRecord[i].id);
-  //}
+  console.log("BEFORE");
+  for(var i in doRecord) {
+      console.log("#"+i+"="+doRecord[i].action+" to "+doRecord[i].id);
+  }
   var prunedDo = [];  // a list of relevant do's.
   var ids_found = [];   // objects already loaded into pruned list
   for(var di = doRecordIndex-1; di >= 0; di--) {  // work backwards through do list
+    //console.log("Do#"+di);
     var to_do = doRecord[di];
-    if(ids_found.hasOwnProperty(to_do.id))
+    //console.log("ids found:"+ids_found);
+    //console.log(ids_found.indexOf(to_do.id));
+    //console.log(typeof to_do.id);
+    //if(ids_found.length > 0)
+    //  console.log(typeof ids_found[0]);
+    if(ids_found.indexOf(to_do.id)>= 0)
       continue;
-    ids_found.push(to_do.id);  // this object covered one way or other
+    ids_found.push(+to_do.id);  // this object covered one way or other - NOTE: push will convert everything to string without the + prefix
     //console.log("Checking todo action:",to_do.action);
     switch(to_do.action) {
       case 'lineMove':
@@ -645,6 +663,7 @@ function pruneDo() {
           //console.log("path nolonger exists - so ignor");
           break;
         }
+        to_do.pos[0] = null;  // so that it knows to remove the line on an undo
         prunedDo.splice(0,0,to_do);
         break;
       case 'imageMove':
@@ -665,7 +684,7 @@ function pruneDo() {
               //console.log("Duplicate");
               continue;
             }
-            //console.log("  Accept #",dj," willdo action:",will_do.action);
+            //console.log("  Accept #"+dj+" willdo action:"+will_do.action+" to "+will_do.id);
             actions_found[will_do.action] = will_do;
             //console.log("af:",actions_found[a])
             prunedDo.splice(0,0,will_do);
@@ -675,9 +694,10 @@ function pruneDo() {
         }
 
     }
-    //for(var i in prunedDo) {
-    //  console.log("#"+i+"="+prunedDo[i].action);
-    //}
+    console.log("AFTER");
+    for(i in prunedDo) {
+      console.log("#"+i+"="+prunedDo[i].action+" to "+prunedDo[i].id);
+    }
   }
   return prunedDo;
 }

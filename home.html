@@ -11,7 +11,7 @@
   <script type="text/paperscript" src="js/myScript.js" canvas="myCanvas">
   <!-- should have the same scope as per https://github.com/paperjs/paper.js/issues/153 -->
   </script>
-  <script>
+  <script>  // type="text/paperscript" canvas="myCanvas">
     window.globals = { onload:null }; // for interscope comms
 
     function showPaper() {
@@ -30,14 +30,14 @@
       else
         canvas.style.display = "none";
     }
-    </script>
-  <script>
+
   function onload() {
     console.log("body loaded");
-    //window.globals.onload();  //no use since it may not be added to globals yet
+    console.log(Object.keys(window.globals) ); //.onload();  //no use since it may not be added to globals yet
+    //myScriptInit();
   }
-    </script>
-    <style>
+  </script>
+  <style>
       .button {
         color: white;
         background-color: black;
