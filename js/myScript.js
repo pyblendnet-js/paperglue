@@ -20,8 +20,59 @@ var first_image = {src:"img/con_Block_5.08mm_12.png", id:"verodes", isSymbol:tru
 
 //view.on('frame', frameHandler);
 
-
+console.log(Object.keys(window));
+console.log(Object.keys(window.paper));
+console.log(window.innerWidth);
+console.log(window.outerWidth);
+//console.log(window.showPaper);
+//console.log(myCanvas);
+drawStripBoard(10,100,34);
 window.globals.loadImages([first_image]);
+//
+// window.onload = function() {
+//   console.log("Window loaded");
+// };
+//
+// window.onshow = function() {
+//   console.log("Window Show");
+// };
+
+function drawGrid(spacing) {
+  var l;
+  for(var y = 0; y < myCanvas.height; y += spacing) {
+    l = new Path();
+    l.strokeColor = '#e0e0e0';
+    l.add([0,y],[myCanvas.width,y]);
+  }
+  for(var x = 0; x < myCanvas.width; x += spacing) {
+    l = new Path();
+    l.strokeColor = '#e0e0e0';
+    l.add([x,0],[x,myCanvas.height]);
+  }
+}
+
+function drawStripBoard(spacing,length,width) {
+  var l;
+  var vh = width*spacing;
+  var vw = (length+1)*spacing;
+  var path = new Path.Circle([0,0], spacing*0.2);
+  path.fillColor = 'white';
+  var hole = new Symbol(path);
+  for(var y = spacing/2; y < vh; y += spacing) {
+    l = new Path();
+    l.strokeColor = '#e0e0e0';
+    l.strokeWidth = spacing*0.8;
+    l.add([0,y],[vw,y]);
+    for(var x = spacing/2; x < vw; x += spacing) {
+      hole.place([x,y]);
+    }
+  }
+  var lr = project.layers[0];
+  console.log(lr._children.length);
+  var top_layer = lr.rasterize();
+  lr.removeChildren();
+  lr.addChild(top_layer);
+}
 
 function imgGetNameCall(obj){
   console.log('get name called');
@@ -37,3 +88,26 @@ function imgGetPosCall(obj){
   console.log('pos called');
   return obj.raster.position;
 }
+
+function onKeyDown(event) {
+  if(event.key == 'control' || event.key == 'shift' || event.key == 'alt')
+    return;
+  console.log(event);
+  console.log("myScript received:",event.key);
+  if(event.modifiers.control) {
+    if(event.key == 's') {
+      console.log("cntrlS");
+      event.stopPropagation();
+
+      var lines = globals.getLines();
+      var images = globals.getImages();
+      var paper_screen = {lines:lines,images:images};
+      json_str = JSON.stringify(paper_screen);
+      console.log(json_str);
+      return false;
+    }
+  }
+  return true;
+}
+
+window.globals.keyhandler = onKeyDown;  // requests paperglue to pass event here

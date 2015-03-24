@@ -31,11 +31,12 @@ var snapQuantum = 40;
 var rightButton = false;
 var imagesLoaded = [];
 var imageInstances = {};  //images that have been cloned from sybols in imagesLoaded.
+var nextImageID = 0;   // each image added to instances needs a new unique id
 var defaultContextMenu = [ {label:'view', callback:viewCall},{label:'open',callback:openCall} ];
 var currentContextMenu = defaultContextMenu;
 var currentContextObject = null;
 var holdContext = false;  // don't reset contextMenu till after mouseUp
-var doRecord = [];  // record of all clonings and moves  {action:string,src:imageobject,obj:raster or path,pos:point}
+var doRecord = [];  // record of all clonings and moves  {action:string,src:src,raster:image or line:path,pos:point}
 var doRecordIndex = 0;  // points to next do location
 
 
@@ -46,6 +47,7 @@ globals.loadImages = loadImages;
 globals.getImages = getImageInstances;
 globals.getLines = getLineInstances;
 globals.setSnapQuantum = setSnapQuantum;
+globals.keyHandler = null;
 
 // global hooks for created objects
 function getImageInstances() {
@@ -53,6 +55,7 @@ function getImageInstances() {
 }
 
 function getLineInstances() {
+  console.log("Returning line instances:", Object.keys(lineInstances).length);
   return lineInstances;
 }
 
@@ -76,31 +79,34 @@ function addImage(source, id) {
   src.appendChild(img);
 }
 
-// finds an instance of an image clone based on id, raster or imageObject
-// If imageObject then returns a list of matching objects, otherwise first instance
+// finds an instance of an image clone based on id, raster or src
+// If src then returns a list of matching ids, otherwise first instance
 function findImageInstance(search_by,search_key) {
-  var objs = [];
+  if(search_key == 'id') {
+    if(imageInstances.hasOwnProperty(search_key)) {
+      return search_key;
+    }
+  }
+  var ids = [];
   for(var i in imageInstances) {
     var inst = imageInstances[i];
     switch(search_by) {
-      case 'id':
-        if(inst.id == search_key)
-          return inst;
-        break;
       case 'raster':
-        if(inst.raster == search_key)
-          return inst;
+        if(inst.raster == search_key) {
+          console.log("Found matching raster");
+          return i;
+        }
         break;
-      case 'imageObject':
-          if(inst.imgobj == search_key)
-            objs.push(inst);
+      case 'src':
+          if(inst.src == search_key)
+            ids.push(id);
           break;
       default:
         return 'null';
     }
   }
-  if(search_by == 'imageObject')
-    return objs;
+  if(search_by == 'src')
+    return ids;
   return null;
 }
 
@@ -119,7 +125,7 @@ function imageMouseDown(event) {
         if(imgobj.hasOwnProperty('contextMenu'))  // if not defined then stay with default
           console.log("Attaching image context menu");
           currentContextMenu = imgobj.contextMenu;
-          currentContextObject = {imageObject:imgobj,raster:imgobj.raster};  //to match image instance object
+          currentContextObject = {src:imgobj,raster:imgobj.raster};  //to match image instance object
           holdContext = true;  // cross browser solution to default mouse up reset
           return false;   // just show context menu now - see context menu callback below
       }
@@ -134,13 +140,14 @@ function imageMouseDown(event) {
     }
   }
   // no master image found, so maybe this is a clone
-  for(i in imageInstances) {
-    var imginst = imageInstances[i];
+  var id = findImageInstance("raster",this);
+  if(!!id) {
+    var imginst = imageInstances[id];
     if(this == imginst.raster) {  // clone image found
       if(rightButton) {
-        imgobj = imginst.imageObject;
+        imgobj = imginst.src;
         if(imgobj.hasOwnProperty('instanceContextMenu')) {   // if not defined then stay with default
-           currentContextMenu = imginst.imageObject.instanceContextMenu;
+           currentContextMenu = imginst.src.instanceContextMenu;
            currentContextObject = imginst;
            holdContext = true;  // cross browser solution to default mouse up reset
            return false; // clone image not selected for right click
@@ -153,34 +160,28 @@ function imageMouseDown(event) {
 }
 
 // uses master image raster to create clone
-function symbolPlace(imgobj) {
+// only use force_id for redo so that it uses old id
+function symbolPlace(imgobj, force_id) {
   imageSelected = imgobj.symbol.place();
   imageSelected.scale(0.5);
   imageSelected.onMouseDown = imageMouseDown;
-  img_id = imgobj.nextID;
-  imageInstances.push({imageObject:imgobj, raster:imageSelected, id:img_id});
-  doRecordAdd({action:'symbolPlace',src:imgobj,id:img_id});
+  var img_id;
+  if(typeof force_id === 'undefined')
+    img_id = nextImageID;
+  else
+    img_id = force_id;  // used by redo to accept old id
+  imageInstances[img_id] = {src:imgobj, raster:imageSelected};
+  doRecordAdd({action:'symbolPlace',id:img_id,type:'image',src:imgobj});
   imgobj.instances += 1;
-  imgobj.nextID += 1;
+  nextImageID += 1;
 }
 
 // find img_id for imgobj in imageInstances
 function symbolRemove(imgobj, img_id) {
   console.log("Attempting to remove instance of " + imgobj.id + " with " + img_id);
-  for(var i in imageInstances) {
-    var inst = imageInstances[i];
-    console.log("Instance#" + i + " = " + inst.imageObject.id + " has id " + inst.id);
-    if(inst.imageObject == imgobj) {
-      console.log("Instance imageobjects match");
-      if(inst.id == img_id) {
-        console.log("Instance id match");
-        imgobj--;
-        inst.raster.remove();
-        imageInstances.slice(i,1);
-        return;
-      }
-    }
-  }
+  var inst = imageInstances[img_id];
+  inst.raster.remove();
+  delete imageInstances[img_id];
 }
 
 /**
@@ -200,7 +201,6 @@ function loadImages(images_to_load) {
         imgobj.raster.remove();  //dont need this cluttering the document
         imgobj.raster = imgobj.symbol.place();
         imgobj.instances = 0;
-        imgobj.nextID = 0;
       }
     }
     if(imgobj.hasOwnProperty('pos')) {   // a position given so it will be visible
@@ -402,53 +402,71 @@ function onMouseUp(event) {
     // for undo it will be necessary to look for previous position if any
     // point needs to be cloned to dereference
     line_id = validatePath(lineSelected);
-    doRecordAdd({action:'pathMove',id:line_id,pos:[lineSelected.firstSegment.point.clone(),lineSelected.lastSegment.point.clone()]});
     lineSelected = null;
     // continue through to path addition or removal
   } else if(!!imageSelected) {
     var rp = imageSelected.position/snapQuantum;
     imageSelected.position = rp.round()*snapQuantum;
-    var imginst = findImageInstance('raster',imageSelected);
-    console.log("instance found with id:"+imginst.id);  // need to keep id as well - might be null for master objects in layout mode
+    var img_id = findImageInstance('raster',imageSelected);
+    console.log("instance found with id:"+img_id);  // need to keep id as well - might be null for master objects in layout mode
     // keeping the obj as record is fine for undo but not so good for redo if the object gets deleted further back
-    doRecordAdd({action:'imageMove',obj:imageSelected,pos:imageSelected.position});
+    doRecordAdd({action:'imageMove',id:img_id,type:'image',pos:imageSelected.position});
     imageSelected = null;
   }
 }
 
 function getLineID(path) {
-  for(var i = 0; i < lineNextID;i++) {
-    if(lineInstances.hasOwnProperty(i))
-      return i;
+  for(var id in lineInstances) {
+    if(lineInstances[id].line == path) {
+      console.log('Found existing line with id:', id);
+      return id;
+    }
   }
-  return lineNextID;
+  return null;
 }
 
-function validatePath(path) {
-  var id = getLineID(lineSelected);
+function validatePath(path, force_id) {
+  // only use force id for redo where the old id must be reused
+  var next_id = lineNextID;
+  var line_id = null;
+  if(typeof force_id == 'undefined') {
+    line_id = getLineID(path);
+  } else {
+    console.log("Force new line to id:",force_id);
+    next_id = force_id;
+  }
   if(path.length >= snapQuantum) {
     snap(path);
-    if(!lineInstances.hasOwnProperty(id)) { //this path doesn't exist
-      lineInstances[id]=path;
-      lineNextID++;
+    if(line_id === null) { //this path doesn't exist
+      console.log('Creating new line with id:',next_id);
+      lineInstances[next_id] = {line:path};
+      if(next_id == lineNextID)
+        lineNextID++;
+      line_id = next_id;
+    }
+    if(typeof force_id == 'undefined') {  // don't record redos
+      doRecordAdd({action:'lineMove',id:line_id,type:'line',pos:[lineSelected.firstSegment.point.clone(),lineSelected.lastSegment.point.clone()]});
     }
   } else {  // length of line is too short
-    removeLine(id);
+    removeLine(line_id);
+    return null;
   }
-  return id;
+  return line_id;
 }
 
 function removeLine(id) {
-  path.remove();
   if(lineInstances.hasOwnProperty(id))  // this path does exist
-    delete lineInstances[id];
+    lineInstances[id].line.remove();  // should remove from screen
+  delete lineInstances[id];  // removes from list
 }
 
 function doRecordAdd(action) {
   if(doRecordIndex >= doRecord.length)
     doRecord.push(action);
-  else
+  else {
+    console.log("Recording action at index:",doRecordIndex);
     doRecord.splice(doRecordIndex,0,action);
+  }
   doRecordIndex++;
 }
 
@@ -456,7 +474,8 @@ function onKeyDown(event) {
   if(event.key == 'control' || event.key == 'shift' || event.key == 'alt')
     return;
   console.log(event);
-  console.log(event.key);
+  console.log("Paperglue received:" + event.key);
+  var propagate = true;
   if(event.key == 'z') {
     if(event.modifiers.control) {
       console.log("cntrlZ");
@@ -464,8 +483,15 @@ function onKeyDown(event) {
         redo();
       else
         undo();
+        event.stopPropagation();
+        propagate = false;
     }
   }
+  if(propagate && (typeof globals.keyhandler == 'function')) {
+    console.log("Passing key upwards");
+    propagate = globals.keyhandler(event);
+  }
+  return propagate;
 }
 
 function undo() {
@@ -474,46 +500,46 @@ function undo() {
     console.log("doRecordIndex: " + doRecordIndex);
     doRecordIndex--;
     var last_do = doRecord[doRecordIndex];
-    console.log("Undoing " + last_do.action + " which as pos:" + last_do.pos);
-    var id = last_do.id;
+    console.log("Undoing " + last_do.action + " for " + last_do.id + " which as pos:" + last_do.pos);
     for(var i = doRecordIndex - 1; i >= 0; i--) {
       var prev_do = doRecord[i];
-      console.log(i + " do is " + prev_do.action + " has pos:" + prev_do.pos);
-      if(prev_do.id == id) {
-        console.log("Found previous move");
+      console.log(i + " do for " + prev_do.id + " is " + prev_do.action + " has pos:" + prev_do.pos);
+      if((prev_do.id == last_do.id) && (prev_do.type == last_do.type)) {
+        console.log("Found previous action for id:" + last_do.id + " and type:" + last_do.type);
         switch(last_do.action) {
-          case 'pathMove':
-            console.log("Obj pos1:",obj.firstSegment.point);
-            console.log("Obj pos2:",obj.lastSegment.point);
-            console.log("Obj pos:",obj.position);
-            obj.firstSegment.point = prev_do.pos[0];
-            obj.lastSegment.point = prev_do.pos[1];
+          case 'lineMove':
+            var path = lineInstances[id].line;
+            // console.log("Obj pos1:",path.firstSegment.point);
+            // console.log("path pos2:",path.lastSegment.point);
+            // console.log("path pos:",path.position);
+            path.firstSegment.point = prev_do.pos[0];
+            path.lastSegment.point = prev_do.pos[1];
             console.log("Return path to " + prev_do.pos);
-            console.log("Obj pos1:",obj.firstSegment.point);
-            console.log("Obj pos2:",obj.lastSegment.point);
-            console.log("Obj pos:",obj.position);
+            // console.log("path pos1:",path.firstSegment.point);
+            // console.log("path pos2:",path.lastSegment.point);
+            // console.log("path pos:",path.position);
             break;
-          case 'imageMove':
-            obj.position = prev_do.pos;
-            console.log("Return img to " + prev_do.pos);
+         case 'imageMove':
+            var raster = imageInstances[last_do.id].raster;
+            if(prev_do.action == 'symbolPlace') {  // this was the first drag
+              console.log("Remove symbol from instances");
+              symbolRemove(prev_do.src, prev_do.id);
+              doRecordIndex--;  // skip back over symbol places too
+            } else if(typeof prev_do.pos != 'undefined'){  // check it has a pos
+              raster.position = prev_do.pos;
+              console.log("Return img to " + prev_do.pos);
+            }
         }
         return;
       }
     }
     // nothing found, so assume can delete
     switch(last_do.action) {
-      case 'pathMove':
-        removeLine(lineInstance[last_do.id]);
+      case 'lineMove':
+        removeLine(last_do.id);
         break;
       case 'imageMove':
-        if(doRecordIndex > 0) {  // if this is a symbol then there should be a symbolPlace as previous do
-          last_do = doRecord[doRecordIndex-1];
-          if(last_do.action == 'symbolPlace') {
-            console.log("Remove symbol from instances");
-            symbolRemove(last_do.src, last_do.id);
-            doRecordIndex--;
-          }
-        }
+        console.log("imageMove with no previous symbolPlace - must be master symbol");
         break;
     }
 }
@@ -522,29 +548,39 @@ function redo() {
   if(doRecordIndex >= doRecord.length)
     return;  // nothing to undo
   var to_do = doRecord[doRecordIndex];
-  var obj;
   console.log("Redoing " + to_do.action);
+  var raster;
   switch(to_do.action) {
-    case 'pathMove':
+    case 'lineMove':
       console.log(lineInstances.length);
       if(!lineInstances.hasOwnProperty(to_do.id)) {
-        console.log("obj nolonger exists - remaking");
+        console.log("path nolonger exists - remaking");
         newLine();
         lineSelected.add(to_do.pos[0]);
         lineSelected.add(to_do.pos[1]);
-        var id = validatePath(lineSelected);
+        // need to reuse old id
+        var id = validatePath(lineSelected,to_do.id);  // adds to lineInstances
+        lineSelected = null;
       } else {
-        obj = lineInstances[to_do.id];
-        obj.firstSegment.point = to_do.pos[0];
-        obj.lastSegment.point = to_do.pos[1];
+        var path = lineInstances[to_do.id].line;
+        path.firstSegment.point = to_do.pos[0];
+        path.lastSegment.point = to_do.pos[1];
       }
       break;
     case 'imageMove':
-      obj = lineInstances[to_do.id];
-      obj.position = to_do.pos;
+      raster = imageInstances[to_do.id].raster;
+      raster.position = to_do.pos;
       break;
     case 'symbolPlace':
-      symbolPlace(to_do.imageObject);
+      symbolPlace(to_do.src,to_do.id);
+      imageSelected = null;
+      // this is normally followed by a drag move, so do this too
+      to_do = doRecord[doRecordIndex+1];
+      if(to_do.action == 'imageMove') {
+        doRecordIndex++;
+        raster = imageInstances[to_do.id].raster;
+        raster.position = to_do.pos;
+      }
       break;
   }
   doRecordIndex++;
