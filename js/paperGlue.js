@@ -22,8 +22,8 @@
 //note:objects here are all somewhere within the paper scope
 // Tp make visibile to window, declare as window.object
 
+var nextID = 0;  // for keeping track of all objects with a unique id
 var lineInstances = {};
-var lineNextID = 0;
 var lineSelected = null;
 var imageSelected = null;
 var imageSelectedPositiion = null;
@@ -31,9 +31,8 @@ var lineSelectMode = 0;
 var snapQuantum = 40;
 var mouseDownPosition;
 var rightButton = false;
-var imagesLoaded = [];
+var imagesLoaded = {};
 var imageInstances = {};  //images that have been cloned from sybols in imagesLoaded.
-var nextImageID = 0;   // each image added to instances needs a new unique id
 var defaultContextMenu = [ {label:'view', callback:viewCall},{label:'open',callback:openCall} ];
 var currentContextMenu = defaultContextMenu;
 var currentContextObject = null;
@@ -121,8 +120,12 @@ function imageMouseDown(event) {
   console.log("image mouse down");
   // look to see if this object is the raster for one of the master images
   var imgobj;
-  for(var i in imagesLoaded) {
-    imgobj = imagesLoaded[i];
+  var imkeys = Object.keys(imagesLoaded);
+  console.log(imkeys);
+  for(var i in imkeys) {
+    var id = imkeys[i];
+    console.log("id:"+id)
+    imgobj = imagesLoaded[id];
     if(this == imgobj.raster) {  //master image found
       if(rightButton) {
         if(imgobj.hasOwnProperty('contextMenu'))  // if not defined then stay with default
@@ -135,7 +138,7 @@ function imageMouseDown(event) {
       if(imgobj.hasOwnProperty('dragClone')) {  // if not defined then assume false
         if(imgobj.dragClone === true) {   // this image object can be dragged, so it should have isSymbol set true also
           //console.log("Symbol:" + imgobj.symbol);
-          symbolPlace(imgobj);
+          symbolPlace(imgobj.id);
           imageSelected.position = imgobj.raster.position;
           imageSelectedPosition = null;  // so we can tell there was no prior position
         }
@@ -166,19 +169,20 @@ function imageMouseDown(event) {
 
 // uses master image raster to create clone
 // only use force_id for redo so that it uses old id
-function symbolPlace(imgobj, force_id) {
+function symbolPlace(imgid, force_id) {
+  var imgobj = imagesLoaded[imgid];
   imageSelected = imgobj.symbol.place();
   imageSelected.scale(0.5);
   imageSelected.onMouseDown = imageMouseDown;
   var img_id;
   if(typeof force_id === 'undefined')
-    img_id = nextImageID;
+    img_id = nextID;
   else
     img_id = force_id;  // used by redo to accept old id
   imageInstances[img_id] = {src:imgobj, raster:imageSelected};
-  doRecordAdd({action:'symbolPlace',id:img_id,type:'image',src:imgobj});
+  doRecordAdd({action:'symbolPlace',id:img_id,type:'image',src:imgobj.id});
   imgobj.instances += 1;
-  nextImageID += 1;
+  nextID += 1;
 }
 
 // find img_id for imgobj in imageInstances
@@ -196,7 +200,7 @@ function symbolRemove(imgobj, img_id) {
 function loadImages(images_to_load) {
   while(images_to_load.length > 0) {  // continue till empty - not sure if this is valid
     var imgobj = images_to_load.pop();
-    imagesLoaded.push(imgobj);  // record master images
+    imagesLoaded[imgobj.id]= imgobj;  // record master images
     addImage(imgobj.src,imgobj.id);  // add image to document
     imgobj.raster = new Raster(imgobj.id);  // make this a paper image
     //console.log(img.isSymbol);
@@ -442,7 +446,7 @@ function getLineID(path) {
 
 function validatePath(path, force_id) {
   // only use force id for redo where the old id must be reused
-  var next_id = lineNextID;
+  var next_id = nextID;
   var line_id = null;
   if(typeof force_id == 'undefined') {
     line_id = getLineID(path);
@@ -455,8 +459,8 @@ function validatePath(path, force_id) {
     if(line_id === null) { //this path doesn't exist
       console.log('Creating new line with id:',next_id);
       lineInstances[next_id] = {line:path};
-      if(next_id == lineNextID)
-        lineNextID++;
+      if(next_id == nextID)
+        nextID++;
       line_id = next_id;
     }
     if(typeof force_id == 'undefined') {  // don't record redos
@@ -495,12 +499,21 @@ function onKeyDown(event) {
   if(event.key == 'z') {
     if(event.modifiers.control) {
       console.log("cntrlZ");
-      if(event.modifiers.shift)
+      if(event.modifiers.shift) {
         redo();
-      else
+      } else {
         undo();
-        event.stopPropagation();
-        propagate = false;
+      }
+      event.stopPropagation();
+      propagate = false;
+    }
+  } else if(event.key) {
+    if(event.modifiers.control) {
+      console.log("cntrlX");
+      doRecord = pruneDo();
+      doRecordIndex = doRecord.length;
+      event.stopPropagation();
+      propagate = false;
     }
   }
   if(propagate && (typeof globals.keyhandler == 'function')) {
@@ -567,7 +580,7 @@ function undo() {
 
 function redo() {
   if(doRecordIndex >= doRecord.length)
-    return;  // nothing to undo
+    return false;  // nothing to undo
   var to_do = doRecord[doRecordIndex];
   console.log("Redoing " + to_do.action);
   var raster;
@@ -609,4 +622,62 @@ function redo() {
       break;
   }
   doRecordIndex++;
+  return true;  // something done
+}
+
+function pruneDo() {
+  // returned current do record pruned down to minimum actions necessary to repeat result
+  // also used for system save.
+  //for(var i in doRecord) {
+  //    console.log("#"+i+"="+doRecord[i].action+" to "+doRecord[i].id);
+  //}
+  var prunedDo = [];  // a list of relevant do's.
+  var ids_found = [];   // objects already loaded into pruned list
+  for(var di = doRecordIndex-1; di >= 0; di--) {  // work backwards through do list
+    var to_do = doRecord[di];
+    if(ids_found.hasOwnProperty(to_do.id))
+      continue;
+    ids_found.push(to_do.id);  // this object covered one way or other
+    //console.log("Checking todo action:",to_do.action);
+    switch(to_do.action) {
+      case 'lineMove':
+        if(!lineInstances.hasOwnProperty(to_do.id)) {
+          //console.log("path nolonger exists - so ignor");
+          break;
+        }
+        prunedDo.splice(0,0,to_do);
+        break;
+      case 'imageMove':
+      case 'imageRotate':
+      case 'symbolPlace':
+        if(!imageInstances.hasOwnProperty(to_do.id)) {
+          //console.log("image nolonger exists - so ignor");
+          break;
+        }
+        //console.log("Checking todo action:",to_do.action);
+        var actions_found = {};
+        for(var dj = di; dj >= 0; dj--) {  // go backwards (including to_do) and find last of move and rotates and symbolplace
+          var will_do = doRecord[dj];
+          //console.log("  Checking #"+dj+" willdo action:"+will_do.action+" for "+will_do.id);
+          if(to_do.id == will_do.id) {
+            //console.log("Actions found:",Object.keys(actions_found));
+            if(actions_found.hasOwnProperty(will_do.action)) {
+              //console.log("Duplicate");
+              continue;
+            }
+            //console.log("  Accept #",dj," willdo action:",will_do.action);
+            actions_found[will_do.action] = will_do;
+            //console.log("af:",actions_found[a])
+            prunedDo.splice(0,0,will_do);
+            if(will_do.action === 'symbolPlace')
+              break; // all done
+          }
+        }
+
+    }
+    //for(var i in prunedDo) {
+    //  console.log("#"+i+"="+prunedDo[i].action);
+    //}
+  }
+  return prunedDo;
 }

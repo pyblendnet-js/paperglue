@@ -4,7 +4,7 @@ var wireLinks = [];
 
 var objectMenu = [ {label:'name', propCall:imgGetNameCall},{label:'pos',propCall:imgGetPosCall} ];
 var objectInstanceMenu = [ {label:'name', propCall:imgGetInstanceNameCall},{label:'pos',propCall:imgGetPosCall} ];
-var first_image = {src:"img/con_Block_5.08mm_12.png", id:"verodes", isSymbol:true, dragClone:true, contextMenu:objectMenu, instanceContextMenu:objectInstanceMenu, pos:view.center };
+var first_image = {src:"img/con_Block_5.08mm_12.png", id:"conBlock1", isSymbol:true, dragClone:true, contextMenu:objectMenu, instanceContextMenu:objectInstanceMenu, pos:view.center };
 //
 // var oldOnLoad = window.globals.onload;
 // console.log("Settings window.globals");
@@ -27,7 +27,7 @@ console.log(window.outerWidth);
 drawStripBoard(10,100,34);
 console.log(Object.keys(window));
 console.log(Object.keys(window.globals));
-console.log(typeof window.globals.loadImsges);
+console.log(typeof window.globals.loadImages);
 window.globals.loadImages([first_image]);
 //
 // window.onload = function() {
