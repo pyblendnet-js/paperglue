@@ -2,8 +2,12 @@
 
 var wireLinks = [];
 
-var objectMenu = [ {label:'name', propCall:imgGetNameCall},{label:'pos',propCall:imgGetPosCall} ];
-var objectInstanceMenu = [ {label:'name', propCall:imgGetInstanceNameCall},{label:'pos',propCall:imgGetPosCall},{label:'properties',callback:openPropDialog} ];
+var objectMenu = [ {label:'name', propCall:imgGetNameCall},
+                   {label:'pos',propCall:imgGetPosCall},
+                   {label:'properties',callback:openPropDialog}
+                 ];
+var objectInstanceMenu = [ {label:'name', propCall:imgGetInstanceNameCall},
+                           {label:'pos',propCall:imgGetPosCall},{label:'properties',callback:openPropDialog} ];
 var first_image = {src:"img/con_Block_5.08mm_12.png", id:"conBlock1", isSymbol:true, dragClone:true, contextMenu:objectMenu, instanceContextMenu:objectInstanceMenu, pos:view.center };
 
 console.log("Starting myScript");
@@ -161,6 +165,8 @@ function openPropDialog() {
     p += '<input id="xpos" type="number" value="'+obj.raster.position.x+'"/></td></tr>';
     p += '<tr><td>Y</td><td>';
     p += '<input id="ypos" type="number" value="'+obj.raster.position.y+'"/></td></tr>';
+    p += '<tr><td>Rot</td><td>';
+    p += '<input id="rot" type="number" value="'+obj.raster.rotation+'"/></td></tr>';
   }
   // var ks = Object.keys(obj);
   // for(var ki in ks ) {
@@ -175,11 +181,13 @@ function openPropDialog() {
 function dialogReturn(reply) {
   var xfield = document.getElementById('xpos');
   var yfield = document.getElementById('ypos');
+  var rfield = document.getElementById('rot');
   var x = parseFloat(xfield.value);
   var y = parseFloat(yfield.value);
-  console.log("X:"+x);
-  if(reply === 'ok')
-    window.globals.paperGlue.moveCurrentImage(x,y);
+  var r = parseFloat(rfield.value);
+  //console.log("X:"+x);
+  if(reply !== 'cancel')
+    window.globals.paperGlue.moveCurrentImage(x,y,r);
 }
 
 

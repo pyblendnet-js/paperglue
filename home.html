@@ -49,8 +49,10 @@
   }
 
   function DlgHide(reply) {
-    var Dlg = document.getElementById('Overlay');
-    Dlg.style.visibility = 'hidden';
+    if(reply !== 'apply') {
+      var Dlg = document.getElementById('Overlay');
+      Dlg.style.visibility = 'hidden';
+    }
     window.globals.dialogReturn(reply);
   }
 
@@ -64,8 +66,8 @@
       #Overlay {
         visibility: hidden;
         position: absolute;
-        left: 90px;
-        top: 120px;
+        left: 20px;
+        top: 60px;
         padding: 2px;
         text-align:center;
         border: solid;
@@ -80,7 +82,7 @@
 <body id="body" onload="onload();" >
   <button type="button" onclick="hideCanvas();" class="button" width="300">hide Canvas</button>
   <button type="button" onclick="myScriptCmd('listActions');" class="button" width="300">List Content</button>
-  <button type="button" onclick="paperGlue('remove_all');" class="button" width="300">Remove All</button>
+  <button type="button" onclick="paperGlueCmd('remove_all');" class="button" width="300">Remove All</button>
   <button type="button" onclick="DlgShow('A message');" class="button" width="300">Show dialog</button>
   <!--<image src="img/verodes.png"/>-->
   <div id="clientArea">
@@ -145,8 +147,11 @@
   <div>
     <div id="DlgContent">Content Goes Here</div>
     <input type="button"
-        value="Ok"
-      onclick="DlgHide('ok')" />
+        value="Apply"
+      onclick="DlgHide('apply')" />
+      <input type="button"
+          value="Ok"
+        onclick="DlgHide('ok')" />
     <input type="button"
         value="Cancel"
       onclick="DlgHide('cancel')" />

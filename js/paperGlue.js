@@ -438,14 +438,21 @@ function onMouseUp(event) {
   }
 }
 
-function moveCurrentImage(x,y) {
+function moveCurrentImage(x,y,r) {
   var im = currentContextObject.raster;
   //console.log("pos:"+im.position);
   var p = new Point(x,y);
-  //console.log(p);
-  doRecordAdd({action:'imageMove',id:currentContextObject.id,type:'image',pos:[im.position,p]});
-  //console.log(doRecord[doRecordIndex-1].pos);
-  im.position = p;
+  if(x !== im.position.x && y !== im.position.y) {
+    //console.log(p);
+    doRecordAdd({action:'imageMove',id:currentContextObject.id,type:'image',pos:[im.position,p]});
+    //console.log(doRecord[doRecordIndex-1].pos);
+    im.position = p;
+  }
+  if(r !== im.rotation) {
+    var rot = Math.round(r);
+    doRecordAdd({action:'imageRotate',id:currentContextObject.id,type:'image',rot:[im.rotation,rot]});
+    im.rotation = rot;
+  }
 }
 
 function getLineID(path) {
