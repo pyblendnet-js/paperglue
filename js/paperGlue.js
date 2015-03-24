@@ -50,6 +50,8 @@ var mouseDownPosition;
 var rightButton = false;
 var customDefaultProps = {};
 var selectedItems = {};
+var selectedPos = {};  // for prev pos following are move
+var selectedMove = false;
 var imagesLoaded = {};
 var imageInstances = {};  //images that have been cloned from sybols in imagesLoaded.
 var defaultContextMenu = [ {label:'view', callback:viewCall},{label:'open',callback:openCall} ];
@@ -537,6 +539,12 @@ function onMouseDown(event) {
   hideArea();
   if(rightButtonCheck(event)) {
     console.log("Right button down");
+    var d = new Date();
+    var nowMs = d.getTime();
+    var shiftPressed = ((nowMs - shiftPressMs) < modPressDelay);
+    if(shiftPressed) {   //if control pressed then do not clear previous
+      selectedMove = true;
+    }
     if(holdContext === false)  // cross browser solution to default mouse up reset
       currentContextMenu = defaultContextMenu;
     return false;
@@ -777,11 +785,10 @@ function selectItem(id,item) {
   var nowMs = d.getTime();
   var controlPressed = ((nowMs - controlPressMs) < modPressDelay);
   if(!controlPressed) {   //if control pressed then do not clear previous
-    var sk = Object.keys(selectedItems);
-    for(var si in sk) {
-      selectedItems[sk[si]].selected = false;
+    for(var sid in selectedItems) {
+      selectedItems[sid].selected = false;
     }
-    selectedItems = {};  // leaves the problem for the garbage collector
+    selectedItems = [];  // leaves the problem for the garbage collector
   }
   selectedItems[id] = item;
   item.selected = true;
@@ -827,6 +834,20 @@ function onMouseDrag(event) {
     return;
   if(rightButton) {
     var v = event.point - mouseDownPosition;
+    if(selectedMove) {
+      for(var sid in selectedItems) {
+        if(lineInstances.hasOwnProperty(sid))
+          lineInstances[sid].path.position += event.delta;
+        else if(imageInstances.hasOwnProperty(sid))
+          imageInstances[sid].raster.position += event.delta;
+        else if(areaInstances.hasOwnProperty(sid)) {
+          var sa =areaInstance[sid];
+          if(sa.hasOwnProperty("path"))
+            areaInstances[sid].path.position += event.delta;
+        }
+      }
+      return;
+    }
     if(Math.abs(v.x) > minAreaSide && Math.abs(v.y) > minAreaSide) {
       if(!areaSelected) {
         newArea();
@@ -917,74 +938,96 @@ function onMouseUp(event) {
   if(modalOpen)
     return;
   if(editMode) {
-  if(!!imageSelected) {
-    console.log("Opacity was:" + imageSelected.opacity);
-    imageSelected.opacity = 1.0;
-  }
-  if(rightButton) {
-    var aid;
-    if(!imageSelected && !lineSelected && !areaSelected) {
-      if(areasVisible) {
-        aid = hitTestAreas(mouseDownPosition);
-        if(!!aid) {
-          var a = areaInstances[aid];
-          currentContextObject = {id:aid,type:'area',inst:a};  //to match image instance object
-          if(a.hasOwnProperty('path'))
-            selectItem(id,a.path);
-          setContextMenu("areaMenu");
+    if(!!imageSelected) {
+      console.log("Opacity was:" + imageSelected.opacity);
+      imageSelected.opacity = 1.0;
+    }
+    if(rightButton) {
+      if(selectedMove) {
+        for(var sid in selectedItems) {
+          var item = selectedItems[sid];
+          var prev_pos = selectedPos[sid];
+          if(lineInstances.hasOwnProperty(sid)) {
+            validatePath(item);
+          } else if(imageInstances.hasOwnProperty(sid)) {
+            imageMoved(item,prev_pos,false);
+          } else if(areaInstances.hasOwnProperty(sid)) {
+          }
+        }
+        selectedMove = false;
+        rightButton = false;
+        imageSelected = null;
+        console.log("Area move completed");
+        return;
+      }
+      var aid;
+      if(!imageSelected && !lineSelected && !areaSelected) {
+        if(areasVisible) {
+          aid = hitTestAreas(mouseDownPosition);
+          if(!!aid) {
+            var a = areaInstances[aid];
+            currentContextObject = {id:aid,type:'area',inst:a};  //to match image instance object
+            if(a.hasOwnProperty('path'))
+              selectItem(id,a.path);
+            setContextMenu("areaMenu");
+          }
+        }
+        if(!aid) {
+          var id = hitTestLines(mouseDownPosition);
+          if(!!id) {
+            var l = lineInstances[id];
+            currentContextObject = {id:id,type:'line',inst:l};  //to match image instance object
+            if(l.hasOwnProperty('path'))
+              selectItem(id,l.path);
+            setContextMenu("lineMenu");
+          }
         }
       }
-      if(!aid) {
-        var id = hitTestLines(mouseDownPosition);
-        if(!!id) {
-          var l = lineInstances[id];
-          currentContextObject = {id:id,type:'line',inst:l};  //to match image instance object
-          if(l.hasOwnProperty('path'))
-            selectItem(id,l.path);
-          setContextMenu("lineMenu");
-        }
-      }
+      rightButton = false;
+      imageSelected = null;
+      return;
     }
-    rightButton = false;
-    imageSelected = null;
-    return;
-  }
-  if(!!lineSelected) {
-    // for undo it will be necessary to look for previous position if any
-    // point needs to be cloned to dereference
-    line_id = validatePath(lineSelected);
-    if(!line_id)
-      hitTestAreas(mouseDownPosition);
-    lineSelected = null;
-    // continue through to path addition or removal
-  } else if(!!imageSelected) {
-    hideCursor();
-    var img_id = findImageInstance('raster',imageSelected);
-    if(!!img_id) {  // shouldn't be any trouble here
-      console.log("instance found with id:"+img_id);  // need to keep id as well - might be null for master objects in layout mode
-      var round_only = !snapDefault;
-      if(img_id !== null) {
-        var inst = imageInstances[img_id];
-        if(inst.hasOwnProperty('snap'))
-          round_only = !inst.snap;
-      }
-      var src = imageInstances[img_id].src;
-      if(imageSelected.position == imageSelectedPosition) { // no movement or no prior position it being null
-        rotateImage(img_id,imageSelected,src,90);
-        correctPosition(imageSelected,src,round_only);
-      } else {
-        correctPosition(imageSelected,src,round_only);
-        // keeping the obj as record is fine for undo but not so good for redo if the object gets deleted further back
-        doRecordAdd({action:'imageMove',id:img_id,type:'image',pos:[imageSelectedPosition,imageSelected.position]});
-      }
-    }
-    imageSelected = null;
-  }  // end of edit mode
+    if(!!lineSelected) {
+      // for undo it will be necessary to look for previous position if any
+      // point needs to be cloned to dereference
+      line_id = validatePath(lineSelected);
+      if(!line_id)
+        hitTestAreas(mouseDownPosition);
+      lineSelected = null;
+      // continue through to path addition or removal
+    } else if(!!imageSelected) {
+      hideCursor();
+      imageMoved(imageSelected,imageSelectedPosition,(imageSelected.position == imageSelectedPosition));
+      imageSelected = null;
+    }  // end of edit mode
   } else {  // not edit mode
     var hit_id = hitTestAreas(mouseDownPosition);
     if(!!hit_id) {
       if(typeof window.globals.hitCallback === 'function')
         window.globals.hitCallback(hit_id);
+    }
+  }
+  selectedMove = false;
+}
+
+function imageMoved(img,prev_pos,spot_rotate) {
+  var img_id = findImageInstance('raster',img);
+  if(!!img_id) {  // shouldn't be any trouble here
+    console.log("instance found with id:"+img_id);  // need to keep id as well - might be null for master objects in layout mode
+    var round_only = !snapDefault;
+    if(img_id !== null) {
+      var inst = imageInstances[img_id];
+      if(inst.hasOwnProperty('snap'))
+        round_only = !inst.snap;
+    }
+    var src = imageInstances[img_id].src;
+    if(spot_rotate) { // no movement or no prior position it being null
+      rotateImage(img_id,img,src,90);
+      correctPosition(img,src,round_only);
+    } else {
+      correctPosition(img,src,round_only);
+      // keeping the obj as record is fine for undo but not so good for redo if the object gets deleted further back
+      doRecordAdd({action:'imageMove',id:img_id,type:'image',pos:[prev_pos,img.position]});
     }
   }
 }
@@ -1843,6 +1886,7 @@ function areaSelect() {
       if(rect.contains(a.rect.topLeft) && rect.contains(a.rect.bottomRight)) {
         if(a.hasOwnProperty('path'))
         selectedItems[id] = a.path;
+        selectedPos[id] = a.path.position;
         a.path.selected = true;
       }
     }
@@ -1851,6 +1895,7 @@ function areaSelect() {
     var l = lineInstances[id];
     if(rect.contains(l.path.firstSegment.point) && rect.contains(l.path.lastSegment.point)) {
       selectedItems[id] = l.path;
+      selectedPos[id] = l.path.position;
       l.path.selected = true;
     }
   }
@@ -1860,6 +1905,7 @@ function areaSelect() {
     console.log("Bounds"+bounds);
     if(rect.contains(bounds.topLeft) && rect.contains(bounds.bottomRight)) {
       selectedItems[id] = imgobj.raster;
+      selectedPos[id] = imgobj.raster.position;
       imgobj.raster.selected = true;
     }
   }
