@@ -6,17 +6,21 @@ var wireLinks = [];
 var objectMenu = [ {label:'name', propCall:imgGetNameCall},
                    {label:'size', propCall:imgGetSizeCall},
                    {label:'pos',propCall:imgGetPosCall},
-                   {label:'properties',callback:openPropDialog},
+                   {label:'properties',callback:openImgPropDialog},
                    {label:'setCenter',propCall:imgGetCenterCall,callback:setCenterToCursor},
                    {label:'setOrigin',propCall:imgGetOriginCall,callback:setOriginToCursor}
                  ];
 var objectInstanceMenu = [ {label:'name', propCall:imgGetInstanceNameCall},
                            {label:'pos',propCall:imgGetPosCall},
                            {label:'snap',propCall:getSnapModeCall,callback:toggleSnap},
-                           {label:'properties',callback:openPropDialog} ];
-var areaMenu = [ {label:'set area#', propCall:getAreaCount, callback:setArea}];
+                           {label:'properties',callback:openImgPropDialog} ];
+var newAreaMenu = [ {label:'set area#', propCall:getAreaCount, callback:setArea}];
+var areaMenu = [ {label:'area', propCall:getAreaNameCall},
+                 {label:'rect', propCall:getAreaRectCall},
+                 {label:'properties',callback:openAreaPropDialog}];
 window.globals.menuLookup = { objectMenu:objectMenu,
                               objectInstanceMenu:objectInstanceMenu,
+                              newAreaMenu:newAreaMenu,
                               areaMenu:areaMenu
                             };
 var first_image = {src:"img/con_Block_5.08mm_12.png", scale:0.6, id:"conBlock1", isSymbol:true, dragClone:true, pos:view.center };
@@ -45,6 +49,7 @@ function initApp() {
   paperGlue.init();  // sets up extra layers
   paperGlue.loadImages([first_image],default_image_menus);
   paperGlue.setSnap([5,5,10,10]);
+  paperGlue.showAreas();
 }
 
 function drawGrid(spacing) {
@@ -97,8 +102,10 @@ function imgGetSizeCall(obj){
 }
 
 function imgGetInstanceNameCall(obj){
-  console.log('get name called');
-  return "" + obj.src.id + "#" + obj.id;
+  var nm = "" + obj.src.id + "#" + obj.id;
+  if(obj.inst.hasOwnProperty('name'))
+    nm += ':'+obj.inst.name;
+  return nm;
 }
 
 function imgGetPosCall(obj){
@@ -203,7 +210,7 @@ function openActionsWindow() {
     myWindow.stop();
 }
 
-function openPropDialog() {
+function openImgPropDialog() {
   var fontsize = window.innerWidth/80;
   var obj = paperGlue.getCurrentContextObject();
   paperGlue.showImageCursors(obj,false);
@@ -215,14 +222,22 @@ function openPropDialog() {
   //Dlg.style = "font-size:"+fontsize+"px;visibility:visible;";
   var fs = 'style="font-size:'+fontsize+'px;"';
   var p = '<table ' + fs + '><tr><td>ID</td><td>'+obj.id+'</td></tr>';
-  if(obj.hasOwnProperty('raster')) {
-    p += '<tr><td>X</td><td>';
-    p += '<input '+fs+' id="xpos" type="number" value="'+obj.raster.position.x+'"/></td></tr>';
-    p += '<tr><td>Y</td><td>';
-    p += '<input '+fs+' id="ypos" type="number" value="'+obj.raster.position.y+'"/></td></tr>';
-    p += '<tr><td>Rot</td><td>';
-    p += '<input '+fs+' id="rot" type="number" value="'+obj.raster.rotation+'"/></td></tr>';
-  }
+  // if(obj.hasOwnProperty('raster')) {
+  if(obj.type === 'image') {
+    p += '<tr><td>Name</td><td>';
+    var nm = obj.id;
+    if(obj.inst.hasOwnProperty('name')) {
+      nm = obj.inst.name;
+    }
+    p += '<input '+fs+' id="name" type="text" value="'+nm+'"/></td></tr>';
+  } // otherwise symbol
+  p += '<tr><td>X</td><td>';
+  p += '<input '+fs+' id="xpos" type="number" value="'+obj.raster.position.x+'"/></td></tr>';
+  p += '<tr><td>Y</td><td>';
+  p += '<input '+fs+' id="ypos" type="number" value="'+obj.raster.position.y+'"/></td></tr>';
+  p += '<tr><td>Rot</td><td>';
+  p += '<input '+fs+' id="rot" type="number" value="'+obj.raster.rotation+'"/></td></tr>';
+  //}
   // var ks = Object.keys(obj);
   // for(var ki in ks ) {
   //   var k = ks[ki];
@@ -231,10 +246,19 @@ function openPropDialog() {
   p += '</table>';
   var content = document.getElementById('DlgContent');
   content.innerHTML = p;
+  paperGlue.enableKeyFocus(false);
   return false;  //do not hide cursors yet
 }
 
 function dialogReturn(reply) {
+  var obj = paperGlue.getCurrentContextObject();
+  console.log("Object type:" + obj.type);
+  if(obj.type === 'area') {
+    areaDialogReturn(reply);
+    return;
+  }
+  // otherwise hope this is an image or symbol
+  var nmfield = document.getElementById('name');
   var xfield = document.getElementById('xpos');
   var yfield = document.getElementById('ypos');
   var rfield = document.getElementById('rot');
@@ -242,13 +266,19 @@ function dialogReturn(reply) {
   var y = parseFloat(yfield.value);
   var r = parseFloat(rfield.value);
   //console.log("X:"+x);
-  if(reply !== 'cancel')
+  if(reply !== 'cancel') {
+    if(!!nmfield) {
+      var name = nmfield.value;
+      console.log("New name:"+name);
+      paperGlue.nameCurrentImage(name);
+    }
     paperGlue.moveCurrentImage(x,y,r);
+  }
   paperGlue.hideCursor();
   if(reply === 'apply') {
-    var obj = paperGlue.getCurrentContextObject();
     paperGlue.showImageCursors(obj,false);
   }
+  paperGlue.enableKeyFocus(true);
 }
 
 function setCenterToCursor() {
@@ -266,6 +296,76 @@ function getAreaCount() {
 function setArea() {
   paperGlue.setArea();
 }
+
+function getAreaNameCall(obj){
+  console.log('get name called');
+  var nm = "" + obj.id;
+  if(obj.inst.hasOwnProperty('name'))
+    nm += ":" + obj.inst.name;
+  return nm;
+}
+
+function getAreaRectCall(obj){
+  console.log("areaRect:" + Object.keys(obj));
+  return obj.inst.rect;
+}
+
+function openAreaPropDialog() {
+  var fontsize = window.innerWidth/80;
+  var obj = paperGlue.getCurrentContextObject();
+  console.log("Opening property dialog:",obj.id);
+  console.log("Prop:"+Object.keys(obj));
+  var Dlg = document.getElementById('Overlay');
+  Dlg.style.visibility = 'visible';
+  //Dlg.style.fontSize = fontsize;
+  //Dlg.style = "font-size:"+fontsize+"px;visibility:visible;";
+  var fs = 'style="font-size:'+fontsize+'px;"';
+  var p = '<table ' + fs + '><tr><td>ID</td><td>'+obj.id+'</td></tr>';
+  var a = obj.inst;
+    p += '<tr><td>Name</td><td>';
+    var nm = obj.id;
+    if(a.hasOwnProperty('name'))
+      nm = a.name;
+    p += '<input '+fs+' id="name" type="text" value="'+nm+'"/></td></tr>';
+    p += '<tr><td>X</td><td>';
+    p += '<input '+fs+' id="xpos" type="number" value="'+a.rect.x+'"/></td></tr>';
+    p += '<tr><td>Y</td><td>';
+    p += '<input '+fs+' id="ypos" type="number" value="'+a.rect.y+'"/></td></tr>';
+    p += '<tr><td>W</td><td>';
+    p += '<input '+fs+' id="width" type="number" value="'+a.rect.width+'"/></td></tr>';
+    p += '<tr><td>H</td><td>';
+    p += '<input '+fs+' id="height" type="number" value="'+a.rect.height+'"/></td></tr>';
+  //}
+  // var ks = Object.keys(obj);
+  // for(var ki in ks ) {
+  //   var k = ks[ki];
+  //   p += '<tr><td>'+k+'</td><td>'+obj[k]+'</td></tr>';
+  // }
+  p += '</table>';
+  paperGlue.enableKeyFocus(false);
+  var content = document.getElementById('DlgContent');
+  content.innerHTML = p;
+  return false;  //do not hide cursors yet
+}
+
+function areaDialogReturn(reply) {
+  var name = document.getElementById('name').value;
+  var xfield = document.getElementById('xpos');
+  var yfield = document.getElementById('ypos');
+  var wfield = document.getElementById('width');
+  var hfield = document.getElementById('height');
+  var x = parseFloat(xfield.value);
+  var y = parseFloat(yfield.value);
+  var w = parseFloat(wfield.value);
+  var h = parseFloat(hfield.value);
+  //console.log("X:"+x);
+  if(reply !== 'cancel') {
+    paperGlue.changeAreaName(name);  // beware name is volitile
+    paperGlue.moveCurrentArea(new Rectangle(x,y,w,h));
+  }
+  paperGlue.enableKeyFocus(true);
+}
+
 
 //window.globals.keyhandler = keyDown;  // requests paperglue to pass event here
 window.globals.listActions = openActionsWindow;

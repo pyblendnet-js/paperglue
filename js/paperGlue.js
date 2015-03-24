@@ -5,8 +5,11 @@
 * Current features:
 *   - click drag to create snap locked lines
 *   - click ends or middle to drag line end or whole lines
-*   - click on master image to clone and drag to locate
-*   - right click on images for context menu and properties
+*   - click on master image to clone and drag to locate clone
+*   - right click and drag to make area then select action
+*   - right click on images or areas for context menu and properties
+*   - cntrl z to undo, cntrl shift z to redo, ctrl x to undeo forever
+*   - cntrl s to save, cntrl o to open, cntrl shift x to prune do record
 *   - communication with external paperscript via window.globals
 *
 * paperglue.js Copyright (c) 2015 - 2015, Robert Parker
@@ -23,6 +26,7 @@
 // Tp make visibile to window, declare as window.object
 
 var editMode = true;
+var keyFocus = true;
 var nextID = 0;  // for keeping track of all objects with a unique id
 var lineInstances = {};
 var lineSelected = null;
@@ -44,6 +48,7 @@ var lineColor = 'black';
 var mouseDownPosition;
 var rightButton = false;
 var customDefaultProps = {};
+var selectedItems = {};
 var imagesLoaded = {};
 var imageInstances = {};  //images that have been cloned from sybols in imagesLoaded.
 var defaultContextMenu = [ {label:'view', callback:viewCall},{label:'open',callback:openCall} ];
@@ -103,6 +108,20 @@ function addImage(source, id) {
   img.hidden = true;
   var src = document.getElementById("body");
   src.appendChild(img);
+}
+
+// returns an array of keys matching search by for array or table of objects
+function findKey(dict,search_by,search_key) {
+  var keys = [];
+  for(var i in dict) {
+    console.log("i:"+i);
+    var inst = dict[i];
+    console.log("Inst:"+inst.hasOwnProperty(search_by));
+    console.log("ByInst:"+inst[search_by]+" ?= "+search_key);
+    if(inst[search_by] === search_key)
+      keys.push(i);
+  }
+  return keys;
 }
 
 // finds an instance of an image clone based on id, raster or src
@@ -234,8 +253,9 @@ function imageMouseDown(event) {
         if(imgobj.hasOwnProperty('contextMenu')) {  // if not defined then stay with default
           console.log("Attaching image context menu");
           setContextMenu(imgobj.contextMenu);
-          // currentContectObject object has some redundant info but seems simpler to use this way
-          currentContextObject = {id:id,inst:imgobj,src:imgobj,raster:imgobj.raster};  //to match image instance object
+          // currentContextObject object has some redundant info but seems simpler to use this way
+          currentContextObject = {id:id,type:'symbol',inst:imgobj,src:imgobj,raster:imgobj.raster};  //to match image instance object
+          selectItem(id,imgobj.raster);
           holdContext = true;  // cross browser solution to default mouse up reset
           showImageCursors(imgobj,true);
           return false;   // just show context menu now - see context menu callback below
@@ -265,8 +285,11 @@ function imageMouseDown(event) {
       if(rightButton) {
         if(src.hasOwnProperty('instanceContextMenu')) {   // if not defined then stay with default
            setContextMenu(src.instanceContextMenu);
-           // currentContectObject object has some redundant info but seems simpler to use this way
-           currentContextObject = {id:id,inst:imgobj,src:src,raster:this};
+           // currentContextObject object has some redundant info but seems simpler to use this way
+           // name may not be defined
+           console.log("name:"+imgobj.name);
+           currentContextObject = {id:id,type:'image',inst:imgobj,src:src,raster:this};
+           selectItem(id,imgobj.raster);
            holdContext = true;  // cross browser solution to default mouse up reset
            return false; // clone image not selected for right click
         }
@@ -372,6 +395,23 @@ function setContextMenu(context_type) {
   console.log("Context menu:"+currentContextMenu);
 }
 
+function nameCurrentImage(name) {
+  var id = currentContextObject.id;
+  nameImage(name,id);
+}
+
+function nameImage(name,id) {
+  var imgobj = imageInstances[id];
+  console.log("ID:"+id);
+  if(name === id) {
+    if(imgobj.hasOwnProperty('name'))
+      delete imgobj.name;
+  } else {
+    imgobj.name = name;
+    console.log("Image renamed:"+imgobj.name);
+  }
+}
+
 window.contextMenuCallback = function(menu_index){
   console.log('context menu call for item:' + menu_index);
   if(currentContextMenu !== null) {
@@ -417,15 +457,15 @@ function showContextMenu(control, e) {
 
 function loadCurrentContextMenu(tbl) {
   tbl.innerHTML = "";
-  console.log("window width:"+window.innerWidth);
-  console.log("window height:"+window.innerHeight);
+  //console.log("window width:"+window.innerWidth);
+  //console.log("window height:"+window.innerHeight);
   var fontsize = window.innerWidth/80;
   for(var mi in currentContextMenu) {
     var m = currentContextMenu[mi];
-    console.log(m);
+    //console.log(m);
     var txt = m.label;
     if(m.hasOwnProperty('propCall')) {
-      console.log("Has propCall");
+      //console.log("Has propCall");
       if(typeof m.propCall == 'function') {
         //console.log("Has propCall as function");
         txt += " " + m.propCall(currentContextObject);
@@ -531,44 +571,113 @@ function setArea() {
   hideArea();
 }
 
-function removeArea(id) {
-  if(areaInstances.hasOwnProperty(id)) {  // this path does exist
-    var a = areaInstances[id];
-    console.log("Removing:"+a.rect);
-    if(a.hasOwnProperty('path')) {
-      if(!!a.path) {
-        a.path.remove();  // should remove from screen
-      }
-    }
-    delete areaInstances[id];  // removes from list
+function nameCurrentArea(name) {
+  var id = currentContextObject.id;
+  var a = areaInstances[id];
+  //console.log("id:"+id+" name:"+name);
+  //console.log("Current name:"+a.name);
+  var oldname = id;
+  if(a.hasOwnProperty('name')) {
+    if(name === a.name)
+      return;  // nothing to do
+    oldname = a.name;
+  }
+  doRecordAdd({action:'rename',id:id,type:'area',oldName:oldname,newName:name});
+  nameArea(name,id);
+}
+
+function nameArea(name,id) {
+  var a = areaInstances[id];
+  if(name === id) {
+    if(a.hasOwnProperty('name'))
+      delete a.name;
+  } else {
+    a.name = name;
+  }
+  console.log("Props:"+Object.keys(a));
+  if(a.hasOwnProperty('text')) {
+    showAreaText(a,id);
   }
 }
 
+function moveCurrentArea(rect) {
+  var id = currentContextObject.id;
+  var a = areaInstances[id];
+  if(a.rect.x === rect.x && a.rect.y === rect.y &&
+     a.rect.width === rect.width && a.rect.height === rect.height) {
+    return;  // nothing to do
+  }
+  doRecordAdd({action:'move',id:id,type:'area',oldRect:a.rect,newRect:rect});
+  moveArea(rect,id);
+}
+
+function moveArea(rect,id) {
+  var a = areaInstances[id];
+  a.rect = rect;
+  showArea(currentContextObject.id);
+}
+
+function removeAreaInstance(id, record) {
+  if(areaInstances.hasOwnProperty(id)) {  // this path does exist
+    var a = areaInstances[id];
+    removeAreaPath(a);
+    if(record) {
+      // note: name may not be defined
+      doRecordAdd({action:'areaDelete',id:id,rect:a.rect,name:a.name});
+    }
+    delete areaInstances[id];  // removes from list
+
+  }
+}
+
+function removeAreaPath(a) {
+    console.log("Removing:"+a.rect);
+    if(a.hasOwnProperty('path')) {
+      a.path.remove();  // should remove from screen
+      delete a.path;
+    }
+    if(a.hasOwnProperty('text')) {
+      a.text.remove();
+      delete a.text;
+    }
+}
+
 function showArea(id) {
+  // assumes path and text do not exist
   var a = areaInstances[id];
   var rect = a.rect;
   console.log("Rect:"+rect);
-  var area = new Path();
-  area.strokeColor = areaColor;
-  area.strokeWidth = areaStrokeThickness;
-  area.strokeCap = 'butt';
-  area.strokeJoin = 'mitre';
-  area.dashArray = [6,6];
-  console.log("TopLeft:"+rect.topLeft);
-  area.add(rect.topLeft);
-  area.add(rect.topRight);
-  area.add(rect.bottomRight);
-  area.add(rect.bottomLeft);
-  area.closed = true;
-  a.path = area;
-  var text = new PointText({
-  point: rect.topLeft + [20,20,],
-  content: id,
-  justification: 'center',
-  fontSize: 15,
-  fillColor: areaColor
-  });
+  if(!a.hasOwnProperty('path')) {
+    var path = new Path();
+    a.path = path;
+  }
+  a.path.strokeColor = areaColor;
+  a.path.strokeWidth = areaStrokeThickness;
+  a.path.strokeCap = 'butt';
+  a.path.strokeJoin = 'mitre';
+  a.path.dashArray = [6,6];
+  a.path.clear();
+  a.path.add(rect.topLeft);
+  a.path.add(rect.topRight);
+  a.path.add(rect.bottomRight);
+  a.path.add(rect.bottomLeft);
+  a.path.closed = true;
+  showAreaText(a,id);
+}
+
+function showAreaText(a,id) {
+  if(a.hasOwnProperty('text'))
+    a.text.remove();
+  var text = new PointText();
   a.text = text;
+  a.text.point = a.rect.topLeft + [20,20,];
+  if(a.hasOwnProperty('name'))
+    a.text.content = a.name;
+  else
+    a.text.content = id;
+  a.text.justification = 'center';
+  a.text.fontSize = 15;
+  a.text.fillColor = areaColor;
 }
 
 function showAllAreas() {
@@ -584,18 +693,7 @@ function showAllAreas() {
 function hideAllAreas() {
   var aks = Object.keys(areaInstances);
   for(var ai in aks) {
-    var a = areaInstances[aks[ai]];
-    if(a.hasOwnProperty("path")) {
-      if(!!a.path) {
-        a.path.remove();
-        console.log("Area:"+a.rect);
-      }
-      a.path = null;
-      if(!!a.text) {
-        a.text.remove();
-      }
-      a.text = null;
-    }
+    removeAreaPath(areaInstances[aks[ai]]);
   }
   areasVisible = false;
 }
@@ -619,19 +717,38 @@ function hitTestAreas(hit_point) {
   return null;
 }
 
+function selectItem(id,item) {
+  var d = new Date();
+  var nowMs = d.getTime();
+  var controlPressed = ((nowMs - controlPressMs) < modPressDelay);
+  if(!controlPressed) {   //if control pressed then do not clear previous
+    var sk = Object.keys(selectedItems);
+    for(var si in sk) {
+      selectedItems[sk[si]].selected = false;
+    }
+    selectedItems = {};  // leaves the problem for the garbage collector
+  }
+  selectedItems[id] = item;
+  item.selected = true;
+}
+
 // onmousedown callback for two point paths
 function lineMouseDown(event) {
+  console.log("Line mouse down");
   mouseDownPosition = event.point;
   if(rightButtonCheck(event)) {
     console.log("Right button down");
+    var ids = findKey(lineInstances,'line',this);
+    if(ids.length > 0)
+      selectItem(ids[0],this);
     if(globals.hasOwnProperty('lineContextMenu')) {
       currentContextMenu = globals.lineContextMenu;
       holdContext = true;  // cross browser solution to default mouse up reset
     } else
       currentContextMenu = defaultContextMenu;
-      return false;
-    }
-    console.log("link mouse down");
+    return false;
+  }
+  console.log("link mouse down");
     lineSelected = this;
     lineSelectedPosition = [lineSelected.firstSegment.point.clone(),lineSelected.lastSegment.point.clone()];
     var line_select_fraction = (event.point - this.segments[0].point).length/this.length;
@@ -655,7 +772,7 @@ function onMouseDrag(event) {
     if(v.x > minAreaSide && v.y > minAreaSide) {
       if(!areaSelected) {
         newArea();
-        setContextMenu("areaMenu");
+        setContextMenu("newAreaMenu");
       }
       switch(areaSelectMode) {  //chosen in onlinemousedown
         case 0: //move last point
@@ -718,7 +835,7 @@ function snapPoint(p,round_only) {
     Math.round((p.x-snapRect[0])/snapRect[2]) * snapRect[2] +snapRect[0],
     Math.round((p.y-snapRect[1])/snapRect[3]) * snapRect[3] +snapRect[1]);
   }
-  console.log("Snap delta:" + (p2 - p));
+  //console.log("Snap delta:" + (p2 - p));
   return p2;
 }
 
@@ -726,10 +843,10 @@ function snapPoint(p,round_only) {
 function snapLine(p,round_only) {
   if(typeof p.firstSegment === 'undefined')
     return;
-  console.log("Before:" + p.firstSegment.point);
-  console.log("Snap Rect:" + snapRect);
+  //console.log("Before:" + p.firstSegment.point);
+  //console.log("Snap Rect:" + snapRect);
   p.firstSegment.point = snapPoint(p.firstSegment.point,round_only);
-  console.log("After:" + p.firstSegment.point);
+  //console.log("After:" + p.firstSegment.point);
   p.lastSegment.point = snapPoint(p.lastSegment.point,round_only);
   var dx = p.firstSegment.point.x - p.lastSegment.point.x;
   var dy = p.firstSegment.point.y - p.lastSegment.point.y;
@@ -745,6 +862,16 @@ function onMouseUp(event) {
     imageSelected.opacity = 1.0;
   }
   if(rightButton) {
+    if(!imageSelected && !lineSelected) {
+      var id = hitTestAreas(mouseDownPosition);
+      if(!!id) {
+        var a = areaInstances[id];
+        currentContextObject = {id:id,type:'area',inst:a};  //to match image instance object
+        if(a.hasOwnProperty('path'))
+          selectItem(id,a.path);
+        setContextMenu("areaMenu");
+      }
+    }
     rightButton = false;
     imageSelected = null;
     return;
@@ -753,7 +880,7 @@ function onMouseUp(event) {
     // for undo it will be necessary to look for previous position if any
     // point needs to be cloned to dereference
     line_id = validatePath(lineSelected);
-    if(!id)
+    if(!line_id)
       hitTestAreas(mouseDownPosition);
     lineSelected = null;
     // continue through to path addition or removal
@@ -858,7 +985,7 @@ function validatePath(path, force_id) {
     console.log("Force new line to id:",force_id);
     next_id = force_id;
   }
-  console.log("Path length:" + path.length);
+  //console.log("Path length:" + path.length);
   var round_only = !snapDefault;
   if(line_id !== null) {
     var inst = lineInstances[line_id];
@@ -913,10 +1040,14 @@ var altPressMs = 0;
 var modPressDelay = 800;  //delay in ms since mod key pressed for modified action
 
 function onKeyDown(event) {   //note: this is the paper.js handler - do not confuse with html
+  if(!keyFocus) {
+    //console.log("Paper  glue ignoring keys");
+    return;
+  }
   var d = new Date();
   var nowMs = d.getTime();
   if(event.key == 'control' || event.key == 'shift' || event.key == 'alt') {
-    console.log("Modifier pressed:"+event.key+" at "+nowMs);
+    //console.log("Modifier pressed:"+event.key+" at "+nowMs);
     switch(event.key) {
       case 'control':
         controlPressMs = nowMs;
@@ -973,10 +1104,12 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
         break;
       case 'o':
         console.log("cntrlO");
-        if(event.shiftPressed) {  // load from
+        if(confirm("Do you want to load from storage?"))
+        { if(event.shiftPressed) {  // load from
 
-        } else {
-          load();
+          } else {
+            load();
+          }
         }
         propagate = false;
         break;
@@ -1001,7 +1134,15 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
   } else {
     switch(event.key) {
       case 'delete':
-        removeImage(currentContextObject,true);
+        var id = currentContextObject.id;
+        switch(currentContextObject.type) {
+          case 'symbol':
+            removeImage(id,true);
+            break;
+          case 'area':
+            removeAreaInstance(id,true);
+            break;
+        }
         propagate = false;
         hideContextMenu('contextMenu');
         hideCursor();
@@ -1244,7 +1385,7 @@ function removeSymbols() {
 }
 
 function removeAll(){
-  if(confirm("Do you really want to clear memory?"))
+  if(confirm("Do you want to clear current workspace?"))
   { removeLines();
     removeSymbols();
     doRecord = [];
@@ -1342,8 +1483,24 @@ function undo() {
         raster.rotation = last_do.rot;
         break;
       case 'setArea':
-        removeArea(last_do.id);
+        removeAreaInstance(last_do.id,false);
         break;
+      case 'rename':
+        if(last_do.type === 'area')
+          nameArea(last_do.oldName,last_do.id);
+        else
+          nameImage(last_do.oldName,last_do.id);
+        break;
+      case 'move':
+        if(last_do.type === 'area')
+          moveArea(last_do.oldRect,last_do.id);
+        break;
+      case 'areaDelete':
+        areaInstances[last_do.id] = {rect:last_do.rect};
+        if(typeof last_do.name !== 'undefined')
+          areaInstances[last_do.id] = last_do.name;
+        if(areasVisible)
+          showArea(last_do.id);
     }
 }
 
@@ -1406,6 +1563,19 @@ function redo() {
       areaInstances[to_do.id] = {rect:to_do.rect};
       if(areasVisible)
         showArea(to_do.id);
+      break;
+    case 'rename':
+      if(to_do.type === 'area')
+        nameArea(to_do.newName,to_do.id);
+      else
+        nameImage(to_do.newName,to_do.id);
+      break;
+    case 'move':
+      if(to_do.type === 'area')
+        moveArea(to_do.newRect,to_do.id);
+      break;
+    case 'areaDelete':
+      removeAreaInstance(to_do.id,false);
       break;
   }
   doRecordIndex++;
@@ -1479,6 +1649,23 @@ function pruneDo() {
       case 'symbolDelete':
         // no need to keep this in pruned
         break;
+      // only the last of these for an id are required
+      case 'rename':
+      case 'move':
+        if(to_do.type === 'area') {
+          if(areaInstances.hasOwnProperty(to_do.id))
+            break;  //nolonger exists
+        } else {  // images can also be renamed
+          if(imageInstances.hasOwnProperty(to_do.id))
+            break;  // nolonger exists
+        }
+        prunedDo.splice(0,0,to_do);
+        break;
+      case 'setArea':
+        if(areaInstances.hasOwnProperty(to_do.id))
+          break;  //nolonger exists
+        prunedDo.splice(0,0,to_do);
+        break;
     }
   }
   console.log("AFTER");
@@ -1540,7 +1727,15 @@ function setOriginToCursor() {
   hideCursor();
 }
 
+function enableKeyFocus(state) {
+  // disable to allow dialog field input
+  keyFocus = state;
+  //console.log("PaperGlue keyfocus:"+  keyFocus);
+}
 
+function setEditMode(state) {
+  editMode = state;
+}
 
 // think this needs to be at the bottom so under scripts find things fully loaded
 console.log("PaperGlue functions to window globals");
@@ -1556,8 +1751,10 @@ var exports = {
   setLineThickness:setLineThickness,
   setLineColor:setLineColor,
   keyHandler:null,
-  remove_all:removeAll,
+  enableKeyFocus:enableKeyFocus,
+  removeAll:removeAll,
   getCurrentContextObject:getCurrentContextObject,
+  nameCurrentImage:nameCurrentImage,
   moveCurrentImage:moveCurrentImage,
   setCenterToCursor:setCenterToCursor,
   setOriginToCursor:setOriginToCursor,
@@ -1568,9 +1765,11 @@ var exports = {
   toggleSnap:toggleSnap,
   getAreaCount:getAreaCount,
   setArea:setArea,
-  show_areas:showAllAreas,
-  hide_areas:hideAllAreas,
-  edit_mode:editMode  // change this to false for application
+  showAreas:showAllAreas,
+  hideAreas:hideAllAreas,
+  changeAreaName:nameCurrentArea,
+  moveCurrentArea:moveCurrentArea,
+  setEditMode:setEditMode  // change this to false for application
 };
 globals.paperGlue = exports;
 
