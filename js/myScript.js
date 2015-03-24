@@ -104,12 +104,13 @@ function imgGetPosCall(obj){
   return obj.raster.position;
 }
 
-function keyDown(event,controlPressed,shiftPressed,altPressed) {  // note: This is accessed from paperglue.js - not directly
+function keyDown(event) {  // note: This is accessed from paperglue.js - not directly
+  // added controlPressed,shiftPressed,altPressed as values in event
   // if(event.key == 'control' || event.key == 'shift' || event.key == 'alt')
   //   return;
   console.log(event);
   console.log("myScript received:",event.key);
-  if(controlPressed) {
+  if(event.controlPressed) {
     if(event.key == 'q') {
       console.log("cntrlQ");
       event.stopPropagation();
@@ -119,7 +120,15 @@ function keyDown(event,controlPressed,shiftPressed,altPressed) {  // note: This 
       console.log("Actions:"+ab.length);
       for(var qi in q) {
         var dr = q[qi];
-        var rhtml = '<tr><td class="td-nya">'+dr.action+'</td><td class="td-nya">'+dr.id+'</td><td class="td-nya">'+"blahblah"+'</td></tr>';
+        var propstr = "";
+        var oks = Object.keys(dr);
+        for(var ki in oks) {
+          var k = oks[ki];
+          if(k == 'action' || k == 'id')
+            continue;
+          propstr += k + ":" + dr[k] + ";";
+        }
+        var rhtml = '<tr><td class="dtd" style="width:100px">'+dr.action+'</td><td class="dtd" style="width:30px">'+dr.id+'</td><td class="dtd">'+propstr+'</td></tr>';
         console.log(rhtml);
         ihtml += rhtml;
       }
@@ -129,6 +138,20 @@ function keyDown(event,controlPressed,shiftPressed,altPressed) {  // note: This 
       // var paper_screen = {lines:lines,images:images};
       // json_str = JSON.stringify(paper_screen);
       // console.log(json_str);
+      var ca = document.getElementById("clientArea");
+      var canvasDiv = document.getElementById("canvasDiv");
+      var canvas = document.getElementById('myCanvas');
+      //var context = canvas.getContext('2d');
+      // translate context to center of canvas
+      //context.translate(canvas.width / 2, canvas.height / 2);
+      // scale y component
+      //context.scale(0.5, 0.5);
+
+      canvasDiv.style.height = ca.clientHeight/2 + 'px';
+      var ad = document.getElementById("actionTableDiv");
+      ad.style.height = ca.clientHeight/2 + 'px';
+      ad.style.display = "inline";
+
       return false;
     }
   }

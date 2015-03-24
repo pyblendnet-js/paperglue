@@ -476,7 +476,7 @@ function doRecordAdd(action) {
 var controlPressMs = 0;
 var shiftPressMs = 0;
 var altPressMs = 0;
-var modPressDelay = 200;  //delay in ms since mod key pressed for modified action
+var modPressDelay = 800;  //delay in ms since mod key pressed for modified action
 
 function onKeyDown(event) {   //note: this is the paper.js handler - do not confuse with html
   var d = new Date();
@@ -484,28 +484,29 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
   if(event.key == 'control' || event.key == 'shift' || event.key == 'alt') {
     console.log("Modifier pressed:"+event.key+" at "+nowMs);
     switch(event.key) {
-       case 'control':
-         controlPressMs = nowMs;
-         break;
+      case 'control':
+        controlPressMs = nowMs;
+        break;
       case 'shift':
-          shiftPressMs = nowMs;
-          break;
+        shiftPressMs = nowMs;
+        break;
       case 'alt':
         altPress = nowMs;
         break;
     }
     return;
   }
-  var controlPress = ((nowMs - controlPressMs) < modPressDelay) || event.modifiers.control;
-  var sinceShift = ((nowMs - shiftPressMs) < modPressDelay) || event.modifiers.shift;
-  var sinceAlt = ((nowMs - altPressMs) < modPressDelay) || event.modifiers.alt;
-  console.log(event);
+  event.controlPressed = ((nowMs - controlPressMs) < modPressDelay) || event.modifiers.control;
+  event.shiftPressed = ((nowMs - shiftPressMs) < modPressDelay) || event.modifiers.shift;
+  event.altPressed = ((nowMs - altPressMs) < modPressDelay) || event.modifiers.alt;
+  console.log("Now:"+nowMs+" "+modPressDelay);
+  console.log("Now:"+(nowMs - controlPressMs));
   console.log("Paperglue received:" + event.key);
   var propagate = true;
   if(event.key == 'z') {
-    if(controlPress) {
+    if(event.controlPress) {
       console.log("cntrlZ");
-      if(event.modifiers.shift) {
+      if(event.shiftPressed) {
         redo();
       } else {
         undo();
@@ -514,9 +515,9 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
       propagate = false;
     }
   } else if(event.key == 'x') {
-    if(controlPressed) {
+    if(event.controlPressed) {
       console.log("cntrlX");
-      if(shiftPressed) {  // prune unnecessary edits
+      if(event.shiftPressed) {  // prune unnecessary edits
         doRecord = pruneDo();
         doRecordIndex = doRecord.length;
       } else {  // undo and remove that particular redo
@@ -527,9 +528,9 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
       propagate = false;
     }
   } else if(event.key == 's') {
-    if(controlPressed) {
+    if(event.controlPressed) {
       console.log("cntrlS");
-      if(event.modifiers.shift) {  // save as
+      if(event.shiftPressed) {  // save as
 
       } else {
         save();
@@ -539,9 +540,9 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
       propagate = false;
     }
   } else if(event.key == 'o') {
-    if(controlPressed) {
+    if(event.controlPressed) {
       console.log("cntrlO");
-      if(event.modifiers.shift) {  // load from
+      if(event.shiftPressed) {  // load from
 
       } else {
         load();
@@ -552,7 +553,7 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
   }
   if(propagate && (typeof globals.keyhandler == 'function')) {
     console.log("Passing key upwards");
-    propagate = globals.keyhandler(event.key,controlPressed,shiftPressed,altPressed);
+    propagate = globals.keyhandler(event);
   }
   return propagate;
 }

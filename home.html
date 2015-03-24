@@ -45,9 +45,12 @@
       }
     </style>
     <style>
-.table{width: 80%;height: 200px;border-collapse:collapse;border:2px solid black}
-.td-nya{border-left:1px solid white;border-right:1px solid grey;border-bottom:1px solid grey;}
-
+    table{border-collapse:collapse;}
+.table{  height: 4em;                    /* define the height */
+         border:4px solid black;
+}
+th{padding: 10px;border:1px solid grey;background-color: lightblue;font-size:14;text-overflow:ellipsis}
+.dtd{padding: 10px;border:1px solid black;font-size:14;text-overflow:ellipsis}
 </style>
 
 </head>
@@ -55,24 +58,36 @@
   <button type="button" onclick="showPaper();" class="button" width="300">Show paper scope</button>
   <button type="button" onclick="hideCanvas();" class="button" width="300">hide Canvas</button>
   <!--<image src="img/verodes.png"/>-->
-  <canvas id="myCanvas" resize></canvas>
-  <p>The END</p>
-  <div id="actionTable">
-    <table class="table" colspan="3">
+  <div id="clientArea">
+  <div id="canvasDiv" style="height=100%;background-color:blue">
+    <canvas id="myCanvas" resize></canvas>
+  </div>
+  <div id="actionTableDiv" style="display:none">
+    <table class="table" height="120">
       <thead>
         <tr>
-          <th>Action</th>
-          <th>Obj ID</th>
+          <th style="width:100px">Action </th>
+          <th style="width:30px">Obj ID</th>
           <th>Parameters</th>
         </tr>
       </thead>
-      <tbody id="actionTableBody">
+      <tbody>
+        <tr>
+          <td colspan="3">
+            <div style="overflow:scroll;height:300px;width:100%;overflow:auto">
+              <table>
+                <tbody id="actionTableBody">
+                </tbody>
+              </table>
+            </div>
+          </td>
+        </tr>
       </tbody>
     </table>
   </div>
   <div style="display:none; " id="contextMenu">
     <table  border="0" cellpadding="0" cellspacing="0"
-    style="border: thin solid #808080; cursor: default; white-space: nowrap" width="100px"
+    style="border: thin solid #808080; cursor: default; white-space: nowrap"
     bgcolor="White">
     <!-- <tr>
       <td >
@@ -90,6 +105,7 @@
       </td>
     </tr> -->
     </table>
+</div>
 </div>
 </body>
 </html>
