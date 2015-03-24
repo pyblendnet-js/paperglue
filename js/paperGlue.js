@@ -39,7 +39,7 @@ var defaultContextMenu = [ {label:'view', callback:viewCall},{label:'open',callb
 var currentContextMenu = defaultContextMenu;
 var currentContextObject = null;
 var holdContext = false;  // don't reset contextMenu till after mouseUp
-var doRecord = [];  // record of all clonings and moves  {action:string,src:src,raster:image or line:path,pos:point}
+var doRecord = [];  // record of all clonings and moves  {action:string,src_id:src.id,raster:image or line:path,pos:point}
 var doRecordIndex = 0;  // points to next do location
 var recordPath = "testSave.json";
 var cursorPos = [];  // mouse, raster, origin, center
@@ -186,26 +186,29 @@ function imageMouseDown(event) {
   var id;
   var imgobj;
   var imkeys = Object.keys(imagesLoaded);
-  console.log(imkeys);
+  console.log("Loaded images:"+imkeys);
   for(var i in imkeys) {
     id = imkeys[i];
-    console.log("id:"+id);
+    console.log("Check id:"+id);
     imgobj = imagesLoaded[id];
 
-    if(this == imgobj.raster) {  //master image found
+    if(this === imgobj.raster) {  //master image found
+      console.log("Master image found");
       if(rightButton) {
-        if(imgobj.hasOwnProperty('contextMenu'))  // if not defined then stay with default
+        if(imgobj.hasOwnProperty('contextMenu')) {  // if not defined then stay with default
           console.log("Attaching image context menu");
           currentContextMenu = imgobj.contextMenu;
           currentContextObject = {id:id,src:imgobj,raster:imgobj.raster};  //to match image instance object
           holdContext = true;  // cross browser solution to default mouse up reset
           showImageCursors(imgobj,true);
           return false;   // just show context menu now - see context menu callback below
+        }
       }
       if(imgobj.hasOwnProperty('dragClone')) {  // if not defined then assume false
         if(imgobj.dragClone === true) {   // this image object can be dragged, so it should have isSymbol set true also
           //console.log("Symbol:" + imgobj.symbol);
-          var inst = symbolPlace(imgobj.id);
+          var inst = symbolPlace(imgobj.id);  //sets imageSelected to the new raster
+          imageSelected.opacity = 0.5;
           imageSelected.position = imgobj.raster.position;
           imageSelectedPosition = null;  // so we can tell there was no prior position
           showImageCursors(inst,false);
@@ -217,12 +220,13 @@ function imageMouseDown(event) {
   // no master image found, so maybe this is a clone
   id = findImageInstance("raster",this);
   if(!!id) {
+    console.log("Clone image found ID=" + id);
     imgobj = imageInstances[id];
     //if(this == imginst.raster) {  // clone image found
       src = imgobj.src;
       showImageCursors(imgobj,false);
       if(rightButton) {
-        if(imgobj.hasOwnProperty('instanceContextMenu')) {   // if not defined then stay with default
+        if(src.hasOwnProperty('instanceContextMenu')) {   // if not defined then stay with default
            currentContextMenu = src.instanceContextMenu;
            // needed to add id to currentContectObject
            currentContextObject = {id:id,src:src,raster:this};
@@ -231,6 +235,7 @@ function imageMouseDown(event) {
         }
       }
       imageSelected = this;
+      imageSelected.opacity = 0.5;
       imageSelectedPosition = this.position.clone();  // need to dereference
       return false;  //found so done looking
     //}
@@ -241,18 +246,23 @@ function imageMouseDown(event) {
 // only use force_id for redo so that it uses old id
 function symbolPlace(imgid, force_id) {
   var imgobj = imagesLoaded[imgid];
+  console.log("Placing clone of:"+imgobj.id);
   imageSelected = imgobj.symbol.place();
   //imageSelected.scale(0.5);
   imageSelected.onMouseDown = imageMouseDown;
   var img_id;
+  var inst;
   if(typeof force_id === 'undefined') {
-    var inst = {src:imgobj, raster:imageSelected};
-    doRecordAdd({action:'symbolPlace',id:nextID,type:'image',src:imgobj.id});
+    inst = {src:imgobj, raster:imageSelected};
+    img_id = nextID;
+    doRecordAdd({action:'symbolPlace',id:nextID,type:'image',src_id:imgobj.id});
     nextID += 1;
   } else {  // used by redo to accept old id - so need to record do action
-    var inst = {src:imgobj, raster:imageSelected};
+    inst = {src:imgobj, raster:imageSelected};
+    img_id = force_id;
+    console.log("Forces instance is:"+inst);
   }
-  imageInstances[nextID] = inst;
+  imageInstances[img_id] = inst;
   imgobj.instances += 1;
   return inst;
 }
@@ -339,6 +349,11 @@ function showContextMenu(control, e) {
   el.style.left = posx;
   el.style.top = posy;
   var tbl = el.children[0];  //assumes menu has table as first child
+  currentContextTable = tbl;
+  loadCurrentContextMenu(tbl);
+}
+
+function loadCurrentContextMenu(tbl) {
   tbl.innerHTML = "";
   for(var mi in currentContextMenu) {
     var m = currentContextMenu[mi];
@@ -497,8 +512,13 @@ function snapLine(p) {
 // universal mouse up handler - mainly just tidy up
 function onMouseUp(event) {
   console.log("Mouse up");
+  if(!!imageSelected) {
+    console.log("Opacity was:" + imageSelected.opacity);
+    imageSelected.opacity = 1.0;
+  }
   if(rightButton) {
     rightButton = false;
+    imageSelected = null;
     return;
   }
   if(!!lineSelected) {
@@ -510,26 +530,34 @@ function onMouseUp(event) {
   } else if(!!imageSelected) {
     hideCursor();
     var img_id = findImageInstance('raster',imageSelected);
-    console.log("instance found with id:"+img_id);  // need to keep id as well - might be null for master objects in layout mode
-    var src = imageInstances[img_id].src;
-    var offset;
-    console.log("Before:"+imageSelected.position);
-    if(src.hasOwnProperty('origin')) {
-      var oo = src.origin.rotate(imageSelected.rotation);
-      imageSelected.position = snapPoint(imageSelected.position-oo) + oo;
-    } else
-      imageSelected.position = snapPoint(imageSelected.position);
-    console.log("After snap:"+imageSelected.position);
-    imageSelected.position = roundPoint(imageSelected.position);
-    console.log("After round:"+imageSelected.position);
-    if(imageSelected.position == imageSelectedPosition) { // no movement or no prior position it being null
-      rotateImage(img_id,imageSelected,src,90);
-    } else {
-      // keeping the obj as record is fine for undo but not so good for redo if the object gets deleted further back
-      doRecordAdd({action:'imageMove',id:img_id,type:'image',pos:[imageSelectedPosition,imageSelected.position]});
+    if(!!img_id) {  // shouldn't be any trouble here
+      console.log("instance found with id:"+img_id);  // need to keep id as well - might be null for master objects in layout mode
+      var src = imageInstances[img_id].src;
+      if(imageSelected.position == imageSelectedPosition) { // no movement or no prior position it being null
+        rotateImage(img_id,imageSelected,src,90);
+        correctPosition(imageSelected,src);
+      } else {
+        correctPosition(imageSelected,src);
+        // keeping the obj as record is fine for undo but not so good for redo if the object gets deleted further back
+        doRecordAdd({action:'imageMove',id:img_id,type:'image',pos:[imageSelectedPosition,imageSelected.position]});
+      }
     }
     imageSelected = null;
   }
+}
+
+function correctPosition(raster,src) {
+  // snaps and rounds image postion raster
+  console.log("Before:"+raster.position);
+  if(src.hasOwnProperty('origin')) {
+    var oo = src.origin.rotate(raster.rotation);
+    raster.position = snapPoint(raster.position-oo) + oo;
+  } else {
+    raster.position = snapPoint(raster.position);
+  }
+  console.log("After snap:"+raster.position);
+  raster.position = roundPoint(raster.position);
+  console.log("After round:"+raster.position);
 }
 
 function rotateImage(id,raster,src,angle) {
@@ -657,59 +685,104 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
   console.log("Now:"+(nowMs - controlPressMs));
   console.log("Paperglue received:" + event.key);
   var propagate = true;
-  if(event.key == 'z') {
-    if(event.controlPressed) {
-      console.log("cntrlZ");
-      if(event.shiftPressed) {
-        redo();
-      } else {
-        undo();
-      }
-      event.stopPropagation();
-      propagate = false;
-    }
-  } else if(event.key == 'x') {
-    if(event.controlPressed) {
-      console.log("cntrlX");
-      if(event.shiftPressed) {  // prune unnecessary edits
-        doRecord = pruneDo();
-        doRecordIndex = doRecord.length;
-      } else {  // undo and remove that particular redo
-        undo();
-        doRecord.splice(doRecordIndex,1);
-      }
-      event.stopPropagation();
-      propagate = false;
-    }
-  } else if(event.key == 's') {
-    if(event.controlPressed) {
-      console.log("cntrlS");
-      if(event.shiftPressed) {  // save as
+  var delta = null;  // for arrow keys
+  if(event.controlPressed) {
+    switch(event.key) {
+      case 'z':
+        console.log("cntrlZ");
+        if(event.shiftPressed) {
+          redo();
+        } else {
+          undo();
+        }
+        event.stopPropagation();
+        propagate = false;
+        break;
+      case 'x':
+        console.log("cntrlX");
+        if(event.shiftPressed) {  // prune unnecessary edits
+          doRecord = pruneDo();
+          doRecordIndex = doRecord.length;
+        } else {  // undo and remove that particular redo
+          undo();
+          doRecord.splice(doRecordIndex,1);
+        }
+        propagate = false;
+        break;
+      case 's':
+        console.log("cntrlS");
+        if(event.shiftPressed) {  // save as
+        } else {
+          save();
+        }
+        propagate = false;
+        break;
+      case 'o':
+        console.log("cntrlO");
+        if(event.shiftPressed) {  // load from
 
-      } else {
-        save();
-      }
-      event.preventDefault();
-      event.stopPropagation();
-      propagate = false;
+        } else {
+          load();
+        }
+        propagate = false;
+        break;
+      case 'left':
+        delta = [-1,0];
+        break;
+      case 'right':
+        delta = [1,0];
+        break;
+      case 'up':
+        delta = [0,-1];
+        break;
+      case 'down':
+        delta = [0,1];
+        break;
     }
-  } else if(event.key == 'o') {
-    if(event.controlPressed) {
-      console.log("cntrlO");
-      if(event.shiftPressed) {  // load from
-
-      } else {
-        load();
-      }
-      event.stopPropagation();
+    if(!!delta) {
+      moveObject(currentContextObject,delta,!event.shiftPressed);
       propagate = false;
+      loadCurrentContextMenu(currentContextTable);
+    }
+  } else {
+    switch(event.key) {
+      case 'delete':
+        removeImage(currentContextObject,true);
+        propagate = false;
+        hideContextMenu('contextMenu');
+        break;
+      case 'escape':
+        hideContextMenu('contextMenu');
+        break;
     }
   }
   if(propagate && (typeof globals.keyhandler == 'function')) {
     console.log("Passing key upwards");
     propagate = globals.keyhandler(event);
+  } else {
+    event.preventDefault();
+    event.stopPropagation();
   }
   return propagate;
+}
+
+function moveObject(obj,direction,snap) {
+  objPosition = obj.raster.position;
+  if(snap) {
+    obj.raster.position += [direction[0]*snapRect[2],direction[1]*snapRect[3]];
+    var img_id = findImageInstance('raster',obj.raster);
+    if(!!img_id) {
+      console.log("instance found with id:"+img_id);  // need to keep id as well - might be null for master objects in layout mode
+      //var src = imageInstances[img_id].src;  // could have used obj.src
+      correctPosition(obj.raster,obj.src);
+      doRecordAdd({action:'imageMove',id:img_id,type:'image',pos:[objPosition,obj.position]});
+    }
+  } else {
+    obj.raster.position += direction;
+  }
+  console.log("Object moved to:"+obj.raster.position);
+  // if(typeof window.globals.updateStatus === 'function')
+  //   window.globals.updateStatus();
 }
 
 function save() {
@@ -850,6 +923,21 @@ function removeAll(){
   }
 }
 
+function removeImage(obj,record) {
+  if(!obj)
+    return;
+  var img_id = findImageInstance('raster',obj.raster);
+  if(!!img_id) {
+    if(!record || confirm("Do you really want to remove object ID =" + img_id + "?")) {
+      symbolRemove(img_id);
+      if(record)
+        doRecordAdd({action:'symbolDelete',id:img_id,src_id:obj.src.id,pos:obj.raster.position,rot:obj.raster.rotation});
+      return true;
+    }
+  }
+  return false;
+}
+
 function undo() {
     console.log("Undo");
     if(doRecord.length <= 0 || doRecordIndex === 0)
@@ -891,7 +979,7 @@ function undo() {
           var prev_do = doRecord[doRecordIndex-1];
           if(prev_do.action == 'symbolPlace') {  // this was the first drag
             console.log("Remove symbol from instances");
-            console.log("Attempting to remove instance of " + prev_do.src + " with " + prev_do.id);
+            console.log("Attempting to remove instance of " + prev_do.src_id + " with " + prev_do.id);
             symbolRemove(prev_do.id);
             doRecordIndex--;  // skip back over symbol places too
             break;
@@ -916,6 +1004,13 @@ function undo() {
             console.log("Return img rotation to " + last_do.rot[0]);
           }
         }
+        break;
+      case 'symbolDelete':
+        console.log("replace image:" + last_do.id);
+        symbolPlace(last_do.src_id,last_do.id);
+        raster = imageInstances[last_do.id].raster;
+        raster.position = last_do.pos;
+        raster.rotation = last_do.rot;
         break;
     }
 }
@@ -953,7 +1048,7 @@ function redo() {
       raster = imgobj.raster;
       raster.position = to_do.pos[1];
       break;
-   case 'imageRotate':
+    case 'imageRotate':
       imgobj = imageInstances[to_do.id];
       raster = imgobj.raster;
       if(to_do.hasOwnProperty('pos'))
@@ -961,7 +1056,7 @@ function redo() {
       raster.rotation = to_do.rot[1];
       break;
     case 'symbolPlace':
-      symbolPlace(to_do.src,to_do.id);
+      symbolPlace(to_do.src_id,to_do.id);
       imageSelected = null;
       // this is normally followed by a drag move, so do this too
       to_do = doRecord[doRecordIndex+1];
@@ -970,6 +1065,10 @@ function redo() {
         raster = imageInstances[to_do.id].raster;
         raster.position = to_do.pos[1];
       }
+      break;
+    case 'symbolDelete':
+      var inst = imageInstances[to_do.id];
+      removeImage(inst,false);   // delete is already in records
       break;
   }
   doRecordIndex++;
