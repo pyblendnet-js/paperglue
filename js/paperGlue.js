@@ -22,6 +22,7 @@
 //note:objects here are all somewhere within the paper scope
 // Tp make visibile to window, declare as window.object
 
+var editMode = true;
 var nextID = 0;  // for keeping track of all objects with a unique id
 var lineInstances = {};
 var lineSelected = null;
@@ -467,20 +468,19 @@ function rightButtonCheck(event) {
 // default mouse down event handler - most browser will bubble to this from the other mouseDown handlers
 function onMouseDown(event) {
   console.log("Basic Mouse down");
+  mouseDownPosition = event.point;
   hideArea();
   if(rightButtonCheck(event)) {
     console.log("Right button down");
     if(holdContext === false)  // cross browser solution to default mouse up reset
       currentContextMenu = defaultContextMenu;
-    mouseDownPosition = event.point;
     return false;
   }
   if(!!lineSelected || !!imageSelected) {     // an existing line has been selected
     console.log("Something selected");
     return false;
   }
-  // other wise start a new line
-  newLine();
+  return false;
 }
 
 function newLine() {
@@ -600,8 +600,28 @@ function hideAllAreas() {
   areasVisible = false;
 }
 
+function hitTestArea(id,hit_point) {
+  var rect = areaInstances[id].rect;
+  //console.log("Is "+hit_point + " in " + rect + " = " +rect.contains(hit_point));
+  return rect.contains(hit_point);
+}
+
+function hitTestAreas(hit_point) {
+  var aks = Object.keys(areaInstances);
+  for(var ai in aks) {
+    var id = aks[ai];
+    //console.log("Hit test area#" + id);
+    if(hitTestArea(id,hit_point)) {
+      console.log("Hit test area#" + id);
+      return id;
+    }
+  }
+  return null;
+}
+
 // onmousedown callback for two point paths
 function lineMouseDown(event) {
+  mouseDownPosition = event.point;
   if(rightButtonCheck(event)) {
     console.log("Right button down");
     if(globals.hasOwnProperty('lineContextMenu')) {
@@ -657,28 +677,32 @@ function onMouseDrag(event) {
     }
     return;
   }
-  if(!!lineSelected) {   // link selected so drag existing
-    //console.log("Link selected");
-    switch(lineSelectMode) {  //chosen in onlinemousedown
-      case 0: //move last point
-        if(lineSelected.segments.length < 2) {
-          lineSelected.add(event.point);
-          lineSelectedPosition = null;  // to indicate it is new
-        } else {
-          lineSelected.lastSegment.point += event.delta;
-        }
-        break;
-      case 1: //move first point
-        lineSelected.firstSegment.point += event.delta;
-        break;
-      default: // move all
-        lineSelected.position += event.delta;   // drag whole link
-    }
-    return;
-  } else if(!!imageSelected) {   // drag image
+  if(!!imageSelected) {   // drag image
     imageSelected.position += event.delta;
     cursorLayer.position += event.delta;
+  } else {
+    if(!lineSelected) //no line selected yet
+      newLine();  // create new line
+    if(!!lineSelected) {   // link selected so drag existing
+      //console.log("Link selected");
+      switch(lineSelectMode) {  //chosen in onlinemousedown
+        case 0: //move last point
+          if(lineSelected.segments.length < 2) {
+            lineSelected.add(event.point - event.delta);
+            lineSelectedPosition = null;  // to indicate it is new
+          } else {
+            lineSelected.lastSegment.point += event.delta;
+          }
+          break;
+        case 1: //move first point
+          lineSelected.firstSegment.point += event.delta;
+          break;
+        default: // move all
+          lineSelected.position += event.delta;   // drag whole link
+      }
+    }
   }
+  return false;
 }
 
 function roundPoint(p) {
@@ -715,6 +739,7 @@ function snapLine(p,round_only) {
 // universal mouse up handler - mainly just tidy up
 function onMouseUp(event) {
   console.log("Mouse up");
+  if(editMode) {
   if(!!imageSelected) {
     console.log("Opacity was:" + imageSelected.opacity);
     imageSelected.opacity = 1.0;
@@ -728,6 +753,8 @@ function onMouseUp(event) {
     // for undo it will be necessary to look for previous position if any
     // point needs to be cloned to dereference
     line_id = validatePath(lineSelected);
+    if(!id)
+      hitTestAreas(mouseDownPosition);
     lineSelected = null;
     // continue through to path addition or removal
   } else if(!!imageSelected) {
@@ -752,6 +779,15 @@ function onMouseUp(event) {
       }
     }
     imageSelected = null;
+  } else {
+    hitTestAreas(mouseDownPosition); //also called if line validate fails
+  }
+  } else {  // not edit mode
+    var hit_id = hitTestAreas(mouseDownPosition);
+    if(!!hit_id) {
+      if(typeof window.globals.hitCallback === 'function')
+        window.globals.hitCallback(hit_id);
+    }
   }
 }
 
@@ -1533,7 +1569,8 @@ var exports = {
   getAreaCount:getAreaCount,
   setArea:setArea,
   show_areas:showAllAreas,
-  hide_areas:hideAllAreas
+  hide_areas:hideAllAreas,
+  edit_mode:editMode  // change this to false for application
 };
 globals.paperGlue = exports;
 
