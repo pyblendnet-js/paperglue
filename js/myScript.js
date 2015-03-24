@@ -104,25 +104,35 @@ function imgGetPosCall(obj){
   return obj.raster.position;
 }
 
-function onKeyDown(event) {
-  if(event.key == 'control' || event.key == 'shift' || event.key == 'alt')
-    return;
+function keyDown(event,controlPressed,shiftPressed,altPressed) {  // note: This is accessed from paperglue.js - not directly
+  // if(event.key == 'control' || event.key == 'shift' || event.key == 'alt')
+  //   return;
   console.log(event);
   console.log("myScript received:",event.key);
-  if(event.modifiers.control) {
-    if(event.key == 's') {
-      console.log("cntrlS");
+  if(controlPressed) {
+    if(event.key == 'q') {
+      console.log("cntrlQ");
       event.stopPropagation();
-
-      var lines = globals.getLines();
-      var images = globals.getImages();
-      var paper_screen = {lines:lines,images:images};
-      json_str = JSON.stringify(paper_screen);
-      console.log(json_str);
+      var q = globals.getDoRecord();
+      var ab = document.getElementById("actionTableBody");
+      var ihtml = "";
+      console.log("Actions:"+ab.length);
+      for(var qi in q) {
+        var dr = q[qi];
+        var rhtml = '<tr><td class="td-nya">'+dr.action+'</td><td class="td-nya">'+dr.id+'</td><td class="td-nya">'+"blahblah"+'</td></tr>';
+        console.log(rhtml);
+        ihtml += rhtml;
+      }
+      ab.innerHTML = ihtml;
+      // var lines = globals.getLines();
+      // var images = globals.getImages();
+      // var paper_screen = {lines:lines,images:images};
+      // json_str = JSON.stringify(paper_screen);
+      // console.log(json_str);
       return false;
     }
   }
   return true;
 }
 
-window.globals.keyhandler = onKeyDown;  // requests paperglue to pass event here
+window.globals.keyhandler = keyDown;  // requests paperglue to pass event here

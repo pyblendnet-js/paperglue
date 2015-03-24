@@ -40,17 +40,8 @@ var holdContext = false;  // don't reset contextMenu till after mouseUp
 var doRecord = [];  // record of all clonings and moves  {action:string,src:src,raster:image or line:path,pos:point}
 var doRecordIndex = 0;  // points to next do location
 var recordPath = "testSave.json";
-
-
-// global hooks for created objects
-function getImageInstances() {
-  return imageInstances;
-}
-
-function getLineInstances() {
-  console.log("Returning line instances:", Object.keys(lineInstances).length);
-  return lineInstances;
-}
+//var ua = navigator.appName.toLowerCase();
+//console.log("Browser details:"+ua);  - not a lot of use
 
 /** Set quantum for snap on lines and images
   @param {float} typically greater than 1
@@ -482,14 +473,37 @@ function doRecordAdd(action) {
   doRecordIndex++;
 }
 
-function onKeyDown(event) {
-  if(event.key == 'control' || event.key == 'shift' || event.key == 'alt')
+var controlPressMs = 0;
+var shiftPressMs = 0;
+var altPressMs = 0;
+var modPressDelay = 200;  //delay in ms since mod key pressed for modified action
+
+function onKeyDown(event) {   //note: this is the paper.js handler - do not confuse with html
+  var d = new Date();
+  var nowMs = d.getTime();
+  if(event.key == 'control' || event.key == 'shift' || event.key == 'alt') {
+    console.log("Modifier pressed:"+event.key+" at "+nowMs);
+    switch(event.key) {
+       case 'control':
+         controlPressMs = nowMs;
+         break;
+      case 'shift':
+          shiftPressMs = nowMs;
+          break;
+      case 'alt':
+        altPress = nowMs;
+        break;
+    }
     return;
+  }
+  var controlPress = ((nowMs - controlPressMs) < modPressDelay) || event.modifiers.control;
+  var sinceShift = ((nowMs - shiftPressMs) < modPressDelay) || event.modifiers.shift;
+  var sinceAlt = ((nowMs - altPressMs) < modPressDelay) || event.modifiers.alt;
   console.log(event);
   console.log("Paperglue received:" + event.key);
   var propagate = true;
   if(event.key == 'z') {
-    if(event.modifiers.control) {
+    if(controlPress) {
       console.log("cntrlZ");
       if(event.modifiers.shift) {
         redo();
@@ -500,9 +514,9 @@ function onKeyDown(event) {
       propagate = false;
     }
   } else if(event.key == 'x') {
-    if(event.modifiers.control) {
+    if(controlPressed) {
       console.log("cntrlX");
-      if(event.modifiers.shift) {  // prune unnecessary edits
+      if(shiftPressed) {  // prune unnecessary edits
         doRecord = pruneDo();
         doRecordIndex = doRecord.length;
       } else {  // undo and remove that particular redo
@@ -513,7 +527,7 @@ function onKeyDown(event) {
       propagate = false;
     }
   } else if(event.key == 's') {
-    if(event.modifiers.control) {
+    if(controlPressed) {
       console.log("cntrlS");
       if(event.modifiers.shift) {  // save as
 
@@ -525,7 +539,7 @@ function onKeyDown(event) {
       propagate = false;
     }
   } else if(event.key == 'o') {
-    if(event.modifiers.control) {
+    if(controlPressed) {
       console.log("cntrlO");
       if(event.modifiers.shift) {  // load from
 
@@ -538,7 +552,7 @@ function onKeyDown(event) {
   }
   if(propagate && (typeof globals.keyhandler == 'function')) {
     console.log("Passing key upwards");
-    propagate = globals.keyhandler(event);
+    propagate = globals.keyhandler(event.key,controlPressed,shiftPressed,altPressed);
   }
   return propagate;
 }
@@ -791,6 +805,22 @@ function pruneDo() {
   return prunedDo;
 }
 
+
+// global hooks for created objects
+function getImageInstances() {
+  return imageInstances;
+}
+
+function getLineInstances() {
+  console.log("Returning line instances:", Object.keys(lineInstances).length);
+  return lineInstances;
+}
+
+function getDoRecord() {
+  console.log("Returning do record:", doRecord.length);
+  return doRecord;
+}
+
 // think this needs to be at the bottom so under scripts find things fully loaded
 console.log("PaperGlue functions to window globals");
 // window global are use for cross scope communications
@@ -798,6 +828,7 @@ var globals = window.globals;
 globals.loadImages = loadImages;
 globals.getImages = getImageInstances;
 globals.getLines = getLineInstances;
+globals.getDoRecord = getDoRecord;
 globals.setSnapQuantum = setSnapQuantum;
 globals.keyHandler = null;
 if(typeof globals.onPaperLoad == 'function')  { // myScript couldn't find loadImages so provided a call to repeat the request

@@ -5,7 +5,7 @@
   <meta content="utf-8" http-equiv="encoding">
   <!-- Load the Paper.js library -->
   <script type="text/javascript" src="js/paper.js"></script>
-  <script>  window.globals = { }; // for interscope comms </script> 
+  <script>  window.globals = { }; // for interscope comms </script>
   <script type="text/javascript" src="js/nodeComms.js"></script>
   <!-- Load external PaperScript and associate it with myCanvas -->
   <script type="text/paperscript" src="js/paperglue.js" canvas="myCanvas">
@@ -44,6 +44,12 @@
         background-color: black;
       }
     </style>
+    <style>
+.table{width: 80%;height: 200px;border-collapse:collapse;border:2px solid black}
+.td-nya{border-left:1px solid white;border-right:1px solid grey;border-bottom:1px solid grey;}
+
+</style>
+
 </head>
 <body id="body" onload="onload();" >
   <button type="button" onclick="showPaper();" class="button" width="300">Show paper scope</button>
@@ -51,6 +57,19 @@
   <!--<image src="img/verodes.png"/>-->
   <canvas id="myCanvas" resize></canvas>
   <p>The END</p>
+  <div id="actionTable">
+    <table class="table" colspan="3">
+      <thead>
+        <tr>
+          <th>Action</th>
+          <th>Obj ID</th>
+          <th>Parameters</th>
+        </tr>
+      </thead>
+      <tbody id="actionTableBody">
+      </tbody>
+    </table>
+  </div>
   <div style="display:none; " id="contextMenu">
     <table  border="0" cellpadding="0" cellspacing="0"
     style="border: thin solid #808080; cursor: default; white-space: nowrap" width="100px"
