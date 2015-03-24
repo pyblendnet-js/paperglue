@@ -4,13 +4,16 @@ var paperGlue;  // see initApp below
 var wireLinks = [];
 
 var objectMenu = [ {label:'name', propCall:imgGetNameCall},
+                   {label:'size', propCall:imgGetSizeCall},
                    {label:'pos',propCall:imgGetPosCall},
                    {label:'properties',callback:openPropDialog},
                    {label:'setCenter',propCall:imgGetCenterCall,callback:setCenterToCursor},
                    {label:'setOrigin',propCall:imgGetOriginCall,callback:setOriginToCursor}
                  ];
 var objectInstanceMenu = [ {label:'name', propCall:imgGetInstanceNameCall},
-                           {label:'pos',propCall:imgGetPosCall},{label:'properties',callback:openPropDialog} ];
+                           {label:'pos',propCall:imgGetPosCall},
+                           {label:'snap',propCall:getSnapModeCall,callback:toggleSnap},
+                           {label:'properties',callback:openPropDialog} ];
 var first_image = {src:"img/con_Block_5.08mm_12.png", scale:0.6, id:"conBlock1", isSymbol:true, dragClone:true, contextMenu:objectMenu, instanceContextMenu:objectInstanceMenu, pos:view.center };
 // other parameters:
 //   origin = point in image which represents position
@@ -80,6 +83,13 @@ function imgGetNameCall(obj){
   return obj.src.id;
 }
 
+function imgGetSizeCall(obj){
+  console.log('get size called');
+  console.log("Obj raster keys:"+Object.keys(obj.raster));
+  console.log(obj.raster.bounds);
+  return new Size(obj.raster.bounds.width,obj.raster.bounds.height);
+}
+
 function imgGetInstanceNameCall(obj){
   console.log('get name called');
   return "" + obj.src.id + "#" + obj.id;
@@ -89,6 +99,19 @@ function imgGetPosCall(obj){
   console.log('pos called');
   console.log(Object.keys(obj));
   return obj.raster.position;
+}
+
+function getSnapModeCall(obj){
+  if(obj.hasOwnProperty('snap'))
+    return obj.snap;
+  return papergui.getSnapDefault();
+}
+
+function toggleSnap(obj) {
+  if(obj.hasOwnProperty('snap'))
+    obj.snap = !obj.snap;
+  else
+    obj.snap = !paperGui.getSnapDefault();
 }
 
 function imgGetCenterCall(obj){
@@ -175,20 +198,24 @@ function openActionsWindow() {
 }
 
 function openPropDialog() {
+  var fontsize = window.innerWidth/80;
   var obj = paperGlue.getCurrentContextObject();
   paperGlue.showImageCursors(obj,false);
   console.log("Opening property dialog:",obj.id);
   console.log("Prop:"+Object.keys(obj));
   var Dlg = document.getElementById('Overlay');
   Dlg.style.visibility = 'visible';
-  var p = '<table><tr><td>ID</td><td>'+obj.id+'</td></tr>';
+  //Dlg.style.fontSize = fontsize;
+  //Dlg.style = "font-size:"+fontsize+"px;visibility:visible;";
+  var fs = 'style="font-size:'+fontsize+'px;"';
+  var p = '<table ' + fs + '><tr><td>ID</td><td>'+obj.id+'</td></tr>';
   if(obj.hasOwnProperty('raster')) {
     p += '<tr><td>X</td><td>';
-    p += '<input id="xpos" type="number" value="'+obj.raster.position.x+'"/></td></tr>';
+    p += '<input '+fs+' id="xpos" type="number" value="'+obj.raster.position.x+'"/></td></tr>';
     p += '<tr><td>Y</td><td>';
-    p += '<input id="ypos" type="number" value="'+obj.raster.position.y+'"/></td></tr>';
+    p += '<input '+fs+' id="ypos" type="number" value="'+obj.raster.position.y+'"/></td></tr>';
     p += '<tr><td>Rot</td><td>';
-    p += '<input id="rot" type="number" value="'+obj.raster.rotation+'"/></td></tr>';
+    p += '<input '+fs+' id="rot" type="number" value="'+obj.raster.rotation+'"/></td></tr>';
   }
   // var ks = Object.keys(obj);
   // for(var ki in ks ) {

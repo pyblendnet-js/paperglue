@@ -29,6 +29,7 @@ var imageSelected = null;
 var imageSelectedPositiion = null;
 var lineSelectMode = 0;
 var snapRect = [5,5,10,10];   // offset x,y and then quantum x, y
+var snapDefault = true;
 var lineThickness = 3;
 var lineColor = 'black';
 var mouseDownPosition;
@@ -56,6 +57,10 @@ function setSnap(q) {
     if(q[qi] > 0.000001)
       snapRect[qi] = q[qi];
   }
+}
+
+function getSnapDefault() {
+  return snapDefault;
 }
 
 function setLineThickness(t) {
@@ -361,6 +366,9 @@ function showContextMenu(control, e) {
 
 function loadCurrentContextMenu(tbl) {
   tbl.innerHTML = "";
+  console.log("window width:"+window.innerWidth);
+  console.log("window height:"+window.innerHeight);
+  var fontsize = window.innerWidth/80;
   for(var mi in currentContextMenu) {
     var m = currentContextMenu[mi];
     console.log(m);
@@ -372,7 +380,7 @@ function loadCurrentContextMenu(tbl) {
         txt += " " + m.propCall(currentContextObject);
       }
     }
-    tbl.innerHTML += '<tr><td ><div  class="ContextItem" onmouseup="contextMenuCallback(' + mi + ')" >' + txt + '</div></td></tr>';
+    tbl.innerHTML += '<tr><td style="padding:0;"><div style="font-size:'+fontsize+'px;" class="ContextItem" onmouseup="contextMenuCallback(' + mi + ')" >' + txt + '</div></td></tr>';
   }
 }
 
@@ -493,23 +501,28 @@ function roundPoint(p) {
   return new Point(Math.round(p.x),Math.round(p.y));
 }
 
-function snapPoint(p) {
-  var p2 = new Point(
+function snapPoint(p,round_only) {
+  var p2;
+  if(round_only) {
+    p2 = new Point(Math.round(p.x),Math.round(p.y));
+  } else {
+    p2 = new Point(
     Math.round((p.x-snapRect[0])/snapRect[2]) * snapRect[2] +snapRect[0],
     Math.round((p.y-snapRect[1])/snapRect[3]) * snapRect[3] +snapRect[1]);
+  }
   console.log("Snap delta:" + (p2 - p));
   return p2;
 }
 
 // snaps both ends of the line path to grid quantum
-function snapLine(p) {
+function snapLine(p,round_only) {
   if(typeof p.firstSegment === 'undefined')
     return;
   console.log("Before:" + p.firstSegment.point);
   console.log("Snap Rect:" + snapRect);
-  p.firstSegment.point = snapPoint(p.firstSegment.point);
+  p.firstSegment.point = snapPoint(p.firstSegment.point,round_only);
   console.log("After:" + p.firstSegment.point);
-  p.lastSegment.point = snapPoint(p.lastSegment.point);
+  p.lastSegment.point = snapPoint(p.lastSegment.point,round_only);
   var dx = p.firstSegment.point.x - p.lastSegment.point.x;
   var dy = p.firstSegment.point.y - p.lastSegment.point.y;
   return((dx !== 0) || (dy !== 0));
@@ -538,12 +551,18 @@ function onMouseUp(event) {
     var img_id = findImageInstance('raster',imageSelected);
     if(!!img_id) {  // shouldn't be any trouble here
       console.log("instance found with id:"+img_id);  // need to keep id as well - might be null for master objects in layout mode
+      var round_only = !snapDefault;
+      if(img_id !== null) {
+        var inst = imageInstances[img_id];
+        if(inst.hasOwnProperty('snap'))
+          round_only = !inst.snap;
+      }
       var src = imageInstances[img_id].src;
       if(imageSelected.position == imageSelectedPosition) { // no movement or no prior position it being null
         rotateImage(img_id,imageSelected,src,90);
-        correctPosition(imageSelected,src);
+        correctPosition(imageSelected,src,round_only);
       } else {
-        correctPosition(imageSelected,src);
+        correctPosition(imageSelected,src,round_only);
         // keeping the obj as record is fine for undo but not so good for redo if the object gets deleted further back
         doRecordAdd({action:'imageMove',id:img_id,type:'image',pos:[imageSelectedPosition,imageSelected.position]});
       }
@@ -552,14 +571,14 @@ function onMouseUp(event) {
   }
 }
 
-function correctPosition(raster,src) {
+function correctPosition(raster,src,round_only) {
   // snaps and rounds image postion raster
   console.log("Before:"+raster.position);
   if(src.hasOwnProperty('origin')) {
     var oo = src.origin.rotate(raster.rotation);
-    raster.position = snapPoint(raster.position-oo) + oo;
+    raster.position = snapPoint(raster.position-oo,round_ony) + oo;
   } else {
-    raster.position = snapPoint(raster.position);
+    raster.position = snapPoint(raster.position,round_only);
   }
   console.log("After snap:"+raster.position);
   raster.position = roundPoint(raster.position);
@@ -620,7 +639,13 @@ function validatePath(path, force_id) {
     next_id = force_id;
   }
   console.log("Path length:" + path.length);
-  if(snapLine(path)) {
+  var round_only = !snapDefault;
+  if(line_id !== null) {
+    var inst = lineInstances[line_id];
+    if(inst.hasOwnProperty('snap'))
+      round_only = !inst.snap;
+  }
+  if(snapLine(path,round_only)) {
     if(line_id === null) { //this path doesn't exist
       console.log('Creating new line with id:',next_id);
       lineInstances[next_id] = {line:path};
@@ -687,9 +712,10 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
   event.controlPressed = ((nowMs - controlPressMs) < modPressDelay) || event.modifiers.control;
   event.shiftPressed = ((nowMs - shiftPressMs) < modPressDelay) || event.modifiers.shift;
   event.altPressed = ((nowMs - altPressMs) < modPressDelay) || event.modifiers.alt;
-  console.log("Now:"+nowMs+" "+modPressDelay);
-  console.log("Now:"+(nowMs - controlPressMs));
-  console.log("Paperglue received:" + event.key);
+  //console.log("Now:"+nowMs+" "+modPressDelay);
+  //console.log("Now:"+(nowMs - controlPressMs));
+  //console.log("Paperglue received:" + event.key);
+  console.log("Window keys:" + Object.keys(window));
   var propagate = true;
   var delta = null;  // for arrow keys
   if(event.controlPressed) {
@@ -701,7 +727,6 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
         } else {
           undo();
         }
-        event.stopPropagation();
         propagate = false;
         break;
       case 'x':
@@ -782,7 +807,13 @@ function moveObject(obj,direction,snap) {
     if(!!img_id) {
       console.log("instance found with id:"+img_id);  // need to keep id as well - might be null for master objects in layout mode
       //var src = imageInstances[img_id].src;  // could have used obj.src
-      correctPosition(obj.raster,obj.src);
+      var round_only = !snapDefault;
+      if(img_id !== null) {
+        var inst = lineInstances[img_id];
+        if(inst.hasOwnProperty('snap'))
+          round_only = !inst.snap;
+      }
+      correctPosition(obj.raster,obj.src,round_only);
       doRecordAdd({action:'imageMove',id:img_id,type:'image',pos:[objPosition,obj.position]});
     }
   } else {
@@ -957,11 +988,11 @@ function undo() {
     var raster;
     switch(last_do.action) {
       case 'lineMove':
-        console.log(lineInstances[0]);
-        console.log("line instances:" + (lineInstances.length));
+        //console.log(lineInstances[0]);
+        //console.log("line instances:" + (lineInstances.length));
 
-        console.log("line instances:" + (Object.keys(lineInstances)));
-        console.log("line instances:" + Object.keys(lineInstances).indexOf(String(last_do.id)));
+        //console.log("line instances:" + (Object.keys(lineInstances)));
+        //console.log("line instances:" + Object.keys(lineInstances).indexOf(String(last_do.id)));
         if(Object.keys(lineInstances).indexOf(String(last_do.id)) < 0) {
           console.log('No instance of line id:' + last_do.id);
           break;
@@ -1028,7 +1059,7 @@ function redo() {
   if(doRecordIndex >= doRecord.length)
     return false;  // nothing to undo
   var to_do = doRecord[doRecordIndex];
-  console.log(Object.keys(to_do));
+  //console.log(Object.keys(to_do));
   console.log("Redoing " + to_do.action);
   var raster;
   var imgobj;
@@ -1038,10 +1069,10 @@ function redo() {
       if(!lineInstances.hasOwnProperty(to_do.id)) {
         console.log("path id " + to_do.id + " nolonger exists - remaking");
         newLine();
-        console.log(to_do.pos[1]);
+        //console.log(to_do.pos[1]);
         lineSelected.add(to_do.pos[1][0]);
         lineSelected.add(to_do.pos[1][1]);
-        console.line("line:" + lineSelected);
+        //console.line("line:" + lineSelected);
         // need to reuse old id
         var id = validatePath(lineSelected,to_do.id);  // adds to lineInstances
         lineSelected = null;
