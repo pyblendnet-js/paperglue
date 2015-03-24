@@ -25,6 +25,7 @@
 //note:objects here are all somewhere within the paper scope
 // Tp make visibile to window, declare as window.object
 
+var body;  // cached in init()
 var editMode = true;
 var modalOpen = false;
 var mouseDownHandled = false;  // prevent propogation to onMouseDown
@@ -136,8 +137,7 @@ function addImage(source, id) {
   img.src = source;  // this will cause a GET call from the browser
   img.id = id;
   img.hidden = true;
-  var src = document.getElementById("body");
-  src.appendChild(img);
+  body.appendChild(img);
 }
 
 // returns an array of keys matching search by for array or table of objects
@@ -196,6 +196,7 @@ function drawCross(pos, size, color) {
 }
 
 function init() {
+  body = document.getElementById("body");
 // there may or maynot be an activeLayer when this code is run
   baseLayer = project.activeLayer;  //for some reason no layer exists yet
   cursorLayer = new Layer();
@@ -377,6 +378,7 @@ function loadImages(images_to_load, custom_default_props) {
     custom_default_props = customDefaultProps;
   else
     customDefaultProps = custom_default_props;
+  console.log("Loading " + images_to_load.length + " images");
   while(images_to_load.length > 0) {  // continue till empty - not sure if this is valid
     var imgobj = images_to_load.pop();
     imgobj.initialProp = Object.keys(imgobj);
@@ -396,10 +398,11 @@ function loadImages(images_to_load, custom_default_props) {
       }
     }
     if(imgobj.hasOwnProperty('pos')) {   // a position given so it will be visible
-      //console.log("Pos:" + img.pos);
+      console.log("Pos:" + imgobj.pos);
       imgobj.raster.position = imgobj.pos;
     } else {  // no position so dont show yet
-      imgobj.raster.remove();  //dont need this cluttering the document
+      imgobj.raster.remove();
+      console.log("don't need this cluttering the document");
     }
     var listen_to_mouse = imgobj.hasOwnProperty('contextMenu');
     if(imgobj.hasOwnProperty('dragClone')) {  // if not defined then assume false
@@ -705,6 +708,12 @@ function removeAreaInstance(id, record) {
     if(selectedItems.hasOwnProperty(id))
       delete selectedItems[id];
   }
+}
+
+function removeAreas(){
+  console.log("Removing area instances:"+Object.keys(areaInstances).length);
+  for(var id in areaInstances)
+    removeAreaInstance(id);
 }
 
 function removeAreaPath(a) {
@@ -1533,7 +1542,7 @@ function onLoadReply(res) {
       if(reply_obj.type == 'file')
         parseRecord(reply_obj.data);
     } catch(e1) {
-      console.logI("Error parsing reply"+e1);
+      console.log("Error parsing reply"+e1);
     }
   }
 }
@@ -1547,21 +1556,25 @@ function parseRecord(jdata) {
       // console.log("New record has" + newRecord.length + " actions");
       removeAll();
       imglist = project_data.imglist;
-      console.log("Images to load:"+Array.isArray(imglist));
+      console.log("Images to load:"+imglist.length); //Array.isArray(imglist));
       // add any images not already loaded - does not check date
+      var overload_images = true;
+      if(editMode && imglist.length > 0)
+        overload_images = confirm("Overload existing images with same name?");
       var imgs_to_load = [];
       //for(var ii in img_keys) {
       for(var ik in imglist) {
         //var ik = img_keys[ii];
         console.log("ik:"+ik+"="+imglist[ik].id);
-        if(imagesLoaded.hasOwnProperty(imglist[ik].id)) {
+        if(!overload_images && imagesLoaded.hasOwnProperty(imglist[ik].id)) {
           console.log("This image already loaded");
           continue;
         }
-        imgs_to_load.push(imglist[img_keys]);
+        var imgobj = parseImageObj(imglist[ik]);
+        imgs_to_load.push(imgobj);
       }
-      //console.log("Images to load:"+img_keys);
-      //loadImages(imgs_to_load);  //will use previously set defaults
+      console.log("Images to load:"+imgs_to_load);
+      loadImages(imgs_to_load);  //will add to previously set defaults
       doRecord = project_data.dolist;
       correctPosPoints(doRecord);
       doRecordIndex = 0;
@@ -1631,24 +1644,38 @@ function parseSize(ord) {
     return ord;  // no change
 }
 
+function parseImageObj(obj) {
+  // correct all the JSON parsed points in the obj
+  var nobj = {};
+  for(var k in obj) {
+    if(Array.isArray(obj[k]))
+      nobj[k] = parsePoint(obj[k]);
+    else
+      nobj[k] = obj[k];
+  }
+  console.log(nobj);
+  return nobj;
+}
+
 function removeLines() {
-  console.log("Removing lines:"+lineIDs.length);
+  console.log("Removing lines:"+Object.keys(lineInstances).length);
   for(var id in lineInstances) {
     removeLine(id);
   }
 }
 
 function removeSymbols() {
-  console.log("Removing images:"+imageInstances.length);
+  console.log("Removing images:"+Object.keys(imageInstances).length);
   for(var id in imageInstances) {
     symbolRemove(id);
   }
 }
 
 function removeAll(){
-  if(confirm("Do you want to clear current workspace?"))
+  if(editMode && confirm("Do you want to clear current workspace?"))
   { removeLines();
     removeSymbols();
+    removeAreas();
     doRecord = [];
     doRecordIndex = 0;
   }

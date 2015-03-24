@@ -50,7 +50,7 @@ function initApp() {
   console.log("Initialising application");
   paperGlue = window.globals.paperGlue;  //to access paperGlue commands
   paperGlue.init();  // sets up extra layers
-  paperGlue.loadImages([first_image],default_image_menus);
+  paperGlue.loadImages([],default_image_menus);  //first_image
   paperGlue.setSnap([5,5,10,10]);
   paperGlue.showAreas();
 }
@@ -322,7 +322,7 @@ function dialogReturn(reply) {
   }
   // otherwise hope this is an image or symbol
   var nmfield = null;
-  if(obj.type === 'symbol') 
+  if(obj.type === 'symbol')
     nmfield = document.getElementById('name');
   var xfield = document.getElementById('xpos');
   var yfield = document.getElementById('ypos');
