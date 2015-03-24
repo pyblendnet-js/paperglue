@@ -255,7 +255,7 @@ function showImageCursors(obj,show_mouse_cursor) {
 // onmousedown callback for images that are cloneable, dragable or have context menu
 function onImageMouseDown(event) {
   mouseDownHandled = true;
-  event.stopPropagation();  // doesn't work
+  stopEvent(event);  // doesn't work
   mouseDownPosition = event.point;
   hideArea();
   hideContextMenu('contextMenu');
@@ -313,7 +313,7 @@ function onImageMouseDown(event) {
            // currentContextObject object has some redundant info but seems simpler to use this way
            // name may not be defined
            console.log("name:"+imgobj.name);
-           currentContextObject = {id:id,type:'image',inst:imgobj,src:src,raster:this};
+           currentContextObject = {id:id,type:'symbol',inst:imgobj,src:src,raster:this};
            selectItem(id,imgobj.raster);
            holdContext = true;  // cross browser solution to default mouse up reset
            return false; // clone image not selected for right click
@@ -341,7 +341,9 @@ function symbolPlace(imgid, force_id) {
   if(typeof force_id === 'undefined') {
     inst = {src:imgobj, raster:imageSelected};
     img_id = nextID;
-    doRecordAdd({action:'symbolPlace',id:nextID,type:'image',src_id:imgobj.id});
+    doRecordAdd({action:'symbolPlace',id:img_id,type:'symbol',src_id:imgobj.id});
+    selectItem(img_id,imageSelected);
+    currentContextObject = {id:img_id,type:'symbol',inst:inst,src:imgobj,raster:imageSelected};
     nextID += 1;
   } else {  // used by redo to accept old id - so need to record do action
     inst = {src:imgobj, raster:imageSelected};
@@ -358,6 +360,8 @@ function symbolRemove(id) {
   var inst = imageInstances[id];
   inst.raster.remove();
   delete imageInstances[id];
+  if(selectedItems.hasOwnProperty(id))
+    delete selectedItems[id];
 }
 
 /**
@@ -688,7 +692,8 @@ function removeAreaInstance(id, record) {
       doRecordAdd({action:'areaDelete',id:id,rect:a.rect,name:a.name});
     }
     delete areaInstances[id];  // removes from list
-
+    if(selectedItems.hasOwnProperty(id))
+      delete selectedItems[id];
   }
 }
 
@@ -740,6 +745,7 @@ function showAreaText(a,id) {
   a.text.justification = 'center';
   a.text.fontSize = 15;
   a.text.fillColor = areaColor;
+  currentContextObject = {id:id,type:'area',inst:a};  
   selectItem(id,a.path);
 }
 
@@ -846,7 +852,7 @@ function selectItem(id,item) {
 
 // onmousedown callback for two point paths
 function onLineMouseDown(event) {
-  event.stopPropagation();  // doesn't work
+  stopEvent(event);
   mouseDownHandled = true;
   console.log("Line mouse down");
   if(modalOpen)
@@ -991,8 +997,9 @@ function snapLine(p,round_only) {
 // universal mouse up handler - mainly just tidy up
 function onMouseUp(event) {
   console.log("Mouse up");
+  stopEvent(event);
   if(modalOpen)
-    return;
+    return false;
   if(editMode) {
     if(!!imageSelected) {
       console.log("Opacity was:" + imageSelected.opacity);
@@ -1018,7 +1025,7 @@ function onMouseUp(event) {
         imageSelected = null;
         currentContextMenu = null;
         console.log("Area move completed");
-        return;
+        return false;
       }
       console.log("Not select move");
       var aid;
@@ -1041,15 +1048,17 @@ function onMouseUp(event) {
             var l = lineInstances[id];
             currentContextObject = {id:id,type:'line',inst:l};  //to match image instance object
             setContextMenu("lineMenu");
-            if(l.hasOwnProperty('path'))
+            if(l.hasOwnProperty('path')) {
               selectItem(id,l.path);  //needs to happen after context select
+                currentContextObject = {id:id,type:'line',inst:l};  
+            }
           }
         }
       }
       console.log("Select check complete");
       rightButton = false;
       imageSelected = null;
-      return;
+      return false;
     }
     if(!!lineSelected) {
       // for undo it will be necessary to look for previous position if any
@@ -1072,6 +1081,7 @@ function onMouseUp(event) {
     }
   }
   selectedMove = false;
+  return false;
 }
 
 function imageMoved(img,prev_pos,spot_rotate) {
@@ -1089,7 +1099,7 @@ function imageMoved(img,prev_pos,spot_rotate) {
     } else {
       correctPosition(img,src,round_only);
       // keeping the obj as record is fine for undo but not so good for redo if the object gets deleted further back
-      doRecordAdd({action:'imageMove',id:img_id,type:'image',pos:[prev_pos,img.position]});
+      doRecordAdd({action:'imageMove',id:img_id,type:'symbol',pos:[prev_pos,img.position]});
     }
   }
 }
@@ -1109,7 +1119,7 @@ function correctPosition(raster,src,round_only) {
 }
 
 function rotateImage(id,raster,src,angle) {
-  var dorec = {action:'imageRotate',id:id,type:'image'};
+  var dorec = {action:'imageRotate',id:id,type:'symbol'};
   // use mouseDownPosition or event.position to find the closest point of rotation in object
   var rotation = Math.round(raster.rotation);
   if(src.hasOwnProperty('center')) {
@@ -1129,14 +1139,14 @@ function moveCurrentImage(x,y,r) {
   var p = new Point(x,y);
   if(x !== im.position.x || y !== im.position.y) {
     //console.log(p);
-    doRecordAdd({action:'imageMove',id:currentContextObject.id,type:'image',pos:[im.position,p]});
+    doRecordAdd({action:'imageMove',id:currentContextObject.id,type:'symbol',pos:[im.position,p]});
     //console.log(doRecord[doRecordIndex-1].pos);
     im.position = p;
   }
   if(r !== im.rotation) {
     rotateImage(currentContextObject.id,im,currentContextObject.src,r-im.rotation);
     // var rot = Math.round(r);
-    // doRecordAdd({action:'imageRotate',id:currentContextObject.id,type:'image',rot:[im.rotation,rot],});
+    // doRecordAdd({action:'imageRotate',id:currentContextObject.id,type:'symbol',rot:[im.rotation,rot],});
     // im.rotation = rot;
   }
 }
@@ -1184,6 +1194,7 @@ function validatePath(path, force_id) {
       var np = [lineSelected.firstSegment.point.clone(),lineSelected.lastSegment.point.clone()];
       doRecordAdd({action:'lineMove',id:line_id,type:'line',pos:[lineSelectedPosition,np] });
       selectItem(line_id,path);
+      currentContextObject = {id:line_id,type:'line',inst:lineInstances[line_id]};  //to match image instance object
     }
   } else {  // length of line is too short
     console.log("Zero length line");
@@ -1197,10 +1208,17 @@ function validatePath(path, force_id) {
   return line_id;
 }
 
-function removeLine(id) {
-  if(lineInstances.hasOwnProperty(id))  // this path does exist
-    lineInstances[id].path.remove();  // should remove from screen
-  delete lineInstances[id];  // removes from list
+function removeLine(id, record) {
+  if(lineInstances.hasOwnProperty(id)) {  // this path does exist
+    var line = lineInstances[id];
+    if(record) {
+      doRecordAdd({action:'lineMove',id:id,type:'line',pos:[[0,0],[0,0]] });  // zero length line
+    }
+    line.path.remove();  // should remove from screen
+    delete lineInstances[id];  // removes from list
+  }
+  if(selectedItems.hasOwnProperty(id))
+    delete selectedItems[id];
 }
 
 function doRecordAdd(action) {
@@ -1220,8 +1238,7 @@ var modPressDelay = 800;  //delay in ms since mod key pressed for modified actio
 
 function onKeyDown(event) {   //note: this is the paper.js handler - do not confuse with html
   if(modalOpen) {
-    event.preventDefault();
-    event.stopPropagation();
+    stopEvent(event);
     return false;
   }
   if(!keyFocus) {
@@ -1318,15 +1335,22 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
   } else {
     switch(event.key) {
       case 'delete':
-        var id = currentContextObject.id;
-        switch(currentContextObject.type) {
-          case 'symbol':
-            removeImage(id,true);
-            break;
-          case 'area':
-            removeAreaInstance(id,true);
-            break;
+        if(currentContextObject) {
+          console.log("Delete "+currentContextObject.id+"="+currentContextObject.type);
+          var id = currentContextObject.id;
+          switch(currentContextObject.type) {
+            case 'line':
+              removeLine(id,true);
+              break;
+            case 'symbol':
+              removeImage(id,true);
+              break;
+            case 'area':
+              removeAreaInstance(id,true);
+              break;
+          }
         }
+        currentContextObject = null;
         propagate = false;
         hideContextMenu('contextMenu');
         hideCursor();
@@ -1341,8 +1365,7 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
     console.log("Passing key upwards");
     propagate = globals.keyhandler(event);
   } else {
-    event.preventDefault();
-    event.stopPropagation();
+    stopEvent(event);
   }
   return propagate;
 }
@@ -1362,7 +1385,7 @@ function moveObject(obj,direction,snap) {
           round_only = !inst.snap;
       }
       correctPosition(obj.raster,obj.src,round_only);
-      doRecordAdd({action:'imageMove',id:img_id,type:'image',pos:[objPosition,obj.position]});
+      doRecordAdd({action:'imageMove',id:img_id,type:'symbol',pos:[objPosition,obj.position]});
     }
   } else {
     obj.raster.position += direction;
@@ -1575,17 +1598,14 @@ function removeAll(){
   }
 }
 
-function removeImage(obj,record) {
-  if(!obj)
-    return;
-  var img_id = findInstance(image,instances,'raster',obj.raster,true);
-  if(!!img_id) {
-    if(!record || confirm("Do you really want to remove object ID =" + img_id + "?")) {
-      symbolRemove(img_id);
-      if(record)
-        doRecordAdd({action:'symbolDelete',id:img_id,src_id:obj.src.id,pos:obj.raster.position,rot:obj.raster.rotation});
-      return true;
+function removeImage(id,record) {
+  if(!record || confirm("Do you really want to remove object ID =" + id + "?")) {
+    if(record) {
+      var obj = imageInstances[id];
+      doRecordAdd({action:'symbolDelete',id:id,src_id:obj.src.id,pos:obj.raster.position,rot:obj.raster.rotation});
     }
+    symbolRemove(id);
+    return true;
   }
   return false;
 }
@@ -1744,8 +1764,7 @@ function redo() {
       }
       break;
     case 'symbolDelete':
-      var inst = imageInstances[to_do.id];
-      removeImage(inst,false);   // delete is already in records
+      removeImage(to_do.id,false);   // delete is already in records
       break;
     case 'setArea':
       areaInstances[to_do.id] = {rect:to_do.rect};
@@ -1936,8 +1955,8 @@ function areaSelect() {
   if(areasVisible) {
     for(var aid in areaInstances) {
       var a = areaInstances[aid];
-      console.log("TopLeft:"+a.rect.topleft);
-      console.log("BottomRight:"+a.rect.bottomright);
+      console.log("TopLeft:"+a.rect.topLeft);
+      console.log("BottomRight:"+a.rect.bottomRight);
       if(rect.contains(a.rect.topLeft) && rect.contains(a.rect.bottomRight)) {
         if(a.hasOwnProperty('path'))
         selectedItems[aid] = a.path;
