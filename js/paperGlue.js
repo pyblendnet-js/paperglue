@@ -26,6 +26,7 @@
 // Tp make visibile to window, declare as window.object
 
 var editMode = true;
+var modalOpen = false;
 var keyFocus = true;
 var nextID = 0;  // for keeping track of all objects with a unique id
 var lineInstances = {};
@@ -437,6 +438,8 @@ function openCall(){
 
 function onContextMenu(event) {
   console.log("Call for context menu");
+  if(modalOpen)
+    return false;
   showContextMenu('contextMenu',event);
   return false;
 }
@@ -508,6 +511,8 @@ function rightButtonCheck(event) {
 // default mouse down event handler - most browser will bubble to this from the other mouseDown handlers
 function onMouseDown(event) {
   console.log("Basic Mouse down");
+  if(modalOpen)
+    return false;
   mouseDownPosition = event.point;
   hideArea();
   if(rightButtonCheck(event)) {
@@ -735,6 +740,8 @@ function selectItem(id,item) {
 // onmousedown callback for two point paths
 function lineMouseDown(event) {
   console.log("Line mouse down");
+  if(modalOpen)
+    return;
   mouseDownPosition = event.point;
   if(rightButtonCheck(event)) {
     console.log("Right button down");
@@ -748,7 +755,6 @@ function lineMouseDown(event) {
       currentContextMenu = defaultContextMenu;
     return false;
   }
-  console.log("link mouse down");
     lineSelected = this;
     lineSelectedPosition = [lineSelected.firstSegment.point.clone(),lineSelected.lastSegment.point.clone()];
     var line_select_fraction = (event.point - this.segments[0].point).length/this.length;
@@ -767,9 +773,11 @@ function lineMouseDown(event) {
 
 // univeral mouse drag function can drag lines or images or create rubber band new line
 function onMouseDrag(event) {
+  if(modalOpen)
+    return;
   if(rightButton) {
     var v = event.point - mouseDownPosition;
-    if(v.x > minAreaSide && v.y > minAreaSide) {
+    if(Math.abs(v.x) > minAreaSide && Math.abs(v.y) > minAreaSide) {
       if(!areaSelected) {
         newArea();
         setContextMenu("newAreaMenu");
@@ -856,6 +864,8 @@ function snapLine(p,round_only) {
 // universal mouse up handler - mainly just tidy up
 function onMouseUp(event) {
   console.log("Mouse up");
+  if(modalOpen)
+    return;
   if(editMode) {
   if(!!imageSelected) {
     console.log("Opacity was:" + imageSelected.opacity);
@@ -1040,9 +1050,14 @@ var altPressMs = 0;
 var modPressDelay = 800;  //delay in ms since mod key pressed for modified action
 
 function onKeyDown(event) {   //note: this is the paper.js handler - do not confuse with html
+  if(modalOpen) {
+    event.preventDefault();
+    event.stopPropagation();
+    return false;
+  }
   if(!keyFocus) {
     //console.log("Paper  glue ignoring keys");
-    return;
+    return false;
   }
   var d = new Date();
   var nowMs = d.getTime();
@@ -1059,7 +1074,7 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
         altPress = nowMs;
         break;
     }
-    return;
+    return false;
   }
   event.controlPressed = ((nowMs - controlPressMs) < modPressDelay) || event.modifiers.control;
   event.shiftPressed = ((nowMs - shiftPressMs) < modPressDelay) || event.modifiers.shift;
@@ -1737,6 +1752,10 @@ function setEditMode(state) {
   editMode = state;
 }
 
+function setModalOpen(state) {
+  modalOpen = state;
+}
+
 // think this needs to be at the bottom so under scripts find things fully loaded
 console.log("PaperGlue functions to window globals");
 // window global are use for cross scope communications
@@ -1769,7 +1788,8 @@ var exports = {
   hideAreas:hideAllAreas,
   changeAreaName:nameCurrentArea,
   moveCurrentArea:moveCurrentArea,
-  setEditMode:setEditMode  // change this to false for application
+  setEditMode:setEditMode,  // change this to false for application
+  setModalOpen:setModalOpen
 };
 globals.paperGlue = exports;
 

@@ -3,14 +3,14 @@ var paperGlue;  // see initApp below
 
 var wireLinks = [];
 
-var objectMenu = [ {label:'name', propCall:imgGetNameCall},
+var symbolMenu = [ {label:'name', propCall:imgGetNameCall},
                    {label:'size', propCall:imgGetSizeCall},
                    {label:'pos',propCall:imgGetPosCall},
                    {label:'properties',callback:openImgPropDialog},
                    {label:'setCenter',propCall:imgGetCenterCall,callback:setCenterToCursor},
                    {label:'setOrigin',propCall:imgGetOriginCall,callback:setOriginToCursor}
                  ];
-var objectInstanceMenu = [ {label:'name', propCall:imgGetInstanceNameCall},
+var symbolInstanceMenu = [ {label:'name', propCall:imgGetInstanceNameCall},
                            {label:'pos',propCall:imgGetPosCall},
                            {label:'snap',propCall:getSnapModeCall,callback:toggleSnap},
                            {label:'properties',callback:openImgPropDialog} ];
@@ -18,13 +18,13 @@ var newAreaMenu = [ {label:'set area#', propCall:getAreaCount, callback:setArea}
 var areaMenu = [ {label:'area', propCall:getAreaNameCall},
                  {label:'rect', propCall:getAreaRectCall},
                  {label:'properties',callback:openAreaPropDialog}];
-window.globals.menuLookup = { objectMenu:objectMenu,
-                              objectInstanceMenu:objectInstanceMenu,
+window.globals.menuLookup = { symbolMenu:symbolMenu,
+                              symbolInstanceMenu:symbolInstanceMenu,
                               newAreaMenu:newAreaMenu,
                               areaMenu:areaMenu
                             };
 var first_image = {src:"img/con_Block_5.08mm_12.png", scale:0.6, id:"conBlock1", isSymbol:true, dragClone:true, pos:view.center };
-var default_image_menus = { contextMenu:"objectMenu", instanceContextMenu:"objectInstanceMenu"};
+var default_image_menus = { contextMenu:"symbolMenu", instanceContextMenu:"symbolInstanceMenu"};
 // other parameters:
 //   origin = point in image which represents position
 //   center = point in image for rotation  e.g , center:[30,0]
@@ -233,19 +233,26 @@ function mouseMove(e) {
   }
 }
 
-function openImgPropDialog() {
-  var fontsize = window.innerWidth/80;
-  var obj = paperGlue.getCurrentContextObject();
-  paperGlue.showImageCursors(obj,false);
-  console.log("Opening property dialog:",obj.id);
-  console.log("Prop:"+Object.keys(obj));
+function openDialogCommon() {
+  paperGlue.enableKeyFocus(false);
   var Dlg = document.getElementById('Overlay');
   Dlg.style.visibility = 'visible';
   Dlg.onmousedown=mouseDown;
   Dlg.onmousemove=mouseMove;
   Dlg.onmouseup=mouseUp;
+  paperGlue.setModalOpen(true);  //make dialog modalish
   //Dlg.style.fontSize = fontsize;
   //Dlg.style = "font-size:"+fontsize+"px;visibility:visible;";
+}
+
+function openImgPropDialog() {
+  openDialogCommon();
+  var obj = paperGlue.getCurrentContextObject();
+  paperGlue.showImageCursors(obj,false);
+  console.log("Opening property dialog:",obj.id);
+  console.log("Prop:"+Object.keys(obj));
+
+  var fontsize = window.innerWidth/80;
   var fs = 'style="font-size:'+fontsize+'px;"';
   var p = '<table ' + fs + '><tr><td>ID</td><td>'+obj.id+'</td></tr>';
   // if(obj.hasOwnProperty('raster')) {
@@ -272,7 +279,6 @@ function openImgPropDialog() {
   p += '</table>';
   var content = document.getElementById('DlgContent');
   content.innerHTML = p;
-  paperGlue.enableKeyFocus(false);
   return false;  //do not hide cursors yet
 }
 
@@ -303,7 +309,9 @@ function dialogReturn(reply) {
   paperGlue.hideCursor();
   if(reply === 'apply') {
     paperGlue.showImageCursors(obj,false);
+    return;
   }
+  paperGlue.setModalOpen(false);
   paperGlue.enableKeyFocus(true);
 }
 
@@ -337,14 +345,11 @@ function getAreaRectCall(obj){
 }
 
 function openAreaPropDialog() {
+  openDialogCommon();
   var fontsize = window.innerWidth/80;
   var obj = paperGlue.getCurrentContextObject();
   console.log("Opening property dialog:",obj.id);
   console.log("Prop:"+Object.keys(obj));
-  var Dlg = document.getElementById('Overlay');
-  Dlg.style.visibility = 'visible';
-  //Dlg.style.fontSize = fontsize;
-  //Dlg.style = "font-size:"+fontsize+"px;visibility:visible;";
   var fs = 'style="font-size:'+fontsize+'px;"';
   var p = '<table ' + fs + '><tr><td>ID</td><td>'+obj.id+'</td></tr>';
   var a = obj.inst;
@@ -368,7 +373,6 @@ function openAreaPropDialog() {
   //   p += '<tr><td>'+k+'</td><td>'+obj[k]+'</td></tr>';
   // }
   p += '</table>';
-  paperGlue.enableKeyFocus(false);
   var content = document.getElementById('DlgContent');
   content.innerHTML = p;
   return false;  //do not hide cursors yet
@@ -388,7 +392,10 @@ function areaDialogReturn(reply) {
   if(reply !== 'cancel') {
     paperGlue.changeAreaName(name);  // beware name is volitile
     paperGlue.moveCurrentArea(new Rectangle(x,y,w,h));
+    if(reply === 'apply')
+      return;
   }
+  paperGlue.setModalOpen(false);
   paperGlue.enableKeyFocus(true);
 }
 
