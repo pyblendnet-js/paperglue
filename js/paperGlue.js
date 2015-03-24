@@ -3,7 +3,7 @@
 * See paper.ps
 *
 * Current features:
-*   - click and drag to create snap locked lines
+*   - click drag to create snap locked lines
 *   - click ends or middle to drag line end or whole lines
 *   - click on master image to clone and drag to locate
 *   - right click on images for context menu and properties
@@ -42,6 +42,7 @@ var holdContext = false;  // don't reset contextMenu till after mouseUp
 var doRecord = [];  // record of all clonings and moves  {action:string,src:src,raster:image or line:path,pos:point}
 var doRecordIndex = 0;  // points to next do location
 var recordPath = "testSave.json";
+var cursorPos = [0,0];
 //var ua = navigator.appName.toLowerCase();
 //console.log("Browser details:"+ua);  - not a lot of use
 
@@ -120,12 +121,8 @@ function drawCross(pos, size) {
 function init() {
 // there may or maynot be an activeLayer when this code is run
   baseLayer = project.activeLayer;  //for some reason no layer exists yet
-  console.log("ActiveLayer&:"+project.activeLayer);
-  console.log("Layers&:"+project.layers);
   cursorLayer = new Layer();
-  console.log("ActiveLayer&:"+project.activeLayer);
-  console.log("ActiveLayer&:"+project._activeLayer);
-  console.log("project:"+Object.keys(project));
+  // Couldn't figure out how to add setActiveLayer
   // if(typeof Project.setActiveLayer === 'undefined') {
   //   var setActiveLayer = function(l) {
   //     this._activeLayer = l;
@@ -133,26 +130,26 @@ function init() {
   //   console.log("Adding setActiveLayer to paper.js");
   //   Project.setActiveLayer = setActiveLayer;
   //  }
+  //.. but this works
   project._activeLayer = baseLayer;
-  console.log("Layers&:"+project.layers);
-  console.log("ActiveLayer&:"+project.activeLayer);
-  console.log("baseLayer&:"+baseLayer);
+  //console.log("Layers&:"+project.layers);
+  //console.log("ActiveLayer&:"+project.activeLayer);
 }
 
 // onmousedown callback for images that are cloneable, dragable or have context menu
 function imageMouseDown(event) {
   mouseDownPosition = event.point;
   if(rightButtonCheck(event)) {  // this will set rightButton global
-    console.log("Right button down");
-    console.log("Layers:"+project.layers);
+    //console.log("Right button down");
+    cursorLayer.removeChildren();
     project._activeLayer = cursorLayer;
-    console.log("ActiveLayer:"+project.activeLayer);
-    console.log("Event:"+event);
-    console.log("Image mouse down at:"+mouseDownPosition);
+    //console.log("Event:"+event);
+    //console.log("Image mouse down at:"+mouseDownPosition);
+    cursorPos = mouseDownPosition;
     drawCross(mouseDownPosition,20);
     project._activeLayer = baseLayer;
   }
-  console.log("ActiveLayer:"+project.activeLayer);
+  //console.log("ActiveLayer:"+project.activeLayer);
   console.log("image mouse down");
   // look to see if this object is the raster for one of the master images
   var id;
@@ -327,6 +324,7 @@ function hideContextMenu(control) {
   var tbl = el.children[0];  //assumes menu has table as first
   tbl.innerHTML = "";
   currentContextMenu = defaultContextMenu;
+  cursorLayer.removeChildren();
 }
 
 window.oncontextmenu = onContextMenu;
@@ -454,10 +452,6 @@ function onMouseUp(event) {
   console.log("Mouse up");
   if(rightButton) {
     rightButton = false;
-    console.log("Layers:"+project.layers);
-    console.log("ActiveLayer:"+project.activeLayer);
-    console.log("cursorLayerChildren:"+cursorLayer.children);
-    cursorLayer.removeChildren();
     return;
   }
   if(!!lineSelected) {
@@ -467,13 +461,21 @@ function onMouseUp(event) {
     lineSelected = null;
     // continue through to path addition or removal
   } else if(!!imageSelected) {
-    imageSelected.position = snapPoint(imageSelected.position);
     var img_id = findImageInstance('raster',imageSelected);
     console.log("instance found with id:"+img_id);  // need to keep id as well - might be null for master objects in layout mode
+    var imgobj = imageInstances[img_id].src;
+    var offset;
+    if(imgobj.hasOwnProperty('origin'))
+      imageSelected.position = snapPoint(imageSelected.position-imgobj.origin) + imgobj.origin;
+    else
+      imageSelected.position = snapPoint(imageSelected.position);
     if(imageSelected.position == imageSelectedPosition) { // no movement or no prior position it being null
       // use mouseDownPosition or event.position to find the closest point of rotation in object
       var rotation = Math.round(imageSelected.rotation);
-      imageSelected.rotate(90);  // need to look up source to find centre of rotation - could also have 45 deg mode
+      if(imgobj.hasOwnProperty('center'))
+        imageSelected.rotate(90,imageSelected.position-imgobj.center);  //(new Point(30,30)));  // need to look up source to find centre of rotation - could also have 45 deg mode
+      else
+        imageSelected.rotate(90);  // need to look up source to find centre of rotation - could also have 45 deg mode
       imageSelected.rotation = Math.round(imageSelected.rotation);  // prevent error creaping in
       doRecordAdd({action:'imageRotate',id:img_id,type:'image',rot:[rotation,imageSelected.rotation]});
     } else {
@@ -995,6 +997,30 @@ function getCurrentContextObject() {
   return currentContextObject;
 }
 
+function setCenterToCursor() {
+  if(currentContextObject.hasOwnProperty('src')) {
+    var src = currentContextObject.src;
+    if(currentContextObject.hasOwnProperty('raster')) {
+      var raster = currentContextObject.raster;
+      src.center = raster.position - cursorPos;
+      console.log("Center:" + src.center);
+    }
+  }
+}
+
+function setOriginToCursor() {
+  if(currentContextObject.hasOwnProperty('src')) {
+    var src = currentContextObject.src;
+    if(currentContextObject.hasOwnProperty('raster')) {
+      var raster = currentContextObject.raster;
+      src.origin = cursorPos - raster.position;
+      console.log("Origin:" + src.origin);
+    }
+  }
+}
+
+
+
 // think this needs to be at the bottom so under scripts find things fully loaded
 console.log("PaperGlue functions to window globals");
 // window global are use for cross scope communications
@@ -1011,7 +1037,9 @@ var exports = {
   keyHandler:null,
   remove_all:removeAll,
   getCurrentContextObject:getCurrentContextObject,
-  moveCurrentImage:moveCurrentImage
+  moveCurrentImage:moveCurrentImage,
+  setCenterToCursor:setCenterToCursor,
+  setOriginToCursor:setOriginToCursor
 };
 globals.paperGlue = exports;
 

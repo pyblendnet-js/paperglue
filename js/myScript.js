@@ -4,11 +4,16 @@ var wireLinks = [];
 
 var objectMenu = [ {label:'name', propCall:imgGetNameCall},
                    {label:'pos',propCall:imgGetPosCall},
-                   {label:'properties',callback:openPropDialog}
+                   {label:'properties',callback:openPropDialog},
+                   {label:'setCenter',callback:setCenterToCursor},
+                   {label:'setOrigin',callback:setOriginToCursor}
                  ];
 var objectInstanceMenu = [ {label:'name', propCall:imgGetInstanceNameCall},
                            {label:'pos',propCall:imgGetPosCall},{label:'properties',callback:openPropDialog} ];
-var first_image = {src:"img/con_Block_5.08mm_12.png", scale:0.5, id:"conBlock1", isSymbol:true, dragClone:true, contextMenu:objectMenu, instanceContextMenu:objectInstanceMenu, pos:view.center };
+var first_image = {src:"img/con_Block_5.08mm_12.png", scale:0.6, id:"conBlock1", isSymbol:true, dragClone:true, contextMenu:objectMenu, instanceContextMenu:objectInstanceMenu, pos:view.center };
+// other parameters:
+//   origin = point in image which represents position
+//   center = point in image for rotation  e.g , center:[30,0]
 
 console.log("Starting myScript");
 drawStripBoard(10,100,34);
@@ -192,6 +197,13 @@ function dialogReturn(reply) {
     window.globals.paperGlue.moveCurrentImage(x,y,r);
 }
 
+function setCenterToCursor() {
+  window.globals.paperGlue.setCenterToCursor();
+}
+
+function setOriginToCursor() {
+  window.globals.paperGlue.setOriginToCursor();
+}
 
 //window.globals.keyhandler = keyDown;  // requests paperglue to pass event here
 window.globals.listActions = openActionsWindow;
