@@ -105,12 +105,44 @@ function findImageInstance(search_by,search_key) {
   return null;
 }
 
+function drawCross(pos, size) {
+  var s = size / 2;
+  var p = new Path();
+  p.strokeColor = 'red';
+  p.add(new Point(pos.x-s, pos.y));
+  p.add(new Point(pos.x+s, pos.y));
+  p = new Path();
+  p.strokeColor = 'red';
+  p.add(new Point(pos.x, pos.y-s));
+  p.add(new Point(pos.x, pos.y+s));
+}
+
+// there may or maynot be an activeLayer when this code is run
+// so force a base layer to exist
+var baseLayer = new Layer();  //for some reason no layer exists yet
+console.log("ActiveLayer&:"+project.activeLayer);
+console.log("Layers&:"+project.layers);
+var cursorLayer = new Layer();
+console.log("ActiveLayer&:"+project.activeLayer);
+project.activeLayer = baseLayer;
+console.log("Layers&:"+project.layers);
+console.log("ActiveLayer&:"+project.activeLayer);
+
+
 // onmousedown callback for images that are cloneable, dragable or have context menu
 function imageMouseDown(event) {
-  mouseDownPos = event.position;
+  mouseDownPosition = event.point;
   if(rightButtonCheck(event)) {  // this will set rightButton global
     console.log("Right button down");
+    console.log("Layers:"+project.layers);
+    project.activeLayer = cursorLayer;
+    console.log("ActiveLayer:"+project.activeLayer);
+    console.log("Event:"+event);
+    console.log("Image mouse down at:"+mouseDownPosition);
+    drawCross(mouseDownPosition,20);
+    project.activeLayer = baseLayer;
   }
+  console.log("ActiveLayer:"+project.activeLayer);
   console.log("image mouse down");
   // look to see if this object is the raster for one of the master images
   var id;
@@ -168,7 +200,7 @@ function imageMouseDown(event) {
 function symbolPlace(imgid, force_id) {
   var imgobj = imagesLoaded[imgid];
   imageSelected = imgobj.symbol.place();
-  imageSelected.scale(0.5);
+  //imageSelected.scale(0.5);
   imageSelected.onMouseDown = imageMouseDown;
   var img_id;
   if(typeof force_id === 'undefined') {
@@ -198,6 +230,9 @@ function loadImages(images_to_load) {
     imagesLoaded[imgobj.id]= imgobj;  // record master images
     addImage(imgobj.src,imgobj.id);  // add image to document
     imgobj.raster = new Raster(imgobj.id);  // make this a paper image
+    if(imgobj.hasOwnProperty('scale')) {
+      imgobj.raster.scale(imgobj.scale);
+    }
     //console.log(img.isSymbol);
     if(imgobj.hasOwnProperty('isSymbol')) {  // this image can appear many times as instances
       if(imgobj.isSymbol === true) {   // needs true comparison
@@ -212,9 +247,6 @@ function loadImages(images_to_load) {
       imgobj.raster.position = imgobj.pos;
     } else {  // no position so dont show yet
       imgobj.raster.remove();  //dont need this cluttering the document
-    }
-    if(imgobj.hasOwnProperty('scale')) {
-      imgobj.raster.scale(image.scale);
     }
     var listen_to_mouse = imgobj.hasOwnProperty('contextMenu');
     if(imgobj.hasOwnProperty('dragClone')) {  // if not defined then assume false
@@ -412,6 +444,10 @@ function onMouseUp(event) {
   console.log("Mouse up");
   if(rightButton) {
     rightButton = false;
+    console.log("Layers:"+project.layers);
+    console.log("ActiveLayer:"+project.activeLayer);
+    console.log("cursorLayerChildren:"+cursorLayer.children);
+    cursorLayer.removeChildren();
     return;
   }
   if(!!lineSelected) {

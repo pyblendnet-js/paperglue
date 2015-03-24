@@ -8,12 +8,12 @@ var objectMenu = [ {label:'name', propCall:imgGetNameCall},
                  ];
 var objectInstanceMenu = [ {label:'name', propCall:imgGetInstanceNameCall},
                            {label:'pos',propCall:imgGetPosCall},{label:'properties',callback:openPropDialog} ];
-var first_image = {src:"img/con_Block_5.08mm_12.png", id:"conBlock1", isSymbol:true, dragClone:true, contextMenu:objectMenu, instanceContextMenu:objectInstanceMenu, pos:view.center };
+var first_image = {src:"img/con_Block_5.08mm_12.png", scale:0.5, id:"conBlock1", isSymbol:true, dragClone:true, contextMenu:objectMenu, instanceContextMenu:objectInstanceMenu, pos:view.center };
 
 console.log("Starting myScript");
 drawStripBoard(10,100,34);
-console.log(Object.keys(window));
-console.log(Object.keys(window.globals));
+//console.log(Object.keys(window));
+//console.log(Object.keys(window.globals));
 if(typeof window.globals.paperGlue === 'undefined')  { // means myScript got here first and paperGlue was not ready
   console.log("paperGlue not ready yet to init app.");
   window.globals.onPaperGlueLoad = initApp;  // paperGlue will call this when it is ready
