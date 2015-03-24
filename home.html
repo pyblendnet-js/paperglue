@@ -38,14 +38,22 @@
     window.globals.paperGlue[cmd]();
   }
 
+  function figClicked(event) {
+    console.log("Figure clicked by:" + this + " because of:" + event);
+  }
+
   </script>
   <style>
       .button {
         color: white;
         background-color: black;
       }
-    </style>
-
+      .toolKit {
+        float: right;
+        width: 20%;
+        overflow:scroll;
+      }
+  </style>
 </head>
 <body id="body" onload="onload();" >
   <button type="button" onclick="hideCanvas();" class="button" width="300">hide Canvas</button>
@@ -53,6 +61,9 @@
   <button type="button" onclick="paperGlue('remove_all');" class="button" width="300">Remove All</button>
   <!--<image src="img/verodes.png"/>-->
   <div id="clientArea">
+  <div id="imagePallet" class="toolKit">
+    <!-- <canvas id="imagePalletCanvas"></canvas> -->
+  </div>
   <div id="canvasDiv" style="height=100%;background-color:blue">
     <canvas id="myCanvas" resize></canvas>
   </div>

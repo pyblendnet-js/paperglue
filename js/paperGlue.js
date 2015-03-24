@@ -65,13 +65,36 @@ function setLineColor(c) {
 }
 
 // helper to add hidden image to document before reference as paper image
-function addImage(source, id) {
+function addImage(source, id, dest) {
+  // optional dest location - if defined then does not hide
   var img = document.createElement("img");
   img.src = source;  // this will cause a GET call from the browser
   img.id = id;
-  img.hidden = true;
-  var src = document.getElementById("body");
-  src.appendChild(img);
+  img.alt = source;
+  if(typeof dest === 'undefined') {
+    img.hidden = true;
+    var src = document.getElementById('body');
+    src.appendChild(img);
+  } else {
+    var fig = '<figure onclick="figClicked('+"'"+img.id+"'"+')">' + img.outerHTML +'<figcaption>'+source+'</figcaption></figure>';
+    // alternative loading of figure
+    // var fig = document.createElement("figure");
+    // fig.onclick = '"figClicked()"';
+    // var cap = document.createElement("figcaption");
+    // cap.innerHTML = source;
+    // img.alt = source;
+    // fig.appendChild(img);
+    // fig.appendChild(cap);
+    var destel = document.getElementById(dest);
+    //destel.appendChild(fig);
+    destel.innerHTML += fig;
+    console.log("Fig:" + fig.outerHTML);
+  }
+  return img;
+}
+
+function figClicked() {
+  console.log("Figure clicked");
 }
 
 // finds an instance of an image clone based on id, raster or src
@@ -191,18 +214,19 @@ function symbolRemove(id) {
  * Called from external script via window.globals to add images to the document with behaviour parameters
  * @param {array} images_to_load is array of image objects having parameters src, id, [isSymbol:bool, dragClone:bool, contextMenu:object, instanceContextMenu:object, pos:point, scale:float]
  */
-function loadImages(images_to_load) {
+function loadImages(images_to_load, frame) {
   while(images_to_load.length > 0) {  // continue till empty - not sure if this is valid
     var imgobj = images_to_load.pop();
     imagesLoaded[imgobj.id]= imgobj;  // record master images
-    addImage(imgobj.src,imgobj.id);  // add image to document
+    var local_img = addImage(imgobj.src,imgobj.id,frame);  // add image to document
     imgobj.raster = new Raster(imgobj.id);  // make this a paper image
     //console.log(img.isSymbol);
     if(imgobj.hasOwnProperty('isSymbol')) {  // this image can appear many times as instances
       if(imgobj.isSymbol === true) {   // needs true comparison
         imgobj.symbol = new Symbol(imgobj.raster);
         imgobj.raster.remove();  //dont need this cluttering the document
-        imgobj.raster = imgobj.symbol.place();
+        if(typeof frame === 'undefined')
+          imgobj.raster = imgobj.symbol.place();
         imgobj.instances = 0;
       }
     }
@@ -220,8 +244,12 @@ function loadImages(images_to_load) {
       if(imgobj.dragClone === true)
         listen_to_mouse = true;
     }
-    if(listen_to_mouse)
-      imgobj.raster.onMouseDown = imageMouseDown;  // needed for drag or context
+    if(listen_to_mouse) {
+        imgobj.raster.onMouseDown = imageMouseDown;  // needed for drag or context
+    }
+    if(typeof frame !== 'undefined') {
+      local_img.onMouseDown = imageMouseDown;
+    }
   }
 }
 

@@ -23,7 +23,7 @@ window.globals.setSnap([5,5,10,10]);
 // see http://eloquentjavascript.net/10_modules.html on the subject of slow module loads
 
 function initImages() {
-  window.globals.loadImages([first_image]);
+  window.globals.loadImages([first_image],"imagePallet");
 }
 
 function drawGrid(spacing) {
