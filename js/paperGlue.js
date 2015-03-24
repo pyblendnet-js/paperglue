@@ -318,7 +318,7 @@ function newLine() {
   lineSelected.strokeColor = 'black';
   lineSelected.strokeWidth = 10;
   lineSelected.strokeCap = 'round';
-  lineSelected.onMouseDown = lineMouseDown;
+  lineSelected.onMouseDown = lineMouseDown;  // the call to use for mod
   lineSelectMode = 0;  // drag last point
 }
 
@@ -355,7 +355,7 @@ function onMouseDrag(event) {
   if(rightButton)  // no drag for right button
     return;
   if(!!lineSelected) {   // link selected so drag existing
-    console.log("Link selected");
+    //console.log("Link selected");
     switch(lineSelectMode) {  //chosen in onlinemousedown
       case 0: //move last point
         if(lineSelected.segments.length < 2) {
@@ -437,11 +437,14 @@ function validatePath(path, force_id) {
     console.log("Force new line to id:",force_id);
     next_id = force_id;
   }
+  console.log("Path length:" + path.length);
   if(path.length >= snapQuantum) {
     snap(path);
     if(line_id === null) { //this path doesn't exist
       console.log('Creating new line with id:',next_id);
       lineInstances[next_id] = {line:path};
+      console.log(lineInstances[next_id]);
+      console.log(lineInstances[0]);
       if(next_id == nextID)
         nextID++;
       line_id = next_id;
@@ -451,7 +454,11 @@ function validatePath(path, force_id) {
       doRecordAdd({action:'lineMove',id:line_id,type:'line',pos:[lineSelectedPosition,np] });
     }
   } else {  // length of line is too short
-    removeLine(line_id);
+    if(line_id === null) { //this path doesn't exist
+      path.remove();
+    } else {
+      removeLine(line_id);
+    }
     return null;
   }
   return line_id;
@@ -504,7 +511,7 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
   console.log("Paperglue received:" + event.key);
   var propagate = true;
   if(event.key == 'z') {
-    if(event.controlPress) {
+    if(event.controlPressed) {
       console.log("cntrlZ");
       if(event.shiftPressed) {
         redo();
@@ -559,15 +566,24 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
 }
 
 function save() {
-  var dolist = pruneDo();
+  var dolist = doRecord;  //pruneDo();
   console.log("Try to save");
   console.log("Globals:" + Object.keys(window.globals));
   console.log("SendData:",typeof window.globals.sendData);
+  var jdata = JSON.stringify(dolist);
   if(window.location.protocol == 'file:') {
     // might try to impletement local storage some day
+    console.log("Storage type:" + typeof(Storage));
+    if(typeof(Storage) === "undefined") {
+      console.log("Local storage not implemented");
+    } else {
+      console.log("Data:"+jdata);
+      localStorage.data = jdata;
+      console.log("Local storage:" + localStorage);
+    }
   } else if(typeof window.globals.sendData === 'function') {
     //window.globals.onReply = onReply(response);
-    var save_data = {command:'save',path:recordPath,data:JSON.stringify(dolist)};
+    var save_data = {command:'save',path:recordPath,data:jdata};
     window.globals.sendData(JSON.stringify(save_data));
   }
 }
@@ -576,6 +592,12 @@ function load() {
   console.log("Load:",typeof window.globals.load);
   if(window.location.protocol == 'file:') {
     // might try to impletement local storage some day
+    if(typeof(Storage) === "undefined") {
+      console.log("Local storage not implemented");
+    } else {
+      console.log("Parsing length = " + localStorage.data.length);
+      parseRecord(localStorage.data);
+    }
   } else if(typeof window.globals.sendData === 'function') {
     window.globals.onReply = onLoadReply;
     var load_data = {command:'load',path:recordPath};
@@ -592,27 +614,73 @@ function onLoadReply(res) {
     try {
       var reply_obj = JSON.parse(res);
       console.log(reply_obj);
-      if(reply_obj.type == 'file') {
-        try {
-          var newRecord = JSON.parse(reply_obj.data);
-          console.log("New record has" + newRecord.length + " actions");
-           removeAll();
-          doRecord = newRecord;
-          doRecordIndex = 0;
-          doAll();
-        } catch(e2) {
-          console.log("Error parsing file data"+e2);
-        }
-      }
+      if(reply_obj.type == 'file')
+        parseRecord(reply_obj.data);
     } catch(e1) {
       console.logI("Error parsing reply"+e1);
     }
   }
 }
 
+function parseRecord(jdata) {
+    try {
+      console.log("Data="+jdata);
+      var newRecord = JSON.parse(jdata);
+      console.log("New record="+newRecord);
+      console.log(typeof newRecord);
+      console.log("New record has" + newRecord.length + " actions");
+      removeAll();
+      doRecord = newRecord;
+      correctPosPoints(doRecord);
+      doRecordIndex = 0;
+      doAll();
+    } catch(e2) {
+      console.log("Error parsing file data"+e2);
+    }
+}
+
+function correctPosPoints(do_record) {
+  for(var di in do_record) {
+    var to_do = do_record[di];
+    if(to_do.hasOwnProperty('pos')) {
+      console.log("Fix pos");
+      fixPos(to_do.pos);  // check for left overs of JSON conversion problems
+    }
+    doRecord[di] = to_do;
+  }
+}
+
+
+function parsePoint(ord) {
+  console.log(ord[0]);  // will be undefined for a real point
+  if(ord[0] === 'Point')
+    return new Point(ord[1],ord[2]);
+  else
+    return ord;  // no change
+}
+
+function parseLine(arr) {
+  console.log("Type;"+(typeof arr));
+  console.log(arr.length);
+  if(arr.length === 2) {
+    return [parsePoint(arr[0]),parsePoint(arr[1])];
+  } else if(arr[0] === 'Point') {
+    return parsePoint(arr);
+  }
+  return arr;  // no change needed
+}
+
+// JSON doesn't know how to create a paper.Point
+function fixPos(pos) {
+  if(typeof pos[0] === 'Array')  // not null
+    pos[0] = parseLine(pos[0]);
+  pos[1] = parseLine(pos[1]);
+  console.log(pos[1]);
+}
+
 function removeLines() {
   var lineIDs = Object.keys(lineInstances);
-  console.log("Removing images:"+lineIDs.length);
+  console.log("Removing lines:"+lineIDs.length);
   for(var i in lineIDs) {
     removeLine(lineIDs[i]);
   }
@@ -620,7 +688,7 @@ function removeLines() {
 
 function removeSymbols() {
   var symbolIDs = Object.keys(imageInstances);
-  console.log("Removing lines:"+symbolIDs.length);
+  console.log("Removing images:"+symbolIDs.length);
   for(var i in symbolIDs) {
     symbolRemove(symbolIDs[i]);
   }
@@ -629,9 +697,11 @@ function removeSymbols() {
 function removeAll(){
   removeLines();
   removeSymbols();
+  doRecordIndex = 0;
 }
 
 function undo() {
+    console.log("Undo");
     if(doRecord.length <= 0 || doRecordIndex === 0)
       return;  // nothing to undo
     console.log("doRecordIndex: " + doRecordIndex);
@@ -641,6 +711,15 @@ function undo() {
     var raster;
     switch(last_do.action) {
       case 'lineMove':
+        console.log(lineInstances[0]);
+        console.log("line instances:" + (lineInstances.length));
+
+        console.log("line instances:" + (Object.keys(lineInstances)));
+        console.log("line instances:" + Object.keys(lineInstances).indexOf(String(last_do.id)));
+        if(Object.keys(lineInstances).indexOf(String(last_do.id)) < 0) {
+          console.log('No instance of line id:' + last_do.id);
+          break;
+        }
         var path = lineInstances[last_do.id].line;
         // console.log("Obj pos1:",path.firstSegment.point);
         // console.log("path pos2:",path.lastSegment.point);
@@ -688,19 +767,23 @@ function undo() {
 }
 
 function redo() {
+  console.log("Redo");
   if(doRecordIndex >= doRecord.length)
     return false;  // nothing to undo
   var to_do = doRecord[doRecordIndex];
+  console.log(Object.keys(to_do));
   console.log("Redoing " + to_do.action);
   var raster;
   switch(to_do.action) {
     case 'lineMove':
-      console.log(lineInstances.length);
+      console.log(Object.keys(lineInstances).length);
       if(!lineInstances.hasOwnProperty(to_do.id)) {
-        console.log("path nolonger exists - remaking");
+        console.log("path id " + to_do.id + " nolonger exists - remaking");
         newLine();
+        console.log(to_do.pos[1]);
         lineSelected.add(to_do.pos[1][0]);
         lineSelected.add(to_do.pos[1][1]);
+        console.line("line:" + lineSelected);
         // need to reuse old id
         var id = validatePath(lineSelected,to_do.id);  // adds to lineInstances
         lineSelected = null;
@@ -753,11 +836,11 @@ function pruneDo() {
     //console.log("Do#"+di);
     var to_do = doRecord[di];
     //console.log("ids found:"+ids_found);
-    //console.log(ids_found.indexOf(to_do.id));
+    //console.log(ids_found.indexOf(string(to_do.id)));
     //console.log(typeof to_do.id);
     //if(ids_found.length > 0)
     //  console.log(typeof ids_found[0]);
-    if(ids_found.indexOf(to_do.id)>= 0)
+    if(ids_found.indexOf(String(to_do.id))>= 0)
       continue;
     ids_found.push(+to_do.id);  // this object covered one way or other - NOTE: push will convert everything to string without the + prefix
     //console.log("Checking todo action:",to_do.action);
@@ -832,6 +915,7 @@ globals.getLines = getLineInstances;
 globals.getDoRecord = getDoRecord;
 globals.setSnapQuantum = setSnapQuantum;
 globals.keyHandler = null;
+globals.paperGlue = { remove_all:removeAll };
 if(typeof globals.onPaperLoad == 'function')  { // myScript couldn't find loadImages so provided a call to repeat the request
   console.log("PaperGlue loaded now so can use onPaperLoad to load images.");
   console.log(typeof globals.loadImages);

@@ -24,6 +24,7 @@ var first_image = {src:"img/con_Block_5.08mm_12.png", id:"conBlock1", isSymbol:t
 //console.log("outerWidth:"+window.outerWidth);
 //console.log(window.showPaper);
 //console.log(myCanvas);
+console.log("Starting myScript");
 drawStripBoard(10,100,34);
 console.log(Object.keys(window));
 console.log(Object.keys(window.globals));
@@ -104,6 +105,31 @@ function imgGetPosCall(obj){
   return obj.raster.position;
 }
 
+function createActionTableBody() {
+  var q = globals.getDoRecord();
+  var ihtml = "";
+  for(var qi in q) {
+    var dr = q[qi];
+    var propstr = "";
+    var oks = Object.keys(dr);
+    for(var ki in oks) {
+      var k = oks[ki];
+      if(k == 'action' || k == 'id')
+        continue;
+      propstr += k + ":" + dr[k] + ";";
+    }
+    var bl;
+    if((qi % 2) === 0)
+      bl = 'FF';
+    else
+      bl = 'C0';
+    var rhtml = '<tr style="background-color:#F0F0' + bl + '""><td class="dtd" style="width:100px;border-left:0">'+dr.action+'</td><td class="dtd" style="width:30px;background-color:#FFE0E0">'+dr.id+'</td><td class="dtd" style="border-right:0">'+propstr+'</td></tr>';
+    //console.log(rhtml);
+    ihtml += rhtml;
+  }
+  return ihtml;
+}
+
 function keyDown(event) {  // note: This is accessed from paperglue.js - not directly
   // added controlPressed,shiftPressed,altPressed as values in event
   // if(event.key == 'control' || event.key == 'shift' || event.key == 'alt')
@@ -114,25 +140,9 @@ function keyDown(event) {  // note: This is accessed from paperglue.js - not dir
     if(event.key == 'q') {
       console.log("cntrlQ");
       event.stopPropagation();
-      var q = globals.getDoRecord();
       var ab = document.getElementById("actionTableBody");
-      var ihtml = "";
       console.log("Actions:"+ab.length);
-      for(var qi in q) {
-        var dr = q[qi];
-        var propstr = "";
-        var oks = Object.keys(dr);
-        for(var ki in oks) {
-          var k = oks[ki];
-          if(k == 'action' || k == 'id')
-            continue;
-          propstr += k + ":" + dr[k] + ";";
-        }
-        var rhtml = '<tr><td class="dtd" style="width:100px">'+dr.action+'</td><td class="dtd" style="width:30px">'+dr.id+'</td><td class="dtd">'+propstr+'</td></tr>';
-        console.log(rhtml);
-        ihtml += rhtml;
-      }
-      ab.innerHTML = ihtml;
+      ab.innerHTML = createActionTableBody();
       // var lines = globals.getLines();
       // var images = globals.getImages();
       // var paper_screen = {lines:lines,images:images};
@@ -158,4 +168,25 @@ function keyDown(event) {  // note: This is accessed from paperglue.js - not dir
   return true;
 }
 
-window.globals.keyhandler = keyDown;  // requests paperglue to pass event here
+function openActionsWindow() {
+    var myWindow = window.open("", "Actions") //, "width=200, height=100");
+    var ad = document.getElementById("actionTableDiv");
+    myWindow.document.write(ad.innerHTML);
+    var ab = myWindow.document.getElementById("actionTableBody");
+    //console.log("Actions:"+ab.length);
+    ab.innerHTML = createActionTableBody();
+    var tb = myWindow.document.getElementById("actionTableBodyDiv");
+    console.log(tb.attributes);
+    var ss = "overflow:scroll;height:1300px;width:100%;overflow:auto;maxHeight:80%;";
+    console.log(ss);
+    tb.style = ss;
+    //tb.style.maxHeight = "400px";
+    console.log(tb.attributes);
+    console.log(tb.style);
+    myWindow.stop();
+}
+
+//window.globals.keyhandler = keyDown;  // requests paperglue to pass event here
+window.globals.listActions = openActionsWindow;
+console.log("GLobals:");
+console.log(Object.keys(window.globals) ); //.onload();  //no use since it may not be added to globals yet

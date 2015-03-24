@@ -37,6 +37,17 @@
     console.log(Object.keys(window.globals) ); //.onload();  //no use since it may not be added to globals yet
     //myScriptInit();
   }
+
+  function listActions() {
+    console.log(Object.keys(window.globals) ); //.onload();  //no use since it may not be added to globals yet
+    window.globals.listActions();
+  }
+
+  function paperGlue(cmd) {
+
+    window.globals.paperGlue[cmd]();
+  }
+
   </script>
   <style>
       .button {
@@ -44,26 +55,29 @@
         background-color: black;
       }
     </style>
-    <style>
-    table{border-collapse:collapse;}
-.table{  height: 4em;                    /* define the height */
-         border:4px solid black;
-}
-th{padding: 10px;border:1px solid grey;background-color: lightblue;font-size:14;text-overflow:ellipsis}
-.dtd{padding: 10px;border:1px solid black;font-size:14;text-overflow:ellipsis}
-</style>
 
 </head>
 <body id="body" onload="onload();" >
   <button type="button" onclick="showPaper();" class="button" width="300">Show paper scope</button>
   <button type="button" onclick="hideCanvas();" class="button" width="300">hide Canvas</button>
+  <button type="button" onclick="listActions();" class="button" width="300">List Content</button>
+  <button type="button" onclick="paperGlue('remove_all');" class="button" width="300">Remove All</button>
   <!--<image src="img/verodes.png"/>-->
   <div id="clientArea">
   <div id="canvasDiv" style="height=100%;background-color:blue">
     <canvas id="myCanvas" resize></canvas>
   </div>
   <div id="actionTableDiv" style="display:none">
-    <table class="table" height="120">
+    <style>
+      table {border-collapse:collapse;}
+      .table{ /*height: 4em; */                   /* define the height */
+        border:4px solid black;
+      }
+      th{margin: 0;padding: 10px;border:1px solid grey;background-color: lightblue;font-size:14;text-overflow:ellipsis}
+      td{margin: 0;padding: 10px;border:1px solid black;font-size:14;text-overflow:ellipsis}
+      tr:nth-child(odd){background-color:#F0F0E0;}  /*  no work for some reason */
+    </style>
+    <table id="actionTable" class="table">
       <thead>
         <tr>
           <th style="width:100px">Action </th>
@@ -73,8 +87,8 @@ th{padding: 10px;border:1px solid grey;background-color: lightblue;font-size:14;
       </thead>
       <tbody>
         <tr>
-          <td colspan="3">
-            <div style="overflow:scroll;height:300px;width:100%;overflow:auto">
+          <td colspan="3"  style="padding:0">
+            <div id="actionTableBodyDiv" style="overflow:scroll;height:200;width:100%;overflow:auto;margin=0;border:0,0,0,0">
               <table>
                 <tbody id="actionTableBody">
                 </tbody>
