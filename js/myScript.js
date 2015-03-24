@@ -203,13 +203,13 @@ function openActionsWindow() {
     //console.log("Actions:"+ab.length);
     ab.innerHTML = createActionTableBody();
     var tb = myWindow.document.getElementById("actionTableBodyDiv");
-    console.log(tb.attributes);
+    //console.log(tb.attributes);
     var ss = "overflow:scroll;height:"+window.innerHeight+"px;width:100%;overflow:auto;maxHeight:80%;";
-    console.log("Style:"+ss);
+    //console.log("Style:"+ss);
     tb.style = ss;
     tb.style.maxHeight = "400px";
-    console.log(tb.attributes);
-    console.log(tb.style);
+    //console.log(tb.attributes);
+    //console.log(tb.style);
     myWindow.stop();
 }
 

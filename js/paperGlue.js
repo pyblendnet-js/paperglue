@@ -27,6 +27,8 @@
 
 var editMode = true;
 var modalOpen = false;
+var mouseDownHandled = false;  // prevent propogation to onMouseDown
+var selectDist = 10;  // how close to a line for right click select closest
 var keyFocus = true;
 var nextID = 0;  // for keeping track of all objects with a unique id
 var lineInstances = {};
@@ -149,33 +151,29 @@ function findKey(dict,search_by,search_key) {
 
 // finds an instance of an image clone based on id, raster or src
 // If src then returns a list of matching ids, otherwise first instance
-function findImageInstance(search_by,search_key) {
-  if(search_key == 'id') {
-    if(imageInstances.hasOwnProperty(search_key)) {
+function findInstance(obj,search_by,search_key,first_only) {
+  // search through obj.search_by == search_key
+  // if first_only is true then return first match
+  console.log("Find instance of "+search_by+ " in "+Object.keys(obj).length);
+  if(search_key === 'id') {
+    if(obj.hasOwnProperty(search_key)) {
       return search_key;
     }
+    return null;
   }
   var ids = [];
-  for(var i in imageInstances) {
-    var inst = imageInstances[i];
-    switch(search_by) {
-      case 'raster':
-        if(inst.raster == search_key) {
-          console.log("Found matching raster");
-          return i;
-        }
-        break;
-      case 'src':
-          if(inst.src == search_key)
-            ids.push(id);
-          break;
-      default:
-        return 'null';
+  for(var id in obj) {
+    console.log("Checking id:"+id);
+    var inst = obj[id];
+    if(inst.hasOwnProperty(search_by) && inst[search_by] == search_key) {
+      if(first_only)
+        return id;
+      ids.push(id);
     }
   }
-  if(search_by == 'src')
-    return ids;
-  return null;
+  if(first_only)
+    return null;
+  return ids;
 }
 
 function drawCross(pos, size, color) {
@@ -252,21 +250,21 @@ function showImageCursors(obj,show_mouse_cursor) {
 }
 
 // onmousedown callback for images that are cloneable, dragable or have context menu
-function imageMouseDown(event) {
+function onImageMouseDown(event) {
+  mouseDownHandled = true;
+  event.stopPropagation();  // doesn't work
   mouseDownPosition = event.point;
   hideArea();
+  hideContextMenu('contextMenu');
   if(rightButtonCheck(event)) {  // this will set rightButton global
     //console.log("Right button down");
   }
   //console.log("ActiveLayer:"+project.activeLayer);
   console.log("image mouse down");
   // look to see if this object is the raster for one of the master images
-  var id;
   var imgobj;
-  var imkeys = Object.keys(imagesLoaded);
-  console.log("Loaded images:"+imkeys);
-  for(var i in imkeys) {
-    id = imkeys[i];
+  console.log("Loaded images:"+Object.keys(imagesLoaded));
+  for(var id in imagesLoaded) {
     console.log("Check id:"+id);
     imgobj = imagesLoaded[id];
 
@@ -279,6 +277,7 @@ function imageMouseDown(event) {
           // currentContextObject object has some redundant info but seems simpler to use this way
           currentContextObject = {id:id,type:'symbol',inst:imgobj,src:imgobj,raster:imgobj.raster};  //to match image instance object
           selectItem(id,imgobj.raster);
+          imageSelected = this;
           holdContext = true;  // cross browser solution to default mouse up reset
           showImageCursors(imgobj,true);
           return false;   // just show context menu now - see context menu callback below
@@ -298,7 +297,7 @@ function imageMouseDown(event) {
     }
   }
   // no master image found, so maybe this is a clone
-  id = findImageInstance("raster",this);
+  id = findInstance(imageInstances,"raster",this,true);
   if(!!id) {
     console.log("Clone image found ID=" + id);
     imgobj = imageInstances[id];
@@ -323,6 +322,7 @@ function imageMouseDown(event) {
       return false;  //found so done looking
     //}
   }
+  return false;
 }
 
 // uses master image raster to create clone
@@ -332,7 +332,7 @@ function symbolPlace(imgid, force_id) {
   console.log("Placing clone of:"+imgobj.id);
   imageSelected = imgobj.symbol.place();
   //imageSelected.scale(0.5);
-  imageSelected.onMouseDown = imageMouseDown;
+  imageSelected.onMouseDown = onImageMouseDown;
   var img_id;
   var inst;
   if(typeof force_id === 'undefined') {
@@ -396,7 +396,7 @@ function loadImages(images_to_load, custom_default_props) {
         listen_to_mouse = true;
     }
     if(listen_to_mouse)
-      imgobj.raster.onMouseDown = imageMouseDown;  // needed for drag or context
+      imgobj.raster.onMouseDown = onImageMouseDown;  // needed for drag or context
     var default_keys = Object.keys(custom_default_props);
     console.log("Image default props:"+default_keys);
     for(var di in default_keys) {
@@ -460,9 +460,9 @@ function openCall(){
 
 function onContextMenu(event) {
   console.log("Call for context menu");
-  if(modalOpen)
+  if(modalOpen || !currentContextMenu)
     return false;
-  showContextMenu('contextMenu',event);
+  showContextMenu('contextMenu',event);  // standard context menu
   return false;
 }
 
@@ -532,11 +532,16 @@ function rightButtonCheck(event) {
 
 // default mouse down event handler - most browser will bubble to this from the other mouseDown handlers
 function onMouseDown(event) {
+  if(mouseDownHandled) {  // another onfunction has handled this event already
+    mouseDownHandled = false;
+    return false;
+  }
   console.log("Basic Mouse down");
   if(modalOpen)
     return false;
   mouseDownPosition = event.point;
   hideArea();
+  hideContextMenu('contextMenu');
   if(rightButtonCheck(event)) {
     console.log("Right button down");
     var d = new Date();
@@ -562,7 +567,7 @@ function newLine() {
   lineSelected.strokeColor = lineColor;
   lineSelected.strokeWidth = lineThickness;
   lineSelected.strokeCap = 'round';
-  lineSelected.onMouseDown = lineMouseDown;  // the call to use for mod
+  lineSelected.onMouseDown = onLineMouseDown;  // the call to use for mod
   lineSelectMode = 0;  // drag last point
 }
 
@@ -574,7 +579,7 @@ function newArea() {
   areaSelected.strokeCap = 'butt';
   areaSelected.strokeJoin = 'mitre';
   areaSelected.dashArray = [6,6];
-  //areaSelected.onMouseDown = lineMouseDown;  // the call to use for mod
+  //areaSelected.onMouseDown = onLineMouseDown;  // the call to use for mod
   areaSelectMode = 0;  // drag last point
 }
 
@@ -640,14 +645,14 @@ function moveCurrentArea(rect) {
      a.rect.width === rect.width && a.rect.height === rect.height) {
     return;  // nothing to do
   }
-  doRecordAdd({action:'move',id:id,type:'area',oldRect:a.rect,newRect:rect});
+  doRecordAdd({action:'move',id:id,type:'area',oldRect:a.rect,newRect:newRect});
   moveArea(rect,id);
 }
 
 function moveArea(rect,id) {
   var a = areaInstances[id];
   a.rect = rect;
-  showArea(currentContextObject.id);
+  showArea(id);
 }
 
 function removeAreaInstance(id, record) {
@@ -711,22 +716,20 @@ function showAreaText(a,id) {
   a.text.justification = 'center';
   a.text.fontSize = 15;
   a.text.fillColor = areaColor;
+  selectItem(id,a.path);
 }
 
 function showAllAreas() {
   areasVisible = true;
-  var aks = Object.keys(areaInstances);
-  for(var ai in aks) {
-    var id = aks[ai];
+  for(var id in areaInstances) {
     console.log("Show area#" + id);
     showArea(id);
   }
 }
 
 function hideAllAreas() {
-  var aks = Object.keys(areaInstances);
-  for(var ai in aks) {
-    removeAreaPath(areaInstances[aks[ai]]);
+  for(var id in areaInstances) {
+    removeAreaPath(areaInstances[id]);
   }
   areasVisible = false;
 }
@@ -738,9 +741,7 @@ function hitTestArea(id,hit_point) {
 }
 
 function hitTestAreas(hit_point) {
-  var aks = Object.keys(areaInstances);
-  for(var ai in aks) {
-    var id = aks[ai];
+  for(var id in areaInstances) {
     //console.log("Hit test area#" + id);
     if(hitTestArea(id,hit_point)) {
       console.log("Hit test area#" + id);
@@ -748,6 +749,19 @@ function hitTestAreas(hit_point) {
     }
   }
   return null;
+}
+
+function areaMoved(path,prev_pos) {
+  console.log("Area moved");
+  var aid = findInstance(areaInstances,'path',path,true);
+  if(!!aid) {  // shouldn't be any trouble here
+    console.log("area instance found with id:"+aid);  // need to keep id as well - might be null for master objects in layout mode
+    var inst = areaInstances[aid];
+    // keeping the obj as record is fine for undo but not so good for redo if the object gets deleted further back
+    var new_rect = new Rectangle(roundPoint(path.firstSegment.point),roundPoint(path.segments[2].point));
+    doRecordAdd({action:'move',id:aid,type:'area',oldRect:inst.rect,newRect:new_rect});
+    inst.rect = new_rect;
+  }
 }
 
 function hitTestLine(id,hit_point) {
@@ -764,11 +778,9 @@ function hitTestLine(id,hit_point) {
 }
 
 function hitTestLines(hit_point) {
-  var aks = Object.keys(lineInstances);
   var best_dist = null;
   var best_id = null;
-  for(var ai in aks) {
-    var id = aks[ai];
+  for(var id in lineInstances) {
     var l = hitTestLine(id,hit_point);
     //console.log("Hit test area#" + id + " = " + l);
     if(!best_dist || (l >= 0 && l < best_dist)) {
@@ -777,6 +789,9 @@ function hitTestLines(hit_point) {
       //console.log("Chose:" + id);
     }
   }
+  console.log("Best dist:"+ best_dist);
+  if(!best_dist || best_dist > selectDist)
+    return null;
   return best_id;
 }
 
@@ -789,24 +804,28 @@ function selectItem(id,item) {
       selectedItems[sid].selected = false;
     }
     selectedItems = [];  // leaves the problem for the garbage collector
-  }
+  } else
+    currentContextMenu = null;  // no context menu for multi selection
   selectedItems[id] = item;
   item.selected = true;
 }
 
 // onmousedown callback for two point paths
-function lineMouseDown(event) {
+function onLineMouseDown(event) {
+  event.stopPropagation();  // doesn't work
+  mouseDownHandled = true;
   console.log("Line mouse down");
   if(modalOpen)
     return;
+  hideContextMenu('contextMenu');
   mouseDownPosition = event.point;
   if(rightButtonCheck(event)) {
     console.log("Right button down");
     var ids = findKey(lineInstances,'path',this);
     if(ids.length > 0) {
-      selectItem(ids[0],this);
       currentContextObject = {id:ids[0],type:'line',inst:this};  //to match image instance object
       setContextMenu("lineInstanceMenu");
+      selectItem(ids[0],this);  //needs to happen after context select
       holdContext = true;  // cross browser solution to default mouse up reset
     }
     return false;
@@ -836,14 +855,17 @@ function onMouseDrag(event) {
     var v = event.point - mouseDownPosition;
     if(selectedMove) {
       for(var sid in selectedItems) {
+        //console.log("Move id:",sid);
         if(lineInstances.hasOwnProperty(sid))
           lineInstances[sid].path.position += event.delta;
         else if(imageInstances.hasOwnProperty(sid))
           imageInstances[sid].raster.position += event.delta;
         else if(areaInstances.hasOwnProperty(sid)) {
-          var sa =areaInstance[sid];
+          var sa =areaInstances[sid];
           if(sa.hasOwnProperty("path"))
-            areaInstances[sid].path.position += event.delta;
+            sa.path.position += event.delta;
+          if(sa.hasOwnProperty("text"))
+            sa.text.position += event.delta;
         }
       }
       return;
@@ -948,18 +970,23 @@ function onMouseUp(event) {
           var item = selectedItems[sid];
           var prev_pos = selectedPos[sid];
           if(lineInstances.hasOwnProperty(sid)) {
+            lineSelected = item;
+            lineSelectedPosition = prev_pos;
             validatePath(item);
           } else if(imageInstances.hasOwnProperty(sid)) {
             imageMoved(item,prev_pos,false);
           } else if(areaInstances.hasOwnProperty(sid)) {
+            areaMoved(item,prev_pos);
           }
         }
         selectedMove = false;
         rightButton = false;
         imageSelected = null;
+        currentContextMenu = null;
         console.log("Area move completed");
         return;
       }
+      console.log("Not select move");
       var aid;
       if(!imageSelected && !lineSelected && !areaSelected) {
         if(areasVisible) {
@@ -967,22 +994,25 @@ function onMouseUp(event) {
           if(!!aid) {
             var a = areaInstances[aid];
             currentContextObject = {id:aid,type:'area',inst:a};  //to match image instance object
-            if(a.hasOwnProperty('path'))
-              selectItem(id,a.path);
             setContextMenu("areaMenu");
+            if(a.hasOwnProperty('path'))
+              selectItem(aid,a.path); // needs to happen after context select
           }
         }
         if(!aid) {
+          console.log("Not area clicked - check lines");
           var id = hitTestLines(mouseDownPosition);
           if(!!id) {
+            console.log("Line found!="+id);
             var l = lineInstances[id];
             currentContextObject = {id:id,type:'line',inst:l};  //to match image instance object
-            if(l.hasOwnProperty('path'))
-              selectItem(id,l.path);
             setContextMenu("lineMenu");
+            if(l.hasOwnProperty('path'))
+              selectItem(id,l.path);  //needs to happen after context select
           }
         }
       }
+      console.log("Select check complete");
       rightButton = false;
       imageSelected = null;
       return;
@@ -1011,15 +1041,13 @@ function onMouseUp(event) {
 }
 
 function imageMoved(img,prev_pos,spot_rotate) {
-  var img_id = findImageInstance('raster',img);
+  var img_id = findInstance(imageInstances,'raster',img,true);
   if(!!img_id) {  // shouldn't be any trouble here
     console.log("instance found with id:"+img_id);  // need to keep id as well - might be null for master objects in layout mode
     var round_only = !snapDefault;
-    if(img_id !== null) {
-      var inst = imageInstances[img_id];
-      if(inst.hasOwnProperty('snap'))
-        round_only = !inst.snap;
-    }
+    var inst = imageInstances[img_id];
+    if(inst.hasOwnProperty('snap'))
+      round_only = !inst.snap;
     var src = imageInstances[img_id].src;
     if(spot_rotate) { // no movement or no prior position it being null
       rotateImage(img_id,img,src,90);
@@ -1288,7 +1316,7 @@ function moveObject(obj,direction,snap) {
   objPosition = obj.raster.position;
   if(snap) {
     obj.raster.position += [direction[0]*snapRect[2],direction[1]*snapRect[3]];
-    var img_id = findImageInstance('raster',obj.raster);
+    var img_id = findInstance(imageInstances,'raster',obj.raster,true);
     if(!!img_id) {
       console.log("instance found with id:"+img_id);  // need to keep id as well - might be null for master objects in layout mode
       //var src = imageInstances[img_id].src;  // could have used obj.src
@@ -1318,16 +1346,10 @@ function save() {
   var img_list = [];
   console.log("Type:"+(typeof img_list));
   var img_ids = Object.keys(imagesLoaded);
-  for(var ii in img_ids) {
-    var im = imagesLoaded[img_ids[ii]];
+  for(var id in imagesLoaded) {
+    var im = imagesLoaded[id];
     var img = {};
-    var img_keys = Object.keys(im);
-    console.log("Image keys:"+img_keys);
-    console.log("Initials keys:"+im.initialProp);
-    console.log("Loaded keys:"+im.loadedProp);
-
-    for(var iik in img_keys) {
-      var ik = img_keys[iik];
+    for(var ik in im) {
       if(ik === 'loadedProp')
         continue;
       console.log(ik);
@@ -1496,18 +1518,16 @@ function parseSize(ord) {
 }
 
 function removeLines() {
-  var lineIDs = Object.keys(lineInstances);
   console.log("Removing lines:"+lineIDs.length);
-  for(var i in lineIDs) {
-    removeLine(lineIDs[i]);
+  for(var id in lineInstances) {
+    removeLine(id);
   }
 }
 
 function removeSymbols() {
-  var symbolIDs = Object.keys(imageInstances);
-  console.log("Removing images:"+symbolIDs.length);
-  for(var i in symbolIDs) {
-    symbolRemove(symbolIDs[i]);
+  console.log("Removing images:"+imageInstances.length);
+  for(var id in imageInstances) {
+    symbolRemove(id);
   }
 }
 
@@ -1523,7 +1543,7 @@ function removeAll(){
 function removeImage(obj,record) {
   if(!obj)
     return;
-  var img_id = findImageInstance('raster',obj.raster);
+  var img_id = findInstance(image,instances,'raster',obj.raster,true);
   if(!!img_id) {
     if(!record || confirm("Do you really want to remove object ID =" + img_id + "?")) {
       symbolRemove(img_id);
@@ -1820,7 +1840,7 @@ function getLineInstances() {
 }
 
 function getDoRecord() {
-  console.log("Returning do record:", doRecord.length);
+  //console.log("Returning do record:", doRecord.length);
   return doRecord;
 }
 
@@ -1885,8 +1905,8 @@ function areaSelect() {
       console.log("BottomRight:"+a.rect.bottomright);
       if(rect.contains(a.rect.topLeft) && rect.contains(a.rect.bottomRight)) {
         if(a.hasOwnProperty('path'))
-        selectedItems[id] = a.path;
-        selectedPos[id] = a.path.position;
+        selectedItems[aid] = a.path;
+        selectedPos[aid] = a.path.position;
         a.path.selected = true;
       }
     }
@@ -1895,7 +1915,8 @@ function areaSelect() {
     var l = lineInstances[id];
     if(rect.contains(l.path.firstSegment.point) && rect.contains(l.path.lastSegment.point)) {
       selectedItems[id] = l.path;
-      selectedPos[id] = l.path.position;
+      // for lines, the selectedPos is both the start and end to match normal line moves
+      selectedPos[id] = [l.path.firstSegment.point.clone(),l.path.lastSegment.point.clone()];
       l.path.selected = true;
     }
   }
