@@ -14,18 +14,8 @@
   <!-- should have the same scope as per https://github.com/paperjs/paper.js/issues/153 -->
   </script>
   <script>  // type="text/paperscript" canvas="myCanvas">
-
-    function showPaper() {
-      console.log("paper="+paper);
-      console.log("paper.projects[0]="+paper.projects[0]);
-      console.log("paper.tools[0]="+paper.tools[0]);
-    }
     function hideCanvas() {
       var canvas = document.getElementById('myCanvas');
-      // if(canvas.style.visibility == "collapse")
-      //   canvas.style.visibility = "visible";
-      // else
-      //   canvas.style.visibility = "collapse";
       if(canvas.style.display == "none")
         canvas.style.display = "inline";
       else
@@ -58,7 +48,6 @@
 
 </head>
 <body id="body" onload="onload();" >
-  <button type="button" onclick="showPaper();" class="button" width="300">Show paper scope</button>
   <button type="button" onclick="hideCanvas();" class="button" width="300">hide Canvas</button>
   <button type="button" onclick="listActions();" class="button" width="300">List Content</button>
   <button type="button" onclick="paperGlue('remove_all');" class="button" width="300">Remove All</button>

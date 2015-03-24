@@ -28,7 +28,9 @@ var lineSelected = null;
 var imageSelected = null;
 var imageSelectedPositiion = null;
 var lineSelectMode = 0;
-var snapQuantum = 40;
+var snapRect = [5,5,10,10];   // offset x,y and then quantum x, y
+var lineThickness = 3;
+var lineColor = 'black';
 var mouseDownPosition;
 var rightButton = false;
 var imagesLoaded = {};
@@ -43,14 +45,23 @@ var recordPath = "testSave.json";
 //var ua = navigator.appName.toLowerCase();
 //console.log("Browser details:"+ua);  - not a lot of use
 
-/** Set quantum for snap on lines and images
+/** Set quantum [x,y] for snap on lines and images
   @param {float} typically greater than 1
  */
-function setSnapQuantum(q) {
-  if(q < 0.000001)
-    snapQuantum = 0.000001;
-  else
-    snapQuantum = q;
+function setSnap(q) {
+  snapRect = [q[0],q[1],0.000001,0.000001];  //min values for quantum
+  for(var qi = 2; qi < 4; qi++) {
+    if(q[qi] > 0.000001)
+      snapRect[qi] = q[qi];
+  }
+}
+
+function setLineThickness(t) {
+  lineThickness = t;
+}
+
+function setLineColor(c) {
+  lineLColor = c;
 }
 
 // helper to add hidden image to document before reference as paper image
@@ -315,8 +326,8 @@ function onMouseDown(event) {
 function newLine() {
   console.log("Start new path");
   lineSelected = new Path();
-  lineSelected.strokeColor = 'black';
-  lineSelected.strokeWidth = 10;
+  lineSelected.strokeColor = lineColor;
+  lineSelected.strokeWidth = lineThickness;
   lineSelected.strokeCap = 'round';
   lineSelected.onMouseDown = lineMouseDown;  // the call to use for mod
   lineSelectMode = 0;  // drag last point
@@ -377,12 +388,22 @@ function onMouseDrag(event) {
   }
 }
 
-// snaps both ends of the lines to grid quantum
-function snap(p) {
-  var rp = p.firstSegment.point/snapQuantum;
-  p.firstSegment.point = rp.round()*snapQuantum;
-  rp = p.lastSegment.point/snapQuantum;
-  p.lastSegment.point = rp.round()*snapQuantum;
+function snapPoint(p) {
+  return new Point(
+    Math.round((p.x-snapRect[0])/snapRect[2]) * snapRect[2] +snapRect[0],
+    Math.round((p.y-snapRect[1])/snapRect[3]) * snapRect[3] +snapRect[1]);
+}
+
+// snaps both ends of the line path to grid quantum
+function snapLine(p) {
+  console.log("Before:" + p.firstSegment.point);
+  console.log("Snap Rect:" + snapRect);
+  p.firstSegment.point = snapPoint(p.firstSegment.point);
+  console.log("After:" + p.firstSegment.point);
+  p.lastSegment.point = snapPoint(p.lastSegment.point);
+  var dx = p.firstSegment.point.x - p.lastSegment.point.x;
+  var dy = p.firstSegment.point.y - p.lastSegment.point.y;
+  return((dx !== 0) || (dy !== 0));
 }
 
 // universal mouse up handler - mainly just tidy up
@@ -399,15 +420,14 @@ function onMouseUp(event) {
     lineSelected = null;
     // continue through to path addition or removal
   } else if(!!imageSelected) {
-    var rp = imageSelected.position/snapQuantum;
-    var np = rp.round()*snapQuantum;
-    imageSelected.position = np;
+    imageSelected.position = snapPoint(imageSelected.position);
     var img_id = findImageInstance('raster',imageSelected);
     console.log("instance found with id:"+img_id);  // need to keep id as well - might be null for master objects in layout mode
-    if(np == imageSelectedPosition) { // no movement or no prior position it being null
+    if(imageSelected.position == imageSelectedPosition) { // no movement or no prior position it being null
       // use mouseDownPosition or event.position to find the closest point of rotation in object
-      var rotation = imageSelected.rotation;
+      var rotation = Math.round(imageSelected.rotation);
       imageSelected.rotate(90);  // need to look up source to find centre of rotation - could also have 45 deg mode
+      imageSelected.rotation = Math.round(imageSelected.rotation);  // prevent error creaping in
       doRecordAdd({action:'imageRotate',id:img_id,type:'image',rot:[rotation,imageSelected.rotation]});
     } else {
       // keeping the obj as record is fine for undo but not so good for redo if the object gets deleted further back
@@ -438,13 +458,12 @@ function validatePath(path, force_id) {
     next_id = force_id;
   }
   console.log("Path length:" + path.length);
-  if(path.length >= snapQuantum) {
-    snap(path);
+  if(snapLine(path)) {
     if(line_id === null) { //this path doesn't exist
       console.log('Creating new line with id:',next_id);
       lineInstances[next_id] = {line:path};
-      console.log(lineInstances[next_id]);
-      console.log(lineInstances[0]);
+      //console.log(lineInstances[next_id]);
+      //console.log(lineInstances[0]);
       if(next_id == nextID)
         nextID++;
       line_id = next_id;
@@ -672,7 +691,7 @@ function parseLine(arr) {
 
 // JSON doesn't know how to create a paper.Point
 function fixPos(pos) {
-  if(typeof pos[0] === 'Array')  // not null
+  if(pos[0] !== null)  // not null
     pos[0] = parseLine(pos[0]);
   pos[1] = parseLine(pos[1]);
   console.log(pos[1]);
@@ -695,9 +714,12 @@ function removeSymbols() {
 }
 
 function removeAll(){
-  removeLines();
-  removeSymbols();
-  doRecordIndex = 0;
+  if(confirm("Do you really want to clear memory?"))
+  { removeLines();
+    removeSymbols();
+    doRecord = [];
+    doRecordIndex = 0;
+  }
 }
 
 function undo() {
@@ -913,7 +935,9 @@ globals.loadImages = loadImages;
 globals.getImages = getImageInstances;
 globals.getLines = getLineInstances;
 globals.getDoRecord = getDoRecord;
-globals.setSnapQuantum = setSnapQuantum;
+globals.setSnap = setSnap;
+globals.setLineThickness = setLineThickness;
+globals.setLineColor = setLineColor;
 globals.keyHandler = null;
 globals.paperGlue = { remove_all:removeAll };
 if(typeof globals.onPaperLoad == 'function')  { // myScript couldn't find loadImages so provided a call to repeat the request
