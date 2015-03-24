@@ -570,6 +570,15 @@ function onMouseDown(event) {
   mouseDownPosition = event.point;
   hideArea();
   hideContextMenu('contextMenu');
+  if(!!lineSelected || !!imageSelected) {     // an existing line has been selected
+    console.log("Something selected");
+  } else {
+    var id = hitTestLines(mouseDownPosition);
+    if(!!id) {
+      lineSelected = lineInstances[id].path;
+      selectLine(event);
+    }
+  }
   if(rightButtonCheck(event)) {
     console.log("Right button down");
     var d = new Date();
@@ -578,13 +587,8 @@ function onMouseDown(event) {
     if(shiftPressed) {   //if control pressed then do not clear previous
       selectedMove = true;
     }
-    if(holdContext === false)  // cross browser solution to default mouse up reset
+    if(!holdContext)  // cross browser solution to default mouse up reset
       currentContextMenu = defaultContextMenu;
-    return false;
-  }
-  if(!!lineSelected || !!imageSelected) {     // an existing line has been selected
-    console.log("Something selected");
-    return false;
   }
   return false;
 }
@@ -851,6 +855,7 @@ function selectItem(id,item) {
 }
 
 // onmousedown callback for two point paths
+// harder to use than picking the ends but the only way to drag whole line
 function onLineMouseDown(event) {
   stopEvent(event);
   mouseDownHandled = true;
@@ -859,31 +864,38 @@ function onLineMouseDown(event) {
     return;
   hideContextMenu('contextMenu');
   mouseDownPosition = event.point;
+
+  lineSelected = this;
+  selectLine(event);
+  return false;
+}
+
+// called both by onLineMouseDown and onMouseDown
+function selectLine(event) {
   if(rightButtonCheck(event)) {
     console.log("Right button down");
-    var ids = findKey(lineInstances,'path',this);
+    var ids = findKey(lineInstances,'path',lineSelected);
     if(ids.length > 0) {
-      currentContextObject = {id:ids[0],type:'line',inst:this};  //to match image instance object
+      console.log("Line found:"+ ids[0]);
+      currentContextObject = {id:ids[0],type:'line',inst:lineSelected};  //to match image instance object
       setContextMenu("lineInstanceMenu");
-      selectItem(ids[0],this);  //needs to happen after context select
+      selectItem(ids[0],lineSelected);  //needs to happen after context select
       holdContext = true;  // cross browser solution to default mouse up reset
     }
-    return false;
+    return;
   }
-    lineSelected = this;
-    lineSelectedPosition = [lineSelected.firstSegment.point.clone(),lineSelected.lastSegment.point.clone()];
-    var line_select_fraction = (event.point - this.segments[0].point).length/this.length;
-    if(line_select_fraction < 0.25) {  //drag start of link
-      lineSelectMode = 1;
-    } else if (line_select_fraction > 0.75) {  // drag end of link
-      lineSelectMode = 0;
-    } else {
-      lineSelectMode = 2;   // drag whole link
-    }
-    console.log("Selected fraction:" + line_select_fraction);
-    console.log("Line select mode:" + lineSelectMode);
-    console.log("Selected pos:" + lineSelected.position);
-    return false;
+  lineSelectedPosition = [lineSelected.firstSegment.point.clone(),lineSelected.lastSegment.point.clone()];
+  var line_select_fraction = (event.point - lineSelected.segments[0].point).length/lineSelected.length;
+  if(line_select_fraction < 0.25) {  //drag start of link
+    lineSelectMode = 1;
+  } else if (line_select_fraction > 0.75) {  // drag end of link
+    lineSelectMode = 0;
+  } else {
+    lineSelectMode = 2;   // drag whole link
+  }
+  console.log("Selected fraction:" + line_select_fraction);
+  console.log("Line select mode:" + lineSelectMode);
+  console.log("Selected pos:" + lineSelected.position);
 }
 
 // universal mouse drag function can drag lines or images or create rubber band new line
@@ -1022,6 +1034,7 @@ function onMouseUp(event) {
         }
         selectedMove = false;
         rightButton = false;
+        lineSelected = null;
         imageSelected = null;
         currentContextMenu = null;
         console.log("Area move completed");
@@ -1050,13 +1063,14 @@ function onMouseUp(event) {
             setContextMenu("lineMenu");
             if(l.hasOwnProperty('path')) {
               selectItem(id,l.path);  //needs to happen after context select
-                currentContextObject = {id:id,type:'line',inst:l};
+              currentContextObject = {id:id,type:'line',inst:l};
             }
           }
         }
       }
       console.log("Select check complete");
       rightButton = false;
+      lineSelected = null;
       imageSelected = null;
       return false;
     }
@@ -1081,6 +1095,8 @@ function onMouseUp(event) {
     }
   }
   selectedMove = false;
+  lineSelected = null;
+  imageSelected = null;
   return false;
 }
 
@@ -1340,7 +1356,9 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
   } else {
     switch(event.key) {
       case 'delete':
-        if(confirm("Remove " + selectedItems.length + " items?")) {
+        var c = Object.keys(selectedItems).length;
+        console.log("Selected items:"+c);
+        if(c > 0 && confirm("Remove " + c + " items?")) {
           for(var id in selectedItems) {
             console.log("Delete "+id);
             if(lineInstances.hasOwnProperty(id))
@@ -1351,6 +1369,7 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
               removeAreaInstance(id,true);
           }
         }
+        console.log("Selected items:"+Object.keys(selectedItems));
         currentContextObject = null;
         propagate = false;
         hideContextMenu('contextMenu');
