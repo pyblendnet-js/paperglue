@@ -22,8 +22,10 @@
 * Date: Sat Jan 10 2015
 */
 
+console.log("Loading paperGlue");
+
 //note:objects here are all somewhere within the paper scope
-// Tp make visibile to window, declare as window.object
+// To make visibile to window, declare as window.object
 
 var body;  // cached in init()
 var editMode = true;
@@ -58,7 +60,11 @@ var selectedPos = {};  // for prev pos following are move
 var selectedMove = false;
 var imagesLoaded = {};
 var imageInstances = {};  //images that have been cloned from sybols in imagesLoaded.
-var defaultContextMenu = [ {label:'view', callback:viewCall},{label:'open',callback:openCall} ];
+var defaultContextMenu = [
+  {label:'view', callback:viewCall},
+  {label:'open',callback:openCall},
+  {label:'hide areas',callback:toggleAreas},
+   ];
 var currentContextMenu = defaultContextMenu;
 var currentContextObject = null;
 var holdContext = false;  // don't reset contextMenu till after mouseUp
@@ -429,7 +435,7 @@ function setContextMenu(context_type) {
     if(choices.hasOwnProperty(context_type))
       currentContextMenu = window.globals.menuLookup[context_type];
   }
-  console.log("Context menu:"+currentContextMenu);
+  //console.log("Context menu:"+currentContextMenu);
 }
 
 function nameCurrentImage(name) {
@@ -783,6 +789,20 @@ function hideAllAreas() {
   areasVisible = false;
 }
 
+function toggleAreas() {
+  if(areasVisible) {
+    hideAllAreas();
+    defaultContextMenu[2].label = 'show areas';
+  } else {
+    showAllAreas();
+    defaultContextMenu[2].label = 'hide areas';
+  }
+}
+
+function addToDefaultMenu(item) {
+  defaultContextMenu.push(item);
+}
+
 function hitTestArea(id,hit_point) {
   var rect = areaInstances[id].rect;
   //console.log("Is "+hit_point + " in " + rect + " = " +rect.contains(hit_point));
@@ -838,7 +858,7 @@ function hitTestLines(hit_point) {
       //console.log("Chose:" + id);
     }
   }
-  console.log("Best dist:"+ best_dist);
+  //console.log("Best dist:"+ best_dist);
   if(!best_dist || best_dist > selectDist)
     return null;
   return best_id;
@@ -1141,16 +1161,16 @@ function imageMoved(img,prev_pos,spot_rotate) {
 
 function correctPosition(raster,src,round_only) {
   // snaps and rounds image postion raster
-  console.log("Before:"+raster.position);
+  //console.log("Before:"+raster.position);
   if(src.hasOwnProperty('origin')) {
     var oo = src.origin.rotate(raster.rotation);
     raster.position = snapPoint(raster.position-oo,round_only) + oo;
   } else {
     raster.position = snapPoint(raster.position,round_only);
   }
-  console.log("After snap:"+raster.position);
+  //console.log("After snap:"+raster.position);
   raster.position = roundPoint(raster.position);
-  console.log("After round:"+raster.position);
+  //console.log("After round:"+raster.position);
 }
 
 function rotateImage(id,raster,src,angle) {
@@ -1463,12 +1483,7 @@ function incMoveArea(obj,direction,snap) {
   doRecordAdd({action:'areaMove',id:area_id,type:'area',oldValue:objRect,pos:inst.rect});
 }
 
-function save() {
-  var dolist = doRecord;  //pruneDo();
-  console.log("Try to save");
-  console.log("Globals:" + Object.keys(window.globals));
-  console.log("SendData:",typeof window.globals.sendData);
-  // build reduced image list
+function buildImgList() {
   var img_list = [];
   console.log("Type:"+(typeof img_list));
   var img_ids = Object.keys(imagesLoaded);
@@ -1478,21 +1493,37 @@ function save() {
     for(var ik in im) {
       if(ik === 'loadedProp')
         continue;
-      console.log(ik);
-      console.log("Loaded:"+im.loadedProp.indexOf(ik));
-      console.log("Initial:"+im.initialProp.indexOf(ik));
-      if((im.loadedProp.indexOf(ik) < 0) || (im.initialProp.indexOf(ik) >= 0))
-        img[ik] = im[ik];
-    }
-    console.log("Img:"+Object.keys(img));
-    img_list.push(img);
-    console.log("ImgList#:"+img_list);
-  }
-  console.log("ImgList:"+img_list);
+
+              console.log(ik);
+              console.log("Loaded:"+im.loadedProp.indexOf(ik));
+              console.log("Initial:"+im.initialProp.indexOf(ik));
+              if((im.loadedProp.indexOf(ik) < 0) || (im.initialProp.indexOf(ik) >= 0))
+                img[ik] = im[ik];
+            }
+            console.log("Img:"+Object.keys(img));
+            img_list.push(img);
+            console.log("ImgList#:"+img_list);
+          }
+          console.log("ImgList:"+img_list);
+          return img_list;
+        }
+
+function buildRedoData() {
+  // build reduced image list
+  var img_list = buildImgList();
   var project_data = {imglist:img_list,dolist:doRecord};
   console.log("project data:"+Object.keys(project_data));
   console.log("project data:"+Object.keys(project_data.imglist[0]));
   var jdata = JSON.stringify(project_data);
+  return jdata;
+}
+
+function save() {
+  var dolist = doRecord;  //pruneDo();
+  console.log("Try to save");
+  console.log("Globals:" + Object.keys(window.globals));
+  console.log("SendData:",typeof window.globals.sendData);
+  var jdata = buildRedoData();
   console.log("jdata:"+jdata);
   console.log("project data imglist[0]:"+Object.keys(project_data.imglist[0]));
   if(window.location.protocol == 'file:') {
@@ -1585,8 +1616,12 @@ function parseRecord(jdata) {
 }
 
 function correctPosPoints(do_record) {
+  var new_nextID = 0;  // nextID will be set to this after finding highest ID
   for(var di in do_record) {
     var to_do = do_record[di];
+    to_do.id += nextID;
+    if(to_do.id >= new_nextID)
+      new_nextID = to_do.id + 1;
     if(to_do.hasOwnProperty('pos')) {
       console.log("Fix pos");
       to_do.pos = parseLine(to_do.pos);  // check for paper.js object JSON conversion problems
@@ -1603,6 +1638,8 @@ function correctPosPoints(do_record) {
     }
     doRecord[di] = to_do;
   }
+  nextID = new_nextID;
+  console.log("NextID will be "+nextID);
 }
 
 
@@ -1678,6 +1715,7 @@ function removeAll(){
     removeAreas();
     doRecord = [];
     doRecordIndex = 0;
+    nextID = 0;  // start again
   }
 }
 
@@ -1809,6 +1847,9 @@ function redo() {
   if(doRecordIndex >= doRecord.length)
     return false;  // nothing to undo
   var to_do = doRecord[doRecordIndex];
+  if(to_do.id > nextID)
+    nextID = to_do.id;  // this used to happen with loading of old data
+  // now loads should advance all to_do ids to start after nextID
   //console.log(Object.keys(to_do));
   console.log("Redoing " + to_do.action);
   var raster;
@@ -1889,19 +1930,19 @@ function doAll() {
 function pruneDo() {
   // returned current do record pruned down to minimum actions necessary to repeat result
   // also used for system save.
-  console.log("BEFORE");
-  for(var i in doRecord) {
-      console.log("#"+i+"="+doRecord[i].action+" to "+doRecord[i].id);
-  }
+  // console.log("BEFORE");
+  // for(var i in doRecord) {
+  //     console.log("#"+i+"="+doRecord[i].action+" to "+doRecord[i].id);
+  // }
   var prunedDo = [];  // a list of relevant do's.
   var ids_found = {};   // action arrays of objects already loaded into pruned list
   for(var di = doRecordIndex-1; di >= 0; di--) {  // work backwards through do list
     //console.log("Do#"+di);
     var to_do = doRecord[di];
-    console.log("ids found:"+Object.keys(ids_found));
-    for(var idk in ids_found) {
-      console.log(idk + " = " + ids_found[idk]);
-    }
+    //console.log("ids found:"+Object.keys(ids_found));
+    //for(var idk in ids_found) {
+    //  console.log(idk + " = " + ids_found[idk]);
+    //}
     //console.log(typeof to_do.id);
     //if(ids_found.length > 0)
     //console.log(typeof ids_found[0]);
@@ -1930,77 +1971,12 @@ function pruneDo() {
     if(to_do.hasOwnProperty('oldValue'))
       delete to_do.oldValue;
     prunedDo.splice(0,0,to_do);
-    console.log("Pruned adding:"+to_do.action + " for:"+to_do.id);
-
-    // //console.log("Checking todo action:",to_do.action);
-    // switch(to_do.action) {
-    //   case 'lineMove':
-    //     if(!lineInstances.hasOwnProperty(to_do.id)) {
-    //       //console.log("path nolonger exists - so ignor");
-    //       break;
-    //     }
-    //     to_do.oldValue = null;  // so that it knows to remove the line on an undo
-    //     prunedDo.splice(0,0,to_do);
-    //     break;
-    //   case 'imageMove':
-    //   case 'imageRotate':
-    //   case 'symbolPlace':
-    //     if(!imageInstances.hasOwnProperty(to_do.id)) {
-    //       //console.log("image nolonger exists - so ignor");
-    //       break;
-    //     }
-    //     //console.log("Checking todo action:",to_do.action);
-    //     var actions_found = {};
-    //     for(var dj = di; dj >= 0; dj--) {  // go backwards (including to_do) and find last of move and rotates and symbolplace
-    //       var will_do = doRecord[dj];
-    //       console.log("  Checking #"+dj+" willdo action:"+will_do.action+" for "+will_do.id);
-    //       if(to_do.id == will_do.id) {
-    //         //console.log("Actions found:",Object.keys(actions_found));
-    //         if(actions_found.hasOwnProperty(will_do.action)) {
-    //           //console.log("Duplicate");
-    //           continue;
-    //         }
-    //         //console.log("  Accept #"+dj+" willdo action:"+will_do.action+" to "+will_do.id);
-    //         actions_found[will_do.action] = will_do;
-    //         //console.log("af:",actions_found[a])
-    //         prunedDo.splice(0,0,will_do);
-    //         console.log("Pruned adding:"+will_do.action + " from index:"+dj);
-    //         if(will_do.action == 'symbolPlace')
-    //           break; // all done
-    //       }
-    //     }
-    //     break;
-    //   case 'symbolDelete':
-    //     // no need to keep this in pruned
-    //     break;
-    //   // only the last of these for an id are required
-    //   case 'rename':
-    //   case 'move':
-    //     if(to_do.type === 'area') {
-    //       if(!areaInstances.hasOwnProperty(to_do.id))
-    //         break;  //nolonger exists
-    //     } else {  // images can also be renamed
-    //       if(!imageInstances.hasOwnProperty(to_do.id))
-    //         break;  // nolonger exists
-    //     }
-    //     prunedDo.splice(0,0,to_do);
-    //     break;
-    //   case 'setArea':
-    //     if(!areaInstances.hasOwnProperty(to_do.id))
-    //       break;  //nolonger exists
-    //     prunedDo.splice(0,0,to_do);
-    //     break;
-    //   case 'lineColor':
-    //     if(!lineInstance.hasOwnProperty(to_do.id))
-    //       break;
-    //     prunedDo.splice(0,0,to_do);
-    //     break;
-    //}
+    //console.log("Pruned adding:"+to_do.action + " for:"+to_do.id);
   }
-  console.log("AFTER");
-  for(i in prunedDo) {
-    console.log("#"+i+"="+prunedDo[i].action+" to "+prunedDo[i].id);
-  }
+  // console.log("AFTER");
+  // for(i in prunedDo) {
+  //   console.log("#"+i+"="+prunedDo[i].action+" to "+prunedDo[i].id);
+  // }
   return prunedDo;
 }
 
@@ -2114,6 +2090,12 @@ function areaSelect() {
   hideArea();
 }
 
+// for loading a static js doRecord
+function loadStaticRec(fname) {
+  console.log("Run global function "+fname);
+  parseRecord(window.globals[fname]());
+}
+
 // think this needs to be at the bottom so under scripts find things fully loaded
 console.log("PaperGlue functions to window globals");
 // window global are use for cross scope communications
@@ -2151,7 +2133,11 @@ var exports = {
   moveCurrentArea:moveCurrentArea,
   setEditMode:setEditMode,  // change this to false for application
   setModalOpen:setModalOpen,
-  areaSelect:areaSelect
+  areaSelect:areaSelect,
+  addToDefaultMenu:addToDefaultMenu,
+  loadStaticRec:loadStaticRec,
+  buildRedoData:buildRedoData,
+  parseRecord:parseRecord
 };
 globals.paperGlue = exports;
 

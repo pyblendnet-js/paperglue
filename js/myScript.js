@@ -26,6 +26,12 @@ window.globals.menuLookup = { symbolMenu:symbolMenu,
                               newAreaMenu:newAreaMenu,
                               areaMenu:areaMenu
                             };
+var defaultMenuAddendum = [
+  {label:'list in new tab',callback:openActionsWindow},
+  {label:'text in new tab',callback:openRecordWindow},
+  {label:'import dorec.js',callback:loadDoRec}
+];
+
 var first_image = {src:"img/con_Block_5.08mm_12.png", scale:0.6, id:"conBlock1", isSymbol:true, dragClone:true, pos:view.center };
 var default_image_menus = { contextMenu:"symbolMenu", instanceContextMenu:"symbolInstanceMenu"};
 // other parameters:
@@ -53,6 +59,9 @@ function initApp() {
   paperGlue.loadImages([],default_image_menus);  //first_image
   paperGlue.setSnap([5,5,10,10]);
   paperGlue.showAreas();
+  for(var i in defaultMenuAddendum)
+    paperGlue.addToDefaultMenu(defaultMenuAddendum[i]);
+  paperGlue.closeDialog = closeDialog;
 }
 
 function drawGrid(spacing) {
@@ -93,7 +102,7 @@ function drawStripBoard(spacing,length,width) {
 }
 
 function imgGetNameCall(obj){
-  console.log('get name called');
+  //console.log('get name called');
   return obj.src.id;
 }
 
@@ -217,6 +226,66 @@ function openActionsWindow() {
     //console.log(tb.attributes);
     //console.log(tb.style);
     myWindow.stop();
+}
+
+/* generate a browser page which can be saved as a js file for
+   inclusion in a paperglue project.
+*/
+function openRecordWindow() {
+    var myWindow = window.open("", "Actions"); //, "width=200, height=100");
+    var q = globals.paperGlue.getDoRecord();
+    //var dri = globals.paperGlue.getDoIndex();
+    var txt = "<html><body><pre>";
+    txt += "var jdata='";
+    txt += paperGlue.buildRedoData();
+    txt += "'\n";
+    // var f1 = true;
+    // for(var qi in q) {
+    //   var dorec = q[qi];
+    //   if(!f1)
+    //     txt += ',\n\t';
+      // txt += '{';
+      // var f2 = true;
+      // for(var k in dorec) {
+      //   if(!f2)
+      //     txt += ",";
+      //   var dta = dorec[k];
+      //   // doesn't print arrays properly
+        // var dts = JSON.stringify(dta);
+        // console.log(dts);
+        // if(Array.isArray(dts)) {
+        //   switch(dts[0]) {
+            // case 'Rectangle':
+            // case 'Point':
+            // case 'Size':
+            //   var dt = "new "+dts[0]+"(";
+            //   for(var i = 1; i < dts.length; i++) {
+            //     if(i > 1)
+            //       dt += ",";
+            //     dt += dts[i];
+            //     dt += ")";
+        //       }
+        //       dta = dt;
+        //       break;
+        //   }
+        // }
+    //     txt += k + ":" + dta;
+    //     f2 = false;
+    //   }
+    //   txt += '}';
+    //   f1 = false;
+    // }
+    // txt += "\n];\n";
+    txt += "function getRecord() {\n\t"+
+             "return jdata;\n}\n";
+    txt += "window.globals.importRecord = getRecord;\n";
+    txt += "</pre></body></html>";
+    myWindow.document.write(txt);
+    myWindow.stop();
+}
+
+function loadDoRec() {
+  paperGlue.loadStaticRec("importRecord");
 }
 
 var tempMouseUp;
@@ -377,7 +446,7 @@ function getAreaNameCall(obj){
 }
 
 function getAreaRectCall(obj){
-  console.log("areaRect:" + Object.keys(obj));
+  //console.log("areaRect:" + Object.keys(obj));
   return obj.inst.rect;
 }
 
@@ -476,6 +545,5 @@ function setLineColor() {
 //window.globals.keyhandler = keyDown;  // requests paperglue to pass event here
 window.globals.listActions = openActionsWindow;
 window.globals.dialogReturn = dialogReturn;
-paperGlue.closeDialog = closeDialog;
 //console.log("Globals:");
 //console.log(Object.keys(window.globals) ); //.onload();  //no use since it may not be added to globals yet
