@@ -742,6 +742,36 @@ function hitTestAreas(hit_point) {
   return null;
 }
 
+function hitTestLine(id,hit_point) {
+  var path = lineInstances[id].path;
+  // var rect = new Rectangle(path.firstSegment.point,path.lastSegment.point);
+  // //console.log("Is "+hit_point + " in " + rect + " = " +rect.contains(hit_point));
+  // if(!rect.contains(hit_point))
+  //   return -1;
+  // return distance to closer end
+  var d1 = (hit_point - path.firstSegment.point).length;
+  var d2 = (hit_point - path.lastSegment.point).length;
+  //console.log(d1,d2);
+  return Math.min(d1,d2);
+}
+
+function hitTestLines(hit_point) {
+  var aks = Object.keys(lineInstances);
+  var best_dist = null;
+  var best_id = null;
+  for(var ai in aks) {
+    var id = aks[ai];
+    var l = hitTestLine(id,hit_point);
+    //console.log("Hit test area#" + id + " = " + l);
+    if(!best_dist || (l >= 0 && l < best_dist)) {
+      best_dist = l;
+      best_id = id;
+      //console.log("Chose:" + id);
+    }
+  }
+  return best_id;
+}
+
 function selectItem(id,item) {
   var d = new Date();
   var nowMs = d.getTime();
@@ -790,8 +820,9 @@ function lineMouseDown(event) {
     return false;
 }
 
-// univeral mouse drag function can drag lines or images or create rubber band new line
+// universal mouse drag function can drag lines or images or create rubber band new line
 function onMouseDrag(event) {
+  // only fires when the mouse button is pressed
   if(modalOpen)
     return;
   if(rightButton) {
@@ -891,14 +922,27 @@ function onMouseUp(event) {
     imageSelected.opacity = 1.0;
   }
   if(rightButton) {
-    if(!imageSelected && !lineSelected) {
-      var id = hitTestAreas(mouseDownPosition);
-      if(!!id) {
-        var a = areaInstances[id];
-        currentContextObject = {id:id,type:'area',inst:a};  //to match image instance object
-        if(a.hasOwnProperty('path'))
-          selectItem(id,a.path);
-        setContextMenu("areaMenu");
+    var aid;
+    if(!imageSelected && !lineSelected && !areaSelected) {
+      if(areasVisible) {
+        aid = hitTestAreas(mouseDownPosition);
+        if(!!aid) {
+          var a = areaInstances[aid];
+          currentContextObject = {id:aid,type:'area',inst:a};  //to match image instance object
+          if(a.hasOwnProperty('path'))
+            selectItem(id,a.path);
+          setContextMenu("areaMenu");
+        }
+      }
+      if(!aid) {
+        var id = hitTestLines(mouseDownPosition);
+        if(!!id) {
+          var l = lineInstances[id];
+          currentContextObject = {id:id,type:'line',inst:l};  //to match image instance object
+          if(l.hasOwnProperty('path'))
+            selectItem(id,l.path);
+          setContextMenu("lineMenu");
+        }
       }
     }
     rightButton = false;
@@ -935,9 +979,7 @@ function onMouseUp(event) {
       }
     }
     imageSelected = null;
-  } else {
-    hitTestAreas(mouseDownPosition); //also called if line validate fails
-  }
+  }  // end of edit mode
   } else {  // not edit mode
     var hit_id = hitTestAreas(mouseDownPosition);
     if(!!hit_id) {
@@ -1282,7 +1324,7 @@ function save() {
 function load() {
   console.log("Load:",typeof window.globals.load);
   if(window.location.protocol == 'file:') {
-    // might try to impletement local storage some day
+    // node js storage
     if(typeof(Storage) === "undefined") {
       console.log("Local storage not implemented");
     } else {
@@ -1290,6 +1332,7 @@ function load() {
       parseRecord(localStorage.data);
     }
   } else if(typeof window.globals.sendData === 'function') {
+    // local storage
     window.globals.onReply = onLoadReply;
     var load_data = {command:'load',path:recordPath};
     window.globals.sendData(JSON.stringify(load_data));
@@ -1322,16 +1365,21 @@ function parseRecord(jdata) {
       // console.log("New record has" + newRecord.length + " actions");
       removeAll();
       imglist = project_data.imglist;
+      console.log("Images to load:"+Array.isArray(imglist));
       // add any images not already loaded - does not check date
-      img_keys = Object.keys(imglist);
       var imgs_to_load = [];
-      for(var ii in img_keys) {
-        var ik = img_keys[ii];
-        if(imagesLoaded.hasOwnProperty(ik))
+      //for(var ii in img_keys) {
+      for(var ik in imglist) {
+        //var ik = img_keys[ii];
+        console.log("ik:"+ik+"="+imglist[ik].id);
+        if(imagesLoaded.hasOwnProperty(imglist[ik].id)) {
+          console.log("This image already loaded");
           continue;
+        }
         imgs_to_load.push(imglist[img_keys]);
       }
-      loadImages(imgs_to_load);  //will use previously set defaults
+      //console.log("Images to load:"+img_keys);
+      //loadImages(imgs_to_load);  //will use previously set defaults
       doRecord = project_data.dolist;
       correctPosPoints(doRecord);
       doRecordIndex = 0;
@@ -1783,6 +1831,34 @@ function setModalOpen(state) {
   modalOpen = state;
 }
 
+function areaSelect() {
+  var rect = new Rectangle(roundPoint(areaSelected.segments[0].point),
+                           roundPoint(areaSelected.segments[2].point));
+  if(areasVisible) {
+    for(var aid in areaInstances) {
+      var a = areaInstances[aid];
+      if(rect.contains(a.rect.topleft) && rect.contains(a.rect.bottomright)) {
+        if(a.hasOwnProperty('path'))
+          selectItem(aid,a.path);
+      }
+    }
+  }
+  for(var id in lineInstances) {
+    var l = lineInstances[id];
+    if(rect.contains(l.path.firstSegment.point) && rect.contains(l.path.lastSegment.point)) {
+      selectItem(id,l.path);
+    }
+  }
+  for(var iid in imageInstances) {
+    var imgobj = imageInstances[iid];
+    var bounds = imgobj.raster.bounds();
+    if(rect.contains(bounds.topleft) && rect.contains(bounds.bottomright)) {
+      selectItem(iid,imgobj.raster);
+    }
+  }
+
+}
+
 // think this needs to be at the bottom so under scripts find things fully loaded
 console.log("PaperGlue functions to window globals");
 // window global are use for cross scope communications
@@ -1818,7 +1894,8 @@ var exports = {
   changeAreaName:nameCurrentArea,
   moveCurrentArea:moveCurrentArea,
   setEditMode:setEditMode,  // change this to false for application
-  setModalOpen:setModalOpen
+  setModalOpen:setModalOpen,
+  areaSelect:areaSelect
 };
 globals.paperGlue = exports;
 

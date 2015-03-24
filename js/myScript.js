@@ -15,7 +15,8 @@ var symbolInstanceMenu = [ {label:'name', propCall:imgGetInstanceNameCall},
                            {label:'snap',propCall:getSnapModeCall,callback:toggleSnap},
                            {label:'properties',callback:openImgPropDialog} ];
 var lineInstanceMenu = [ {label:'color', propCall:lineGetColor, callback:setLineColor}];
-var newAreaMenu = [ {label:'set area#', propCall:getAreaCount, callback:setArea}];
+var newAreaMenu = [ {label:'set area#', propCall:getAreaCount, callback:setArea},
+                    {label:'select', callback:areaSelect }];
 var areaMenu = [ {label:'area', propCall:getAreaNameCall},
                  {label:'rect', propCall:getAreaRectCall},
                  {label:'properties',callback:openAreaPropDialog}];
@@ -328,6 +329,10 @@ function setCenterToCursor() {
 
 function setOriginToCursor() {
   paperGlue.setOriginToCursor();
+}
+
+function areaSelect() {
+  paperGlue.areaSelect();
 }
 
 function getAreaCount() {
