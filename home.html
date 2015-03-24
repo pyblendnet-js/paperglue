@@ -26,9 +26,15 @@
     //window.globals.onload();  //no use since it may not be added to globals yet
   }
     </script>
-    </head>
+    <style>
+      .button {
+        color: red;
+        background-color: green;
+      }
+    </style>
+</head>
 <body id="body" onload="onload();" >
-  <div onmouseup="showPaper();" class="detailItem">Show paper scope</div>
+  <button type="button" onclick="showPaper();" class="button" width="300">Show paper scope</button>
   <!--<image src="img/verodes.png"/>-->
   <canvas id="myCanvas" resize></canvas>
   <div style="display:none; " id="contextMenu">

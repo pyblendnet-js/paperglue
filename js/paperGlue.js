@@ -26,8 +26,10 @@ var lineInstances = {};
 var lineNextID = 0;
 var lineSelected = null;
 var imageSelected = null;
+var imageSelectedPositiion = null;
 var lineSelectMode = 0;
 var snapQuantum = 40;
+var mouseDownPosition;
 var rightButton = false;
 var imagesLoaded = [];
 var imageInstances = {};  //images that have been cloned from sybols in imagesLoaded.
@@ -112,6 +114,7 @@ function findImageInstance(search_by,search_key) {
 
 // onmousedown callback for images that are cloneable, dragable or have context menu
 function imageMouseDown(event) {
+  mouseDownPos = event.position;
   if(rightButtonCheck(event)) {  // this will set rightButton global
     console.log("Right button down");
   }
@@ -133,7 +136,8 @@ function imageMouseDown(event) {
         if(imgobj.dragClone === true) {   // this image object can be dragged, so it should have isSymbol set true also
           //console.log("Symbol:" + imgobj.symbol);
           symbolPlace(imgobj);
-          imageSelected.position = this.position;
+          imageSelected.position = imgobj.raster.position;
+          imageSelectedPosition = null;  // so we can tell there was no prior position
         }
       }
       return false;  // master image found, so no need to look at clones in imageInstances
@@ -154,6 +158,7 @@ function imageMouseDown(event) {
         }
       }
       imageSelected = this;
+      imageSelectedPosition = this.position.clone();  // need to dereference
       return false;  //found so done looking
     }
   }
@@ -343,6 +348,7 @@ function lineMouseDown(event) {
     }
     console.log("link mouse down");
     lineSelected = this;
+    lineSelectedPosition = [lineSelected.firstSegment.point.clone(),lineSelected.lastSegment.point.clone()];
     var line_select_fraction = (event.point - this.segments[0].point).length/this.length;
     if(line_select_fraction < 0.25) {  //drag start of link
       lineSelectMode = 1;
@@ -367,6 +373,7 @@ function onMouseDrag(event) {
       case 0: //move last point
         if(lineSelected.segments.length < 2) {
           lineSelected.add(event.point);
+          lineSelectedPosition = null;  // to indicate it is new
         } else {
           lineSelected.lastSegment.point += event.delta;
         }
@@ -406,11 +413,19 @@ function onMouseUp(event) {
     // continue through to path addition or removal
   } else if(!!imageSelected) {
     var rp = imageSelected.position/snapQuantum;
-    imageSelected.position = rp.round()*snapQuantum;
+    var np = rp.round()*snapQuantum;
+    imageSelected.position = np;
     var img_id = findImageInstance('raster',imageSelected);
     console.log("instance found with id:"+img_id);  // need to keep id as well - might be null for master objects in layout mode
-    // keeping the obj as record is fine for undo but not so good for redo if the object gets deleted further back
-    doRecordAdd({action:'imageMove',id:img_id,type:'image',pos:imageSelected.position});
+    if(np == imageSelectedPosition) { // no movement or no prior position it being null
+      // use mouseDownPosition or event.position to find the closest point of rotation in object
+      var rotation = imageSelected.rotation;
+      imageSelected.rotate(90);  // need to look up source to find centre of rotation - could also have 45 deg mode
+      doRecordAdd({action:'imageRotate',id:img_id,type:'image',rot:[rotation,imageSelected.rotation]});
+    } else {
+      // keeping the obj as record is fine for undo but not so good for redo if the object gets deleted further back
+      doRecordAdd({action:'imageMove',id:img_id,type:'image',pos:[imageSelectedPosition,imageSelected.position]});
+    }
     imageSelected = null;
   }
 }
@@ -445,7 +460,8 @@ function validatePath(path, force_id) {
       line_id = next_id;
     }
     if(typeof force_id == 'undefined') {  // don't record redos
-      doRecordAdd({action:'lineMove',id:line_id,type:'line',pos:[lineSelected.firstSegment.point.clone(),lineSelected.lastSegment.point.clone()]});
+      var np = [lineSelected.firstSegment.point.clone(),lineSelected.lastSegment.point.clone()];
+      doRecordAdd({action:'lineMove',id:line_id,type:'line',pos:[lineSelectedPosition,np] });
     }
   } else {  // length of line is too short
     removeLine(line_id);
@@ -501,45 +517,50 @@ function undo() {
     doRecordIndex--;
     var last_do = doRecord[doRecordIndex];
     console.log("Undoing " + last_do.action + " for " + last_do.id + " which as pos:" + last_do.pos);
-    for(var i = doRecordIndex - 1; i >= 0; i--) {
-      var prev_do = doRecord[i];
-      console.log(i + " do for " + prev_do.id + " is " + prev_do.action + " has pos:" + prev_do.pos);
-      if((prev_do.id == last_do.id) && (prev_do.type == last_do.type)) {
-        console.log("Found previous action for id:" + last_do.id + " and type:" + last_do.type);
-        switch(last_do.action) {
-          case 'lineMove':
-            var path = lineInstances[id].line;
-            // console.log("Obj pos1:",path.firstSegment.point);
-            // console.log("path pos2:",path.lastSegment.point);
-            // console.log("path pos:",path.position);
-            path.firstSegment.point = prev_do.pos[0];
-            path.lastSegment.point = prev_do.pos[1];
-            console.log("Return path to " + prev_do.pos);
-            // console.log("path pos1:",path.firstSegment.point);
-            // console.log("path pos2:",path.lastSegment.point);
-            // console.log("path pos:",path.position);
-            break;
-         case 'imageMove':
-            var raster = imageInstances[last_do.id].raster;
-            if(prev_do.action == 'symbolPlace') {  // this was the first drag
-              console.log("Remove symbol from instances");
-              symbolRemove(prev_do.src, prev_do.id);
-              doRecordIndex--;  // skip back over symbol places too
-            } else if(typeof prev_do.pos != 'undefined'){  // check it has a pos
-              raster.position = prev_do.pos;
-              console.log("Return img to " + prev_do.pos);
-            }
-        }
-        return;
-      }
-    }
-    // nothing found, so assume can delete
+    var raster;
     switch(last_do.action) {
       case 'lineMove':
-        removeLine(last_do.id);
+        var path = lineInstances[last_do.id].line;
+        // console.log("Obj pos1:",path.firstSegment.point);
+        // console.log("path pos2:",path.lastSegment.point);
+        // console.log("path pos:",path.position);
+        if(!last_do.pos[0]) {  // no previous existance
+          removeLine(last_do.id);
+        } else {
+          path.firstSegment.point = last_do.pos[0][0];
+          path.lastSegment.point = last_do.pos[0][1];
+          console.log("Return path to " + last_do.pos[0]);
+          // console.log("path pos1:",path.firstSegment.point);
+          // console.log("path pos2:",path.lastSegment.point);
+          // console.log("path pos:",path.position);
+        }
         break;
       case 'imageMove':
-        console.log("imageMove with no previous symbolPlace - must be master symbol");
+        raster = imageInstances[last_do.id].raster;
+        if(doRecordIndex > 0) {
+          var prev_do = doRecord[doRecordIndex-1];
+          if(prev_do.action == 'symbolPlace') {  // this was the first drag
+            console.log("Remove symbol from instances");
+            symbolRemove(prev_do.src, prev_do.id);
+            doRecordIndex--;  // skip back over symbol places too
+            break;
+          }
+        }
+        if(last_do.pos != 'undefined'){  // check it has a pos
+          raster.position = last_do.pos[0];
+          console.log("Return img position to " + last_do.pos);
+        }
+        break;
+      case 'imageRotate':
+        raster = imageInstances[last_do.id].raster;
+        if(typeof last_do.rot != 'undefined'){  // check it has a rot
+          if(!last_do.rot[0]) {
+            raster.rotation = 0;
+          } else {
+            raster.rotation = last_do.rot[0];
+            console.log("Return img rotation to " + last_do.rot[0]);
+          }
+        }
         break;
     }
 }
@@ -556,20 +577,24 @@ function redo() {
       if(!lineInstances.hasOwnProperty(to_do.id)) {
         console.log("path nolonger exists - remaking");
         newLine();
-        lineSelected.add(to_do.pos[0]);
-        lineSelected.add(to_do.pos[1]);
+        lineSelected.add(to_do.pos[1][0]);
+        lineSelected.add(to_do.pos[1][1]);
         // need to reuse old id
         var id = validatePath(lineSelected,to_do.id);  // adds to lineInstances
         lineSelected = null;
       } else {
         var path = lineInstances[to_do.id].line;
-        path.firstSegment.point = to_do.pos[0];
-        path.lastSegment.point = to_do.pos[1];
+        path.firstSegment.point = to_do.pos[1][0];
+        path.lastSegment.point = to_do.pos[1][1];
       }
       break;
     case 'imageMove':
       raster = imageInstances[to_do.id].raster;
-      raster.position = to_do.pos;
+      raster.position = to_do.pos[1];
+      break;
+   case 'imageRotate':
+      raster = imageInstances[to_do.id].raster;
+      raster.rotation = to_do.rot[1];
       break;
     case 'symbolPlace':
       symbolPlace(to_do.src,to_do.id);
@@ -579,7 +604,7 @@ function redo() {
       if(to_do.action == 'imageMove') {
         doRecordIndex++;
         raster = imageInstances[to_do.id].raster;
-        raster.position = to_do.pos;
+        raster.position = to_do.pos[1];
       }
       break;
   }

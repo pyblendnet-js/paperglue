@@ -20,13 +20,14 @@ var first_image = {src:"img/con_Block_5.08mm_12.png", id:"verodes", isSymbol:tru
 
 //view.on('frame', frameHandler);
 
-console.log(Object.keys(window));
-console.log(Object.keys(window.paper));
 console.log(window.innerWidth);
 console.log(window.outerWidth);
 //console.log(window.showPaper);
 //console.log(myCanvas);
 drawStripBoard(10,100,34);
+console.log(Object.keys(window));
+console.log(Object.keys(window.globals));
+console.log(typeof window.globals.loadImsges);
 window.globals.loadImages([first_image]);
 //
 // window.onload = function() {
@@ -76,12 +77,12 @@ function drawStripBoard(spacing,length,width) {
 
 function imgGetNameCall(obj){
   console.log('get name called');
-  return obj.imageObject.id;
+  return obj.src.id;
 }
 
 function imgGetInstanceNameCall(obj){
   console.log('get name called');
-  return "" + obj.imageObject.id + "#" + obj.id;
+  return "" + obj.src.id + "#" + obj.id;
 }
 
 function imgGetPosCall(obj){

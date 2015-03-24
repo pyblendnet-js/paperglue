@@ -31,12 +31,12 @@ http.createServer(function(req,res){
   var content_type = 'text/html';
   var ext = path.extname(url_path);
   if( ext == ".js")
-    content_type = 'text/javascript'
+    content_type = 'text/javascript';
   else if(ext == "png")
       content_type = 'image/png';
   else if(ext == "jpg")
       content_type = 'image/jpg';
-  if(url_path == '')
+  if(url_path === '')
     url_path = '/home.html';
   serveStaticFile(res, url_path, content_type);
   //    serveStaticFile(res, '/public/404.html', 'text/html', 404);
