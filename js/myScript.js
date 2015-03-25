@@ -28,7 +28,8 @@ window.globals.menuLookup = { symbolMenu:symbolMenu,
                             };
 var defaultMenuAddendum = [
   {label:'list in new tab',callback:openActionsWindow},
-  {label:'text in new tab',callback:openRecordWindow},
+  {label:'json in new tab',callback:openJSONWindow},
+  {label:'  js in new tab',callback:openJSWindow},
   {label:'import dorec.js',callback:loadDoRec}
 ];
 
@@ -228,60 +229,95 @@ function openActionsWindow() {
     myWindow.stop();
 }
 
+function openJSONWindow() {
+  openRecordWindow(true,false);
+}
+
+function openJSWindow() {
+  openRecordWindow(false,true);
+}
+
 /* generate a browser page which can be saved as a js file for
    inclusion in a paperglue project.
 */
-function openRecordWindow() {
+function openRecordWindow(beautify,include_loader) {
     var myWindow = window.open("", "Actions"); //, "width=200, height=100");
-    var q = globals.paperGlue.getDoRecord();
+    //var q = globals.paperGlue.getDoRecord();
     //var dri = globals.paperGlue.getDoIndex();
-    var txt = "<html><body><pre>";
-    txt += "var jdata='";
-    txt += paperGlue.buildRedoData();
-    txt += "'\n";
-    // var f1 = true;
-    // for(var qi in q) {
-    //   var dorec = q[qi];
-    //   if(!f1)
-    //     txt += ',\n\t';
-      // txt += '{';
-      // var f2 = true;
-      // for(var k in dorec) {
-      //   if(!f2)
-      //     txt += ",";
-      //   var dta = dorec[k];
-      //   // doesn't print arrays properly
-        // var dts = JSON.stringify(dta);
-        // console.log(dts);
-        // if(Array.isArray(dts)) {
-        //   switch(dts[0]) {
-            // case 'Rectangle':
-            // case 'Point':
-            // case 'Size':
-            //   var dt = "new "+dts[0]+"(";
-            //   for(var i = 1; i < dts.length; i++) {
-            //     if(i > 1)
-            //       dt += ",";
-            //     dt += dts[i];
-            //     dt += ")";
-        //       }
-        //       dta = dt;
-        //       break;
-        //   }
-        // }
-    //     txt += k + ":" + dta;
-    //     f2 = false;
-    //   }
-    //   txt += '}';
-    //   f1 = false;
-    // }
-    // txt += "\n];\n";
-    txt += "function getRecord() {\n\t"+
+    var txt = "";
+    txt = "";
+    if(include_loader)
+      txt += "var jdata='";
+    else
+      txt += "<html><body><pre>";
+    txt += buildRedoData(beautify);
+    if(include_loader) {
+      txt += "';\n";
+      txt += "function getRecord() {\n\t"+
              "return jdata;\n}\n";
-    txt += "window.globals.importRecord = getRecord;\n";
-    txt += "</pre></body></html>";
+      txt += "window.globals.importRecord = getRecord;\n";
+    } else {
+      txt += "</pre></body></html>";
+    }
     myWindow.document.write(txt);
     myWindow.stop();
+}
+
+function buildRedoData(beautify) {
+  // made sort of JSON beautifier but may not use
+    var txt = "";
+    var json_txt = paperGlue.buildRedoData();
+    var indent = 0;
+    var llc = null;
+    var lc = null;
+    var lt = [];  // whether brace level caused indent
+    var bl = 0;
+    var col = 0;
+    for(var ji in json_txt) {
+      var c = json_txt[ji];
+      if(beautify) {
+        var nl = false;  // assumption
+        switch(c) {
+          case '{':
+          case '[':
+            //if(lc === ':')
+            //  break;
+            //if(lc !== ',')  // array
+            indent++;
+            //lt[bl++] = 0;
+            nl = true;
+            break;
+          case '}':
+          case ']':
+            bl--;
+            indent -= 2;
+            break;
+          //case '[':
+          //  lt[bl++] = 1;
+          //  break;
+          //case ']':
+          //  bl--;
+          //  break;
+        }
+        if(lc === ',') {
+          //if(col > 80 || llc === '}' || llc === ']')
+            nl = true;
+        }
+        if(nl) {
+          txt += "\n";
+          for(var ti = 0; ti < indent; ti++)
+            txt += "  ";
+          col = indent*2;
+        }
+        if(nl && lc !== ',')
+          indent++;
+      }
+      txt += c;
+      col++;
+      llc = c;
+      lc = c;
+    }
+    return txt;
 }
 
 function loadDoRec() {

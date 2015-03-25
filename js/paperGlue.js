@@ -1525,7 +1525,6 @@ function save() {
   console.log("SendData:",typeof window.globals.sendData);
   var jdata = buildRedoData();
   console.log("jdata:"+jdata);
-  console.log("project data imglist[0]:"+Object.keys(project_data.imglist[0]));
   if(window.location.protocol == 'file:') {
     // might try to impletement local storage some day
     console.log("Storage type:" + typeof(Storage));
@@ -1544,9 +1543,8 @@ function save() {
 }
 
 function load() {
-  console.log("Load:",typeof window.globals.load);
   if(window.location.protocol == 'file:') {
-    // node js storage
+    // local storage
     if(typeof(Storage) === "undefined") {
       console.log("Local storage not implemented");
     } else {
@@ -1554,8 +1552,9 @@ function load() {
       parseRecord(localStorage.data);
     }
   } else if(typeof window.globals.sendData === 'function') {
-    // local storage
+    // node js storage
     window.globals.onReply = onLoadReply;
+    console.log("Attempting to load:"+path.recordPath);
     var load_data = {command:'load',path:recordPath};
     window.globals.sendData(JSON.stringify(load_data));
   }
