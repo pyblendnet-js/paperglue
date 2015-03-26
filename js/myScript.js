@@ -30,7 +30,8 @@ var defaultMenuAddendum = [
   {label:'list in new tab',callback:openActionsWindow},
   {label:'json in new tab',callback:openJSONWindow},
   {label:'  js in new tab',callback:openJSWindow},
-  {label:'import dorec.js',callback:loadDoRec}
+  {label:'import dorec.js',callback:loadDoRec},
+  {label:'set state',callback:setNewState}
 ];
 
 var first_image = {src:"img/con_Block_5.08mm_12.png", scale:0.6, id:"conBlock1", isSymbol:true, dragClone:true, pos:view.center };
@@ -153,8 +154,8 @@ function imgGetOriginCall(obj){
 }
 
 function createActionTableBody() {
-  var q = globals.paperGlue.getDoRecord();
-  var dri = globals.paperGlue.getDoIndex();
+  var q = paperGlue.getDoRecord();
+  var dri = paperGlue.getDoIndex();
   var ihtml = "";
   for(var qi in q) {
     var dr = q[qi];
@@ -327,6 +328,7 @@ function loadDoRec() {
 var tempMouseUp;
 var dialogDiv;
 var idRow;
+var dialogType;
 
 function mouseDown(e) {
   e.stopPropagation();
@@ -374,6 +376,7 @@ function closeDialog() {
 }
 
 function openDialogPropCommon(id) {
+  dialogType = 'property';
   openDialogCommon();
   console.log("Opening property dialog:",id);
   var fontsize = window.innerWidth/80;
@@ -419,6 +422,20 @@ function openImgPropDialog() {
 }
 
 function dialogReturn(reply) {
+  switch(dialogType) {
+    case 'obj_prop':
+      propDialogReturn(reply);
+      break;
+    case 'state':
+      stateDialogReturn(reply);
+      break;
+    default:
+      console.log("Unknown dialog type:"+dialogType);
+      break;
+  }
+}
+
+function propDialogReturn(reply) {
   var obj = paperGlue.getCurrentContextObject();
   console.log("Object type:" + obj.type);
   if(obj.type === 'area') {
@@ -576,6 +593,50 @@ function setLineColor() {
   var content = document.getElementById('DlgContent');
   content.innerHTML = p;
   return false;  //do not hide cursors yet
+}
+
+var nextStateID = 0;
+var nextStateTime = 0;
+
+function setNewState() {
+  var new_state = {nm:"state#"+nextStateID,dt:0};
+  nextStateID++;
+  setState(new_state,'new');
+}
+
+function setState(state,id) {
+  dialogType = 'state';
+  openDialogCommon();
+  console.log("Opening set state dialog");
+  var fontsize = window.innerWidth/80;
+  var fs = 'style="font-size:'+fontsize+'px;"';
+  var p = '<table ' + fs + '>';
+  p += '<tr id="idRow"><td>ID</td><td>'+id+'</td></tr>';
+  p += '<tr><td>State Name</td><td>';
+  p += '<input id="statename" type="text" value="'+state.nm+'"/></td></tr>';
+  p += '<tr><td>DeltaTime</td><td>';
+  p += '<input id="deltatime" type="number" value="'+state.dt+'"/></td></tr>';
+  p += '</table>';
+  var content = document.getElementById('DlgContent');
+  content.innerHTML = p;
+  setDialogMove("idRow");
+  return false;  //do not hide cursors yet
+}
+
+function stateDialogReturn(reply) {
+  var nfield = document.getElementById('statename');
+  var nm = nfield.value;
+  var tfield = document.getElementById('deltatime');
+  var dt = parseFloat(tfield.value);
+  if(reply !== 'cancel') {
+    paperGlue.setState({nm:nm,dt:dt});
+  }
+  paperGlue.hideCursor();
+  if(reply === 'apply') {
+    return;
+  }
+  paperGlue.setModalOpen(false);
+  paperGlue.enableKeyFocus(true);
 }
 
 //window.globals.keyhandler = keyDown;  // requests paperglue to pass event here

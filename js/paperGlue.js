@@ -75,6 +75,8 @@ var imgListPath = "imgList.json";
 var cursorPos = [];  // mouse, raster, origin, center
 var cursorImage = null;  // to allow cursor hide in selectItem
 var cursorColors = ['#f00','#ff0','#88f','#8f8'];
+var stateInstances = {};
+var currentStateRate = 0.0;  // immediate jumps to state
 //var ua = navigator.appName.toLowerCase();
 //console.log("Browser details:"+ua);  - not a lot of use
 
@@ -1340,6 +1342,7 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
   var propagate = true;
   var delta = null;  // for arrow keys
   if(event.controlPressed) {
+    console.log("Key:"+event.key);
     switch(event.key) {
       case 'z':
         console.log("cntrlZ");
@@ -1354,7 +1357,8 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
         console.log("cntrlX");
         if(event.shiftPressed) {  // prune unnecessary edits
           if(confirm("Remove events with no end effect?")) {
-            doRecord = pruneDo();
+            var remove_undo = confirm("Remove undo info?");
+            doRecord = pruneDo(remove_undo);
             doRecordIndex = doRecord.length;
             console.log("Do record index ="+doRecordIndex);
           }
@@ -1382,6 +1386,18 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
           }
         }
         propagate = false;
+        break;
+      case '.':
+        if(event.shiftPressed)
+          stepState(1,1);
+        else
+          stepState(1,0);
+        break;
+      case ',':
+        if(event.shiftPressed)
+          stepState(-1,1);
+        else
+          stepState(-1,0);
         break;
       case 'left':
         delta = [-1,0];
@@ -1787,6 +1803,7 @@ function undo() {
         break;
       case 'imageRotate':
         raster = imageInstances[last_do.id].raster;
+        console.log("oldValue:"+last_do.oldValue);
         if(typeof last_do.oldValue != 'undefined'){  // check it has a pos
           raster.position = last_do.oldValue[0];  // required for non centered rotation
           raster.rotation = last_do.oldValue[1];
@@ -1926,18 +1943,20 @@ function doAll() {
   }
 }
 
-function pruneDo() {
+function pruneDo(remove_undo) {
   // returned current do record pruned down to minimum actions necessary to repeat result
   // also used for system save.
   // console.log("BEFORE");
   // for(var i in doRecord) {
   //     console.log("#"+i+"="+doRecord[i].action+" to "+doRecord[i].id);
   // }
+  var keep_all = false;
   var prunedDo = [];  // a list of relevant do's.
   var ids_found = {};   // action arrays of objects already loaded into pruned list
+  var to_do;
   for(var di = doRecordIndex-1; di >= 0; di--) {  // work backwards through do list
     //console.log("Do#"+di);
-    var to_do = doRecord[di];
+    to_do = doRecord[di];
     //console.log("ids found:"+Object.keys(ids_found));
     //for(var idk in ids_found) {
     //  console.log(idk + " = " + ids_found[idk]);
@@ -1945,7 +1964,16 @@ function pruneDo() {
     //console.log(typeof to_do.id);
     //if(ids_found.length > 0)
     //console.log(typeof ids_found[0]);
+    if(keep_all) {
+      prunedDo.splice(0,0,to_do);
+      continue;
+    }
     switch(to_do.type) {
+      case 'state':
+        prunedDo.splice(0,0,to_do);
+        if(di < doRecordIndex-1)
+          keep_all = true;
+        break;
       case 'symbol':
         if(!imageInstances.hasOwnProperty(to_do.id))
           continue;  // image nolonger exists
@@ -1967,10 +1995,22 @@ function pruneDo() {
     } else {
       ids_found[to_do.id] = [to_do.action];  // this object covered one way or other - NOTE: push will convert everything to string without the + prefix but indexof only works with Strings
     }
-    if(to_do.hasOwnProperty('oldValue'))
+    if(remove_undo && to_do.hasOwnProperty('oldValue'))
       delete to_do.oldValue;
     prunedDo.splice(0,0,to_do);
     //console.log("Pruned adding:"+to_do.action + " for:"+to_do.id);
+  }
+  keep_all = false;
+  if(doRecordIndex > 0 && doRecord[doRecordIndex-1].type === 'state')
+    keep_all = true;
+  for(di = doRecordIndex; di < doRecord.length; di++) {
+    // work forwards to look for future states
+    //console.log("Do#"+di);
+    to_do = doRecord[di];
+    if(to_do.type === 'state')
+      keep_all = true;
+    if(keep_all)
+      prunedDo.push(to_do);
   }
   // console.log("AFTER");
   // for(i in prunedDo) {
@@ -2095,6 +2135,124 @@ function loadStaticRec(fname) {
   parseRecord(window.globals[fname]());
 }
 
+/* Add meta data to do record from external
+   If to_seleted is true then it is added to select instances
+   Otherwise a meta event is created with the data
+*/
+function addMeta(to_selected, meta_data) {
+  if(to_selected) {
+    var sok = Object.keys(selectedItems);
+    if(sok.length > 0) {
+      doRecordAdd({action:'addMeta',ids:Object.keys(selectedItems)}+meta_data);
+      for(var sid in selectedItems) {
+        if(lineInstances.hasOwnProperty(sid)) {
+          lineInstances[sid] += meta_data;
+        }
+        else if(areaInstances.hasOwnProperty(sid)) {
+          areaInstances[sid] += meta_data;
+        }
+        else if(imageInstances.hasOwnProperty(sid)) {
+          imageInstances[sid] += meta_data;
+        }
+      }
+    } else
+      console.log("No selected items to add meta data to.");
+  } else {
+    doRecordAdd({action:'addMeta'}+meta_data);
+  }
+}
+
+function getState() {
+  // tricky - do we go to the next state or the previous
+  // do we delete anything in between?
+}
+
+function setState(state) {
+  var id = null;
+  if(doRecordIndex > 0) {
+    var to_do = doRecord[doRecordIndex-1];
+    if(to_do.type === 'state') {  // this position already stated
+      id = to_do.id;
+      delete doRecord[--doRecordIndex];
+    }
+  }
+  if(!id) {
+    if(stateInstances.hasOwnProperty(state.nm)) {
+      alert("A state with name " + state.nm + " already exists");
+      return;
+    }
+    id = nextID;
+    nextID++;
+  }
+  var inst = {id:nextID};
+  var dorec = {action:'state',id:id,type:'state'};
+  for(var k in state) {
+    dorec[k] = state[k];
+    inst[k] = state[k];
+    console.log("State key:"+k+" = "+state[k]);
+  }
+  stateInstances[state.nm] = inst;
+  console.log("Adding state:"+ Object.keys(state));
+  doRecordAdd(dorec);  // where state is an object
+  return doRecordIndex;
+}
+
+function scanStateForward() {
+  for(var di = doRecordIndex; di < doRecord.length; di++) {
+    var dorec = doRecord[di];
+    if(dorec.type === 'state') {
+      return dorec;
+    }
+  }
+  return null;
+}
+
+function gotoState(nm,direction,rate) {
+  var dorec;
+  do {
+    dorec = stepState(direction,rate);
+  } while(!!dorec && dorec.nm !== nm);
+}
+/* Go to a particular state
+
+   rate = 1.0 then use dt as per state
+   rate = 0.0 then go immediate
+   rate = -ve then skip others to start at previous (or next reverse) state
+*/
+function stepState(direction, rate) {
+  // direction = -1 for back or +1 for forward
+  console.log("Step state direction:"+direction+" rate:"+rate);
+  var steps = 0;
+  while((direction < 0 && doRecordIndex > 1) ||
+        (direction > 0 && doRecordIndex < doRecord.length)) {
+    if(doRecordIndex > 0) {
+      var dorec = doRecord[doRecordIndex-1];
+      if(dorec.action === 'state') {
+        console.log("Just past state:" + dorec.nm);
+        if(direction < 0)
+          currentStateRate = dorec.dt;
+        else {  // scan forward for next state
+          var dr = scanStateForward();
+          if(!!dr) {
+            currentStateRate = dr.dt;
+          } else
+            currentStateRate = 0.0;
+        }
+      }
+      if(steps > 0)
+        return dorec.nm;
+    }
+    console.log("Step");
+    if(direction < 0)
+      undo();
+    else
+      redo();
+    steps++;
+    console.log("RecordIndex:"+doRecordIndex);
+  }
+  return null; // to indicate that we failed to find state point
+}
+
 // think this needs to be at the bottom so under scripts find things fully loaded
 console.log("PaperGlue functions to window globals");
 // window global are use for cross scope communications
@@ -2136,7 +2294,9 @@ var exports = {
   addToDefaultMenu:addToDefaultMenu,
   loadStaticRec:loadStaticRec,
   buildRedoData:buildRedoData,
-  parseRecord:parseRecord
+  parseRecord:parseRecord,
+  addMeta:addMeta,
+  setState:setState
 };
 globals.paperGlue = exports;
 
