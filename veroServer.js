@@ -21,79 +21,100 @@ function serveStaticFile(res, path, contentType, responseCode) {
   );
 }
 
-function handlePost(post_data) {  //when all the post_data is complete
-  console.log('RECEIVED THIS DATA:\n'+ post_data);
-  var response = '';
-  var post_obj = JSON.parse(post_data);
-  var rtnval;
-  switch(post_obj.command) {
-    case 'save':
-      saveData(post_obj.path,post_obj.data);
-      break;
-    case 'load':
-      loadData(post_obj.path);
-      break;
-    default:
-      rtnval = {type:'ack',msg:'unknown command'};
-      respondPost(JSON.stringify(rtnval));
-  }
-}
-
-function loadData(load_path) {
+function loadData(res,load_path) {
+  pth = buildSafePath(res,load_path);
+  if(!pth)
+    return;
   fs.readFile(pth,
     function(err,data) {
       if(err) {
         response = '500 - Internal Error:' + err.message;
       } else {
-        console.log("File is of length:" + data.length);
-        console.log("Type:" + (typeof data));
-        rtnval = {type:'file',data:data.toString()};
-        response = JSON.stringify(rtnval);
+        var isDirectory = false;
+        try {
+          isDirectory = fs.lstatSync(pth).isDirectory();
+        } catch(e) {
+          response = '500 - Error:'+e;
+          respondPost(res,response);
+          return;
+        }
+        if(isDirectory) {
+          var darray = [];
+          for(var i in data) {
+            var p = path.join(pth, data[i]);
+            //console.log(p);
+            var t = "file";
+            if(fs.lstatSync(p).isDirectory())
+              t = "dir";
+            var ft = {type:t,name:data[i]};
+            darray.push(ft);
+          }
+          rtnval = {type:'dir', path: path_ext, dir:darray};
+          response = JSON.stringify(rtnval);
+        } else {
+          //console.log("Response:" + response);
+          console.log("File is of length:" + data.length);
+          console.log("Type:" + (typeof data));
+          rtnval = {type:'file',data:data.toString()};
+          response = JSON.stringify(rtnval);
+        }
+        console.log("Response:" + response);
+        respondPost(res,response);
       }
-      console.log("Response:" + response);
-      respondPost(response);
     }
   );
 }
 
-function saveData(save_path,data) {
-  var path_ext = decodeURI(save_path);
+function buildSafePath(res,rel_path) {
+  var path_ext = decodeURI(rel_path);
   console.log("Path Extension:"+path_ext);
   if(path_ext.indexOf("..") >= 0) {  //we don't want anyone hacking into a parent directory
-    response = '500 - Internal Error: Attempting to write to parent directories';
-    respondPost(response);
+    response = '500 - Error: Attempting to access parent directories';
+    respondPost(res,response);
+    return null;
   }
-  pth = path.join(__dirname, path_ext);
+  return path.join(__dirname, path_ext);
+}
+
+function saveData(res,save_path,data,overwrite) {
+  pth = buildSafePath(res,save_path);
+  if(!path)
+    return;
   console.log("Path:"+pth);
   isDirectory = false;
   try {
-    isDirectory = fs.lstatSync(pth).isDirectory();
-  } catch(err) {
+    if(fs.lstatSync(pth).isDirectory()) {
+      response = '500 - Error: Attempting to write to directory';
+      respondPost(res,response);
+      return;
+    } else if(!overwrite) {
+      rtnval = {type:'ack',msg:'fileExists'};
+      respondPost(res,rtnval);
+      return;
+    }
+  } catch(e) {
     // file does not exist yet - could have also used if (fs.existsSync(path))
   }
   try {
-    if(!isDirectory) {
-      console.log("Attempting to write " + data.length + "bytes to path:"+pth);
-      fs.writeFile(pth,data,
-        function(err) {
-          if(err) {
-            response = '500 - Internal Error:' + err.message;
-          } else {
-            console.log("File written");
-            rtnval = {type:'ack',msg:'data saved'};
-            response = JSON.stringify(rtnval);
-          }
-          respondPost(response);
+    console.log("Attempting to write " + data.length + "bytes to path:"+pth);
+    fs.writeFile(pth,data,
+      function(err) {
+        if(err) {
+          response = '500 - Internal Error:' + err.message;
+        } else {
+          console.log("File written");
+          rtnval = {type:'ack',msg:'data saved'};
+          response = JSON.stringify(rtnval);
         }
-      );
-    }
+        respondPost(res,response);
+      }
+    );
   } catch(err) {
-    respondPost('500 - Internal Error:' + err.message);
+    respondPost(res,'500 - Internal Error:' + err.message);
   }
-
 }
 
-function respondPost(resval) {
+function respondPost(res,resval) {
   res.writeHead(200, {'Content-Type': 'text/plain'});
   res.end(resval);
 }
@@ -124,7 +145,31 @@ http.createServer(function(req,res){
     req.on('data', function (data) {
       post_data += data;
     });
-    req.on('end', handlePost(post_data));
+    req.on('end', function() {
+      // every end path must end with a respondPost(res,string)
+      console.log('RECEIVED THIS DATA:\n'+ post_data);
+      var response = '';
+      var post_obj;
+      try {
+        post_obj = JSON.parse(post_data);
+      } catch(err) {
+        respondPost(res,'500 - Error: JSON Parse Error:' + err.message);
+        return;
+      }
+      var rtnval;
+      switch(post_obj.command) {
+        case 'save':
+          saveData(res,post_obj.path,post_obj.data);
+          break;
+        case 'list':  // the same as load only using a path to a directory
+        case 'load':
+          loadData(res,post_obj.path);
+          break;
+        default:
+          rtnval = {type:'ack',msg:'unknown command'};
+          respondPost(res,JSON.stringify(rtnval));
+      }
+    });
   }
 
 }).listen(3000);
