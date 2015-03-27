@@ -124,6 +124,7 @@ http.createServer(function(req,res){
   if (req.method == 'GET') {
     // normalize url by removing querystring, optional
     // trailing slash, and making lowercase
+    util.log("Request:" + req.url);
     var url_path = req.url.replace(/\/?(?:\?.*)?$/, '').toLowerCase();
     util.log("Request:" + url_path);
     util.log("Request length:" + url_path.length);
