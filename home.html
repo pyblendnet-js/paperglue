@@ -29,13 +29,14 @@
     window.globals.importRecord = getRecord;
   }
 
-  function myScriptCmd(cmd, arg) {
-    console.log(Object.keys(window.globals) ); //.onload();  //no use since it may not be added to globals yet
-    window.globals[cmd](arg);
+  function myScriptCmd(cmd, arg0,arg1,arg2) {
+    console.log(Object.keys(window.globals.myScript) );
+    console.log(cmd,arg0,arg1,arg2);//.onload();  //no use since it may not be added to globals yet
+    window.globals.myScript[cmd](arg0,arg1,arg2);
   }
 
-  function paperGlueCmd(cmd,arg) {
-    window.globals.paperGlue[cmd](arg);
+  function paperGlueCmd(cmd,arg0,arg1,arg2) {
+    window.globals.paperGlue[cmd](arg0,arg1,arg2);
   }
 
   function DlgShow(Message)
@@ -44,25 +45,10 @@
     var Msg = document.getElementById('DlgContent');
     Msg.innerHTML = Message;
     // Display the dialog box.
-    var Dlg = document.getElementById('Overlay');
+    var Dlg = document.getElementById('Dialog');
     Dlg.style.visibility = 'visible';
   }
 
-  function DlgHide(reply) {
-    if(reply !== 'apply') {
-      var Dlg = document.getElementById('Overlay');
-      Dlg.style.visibility = 'hidden';
-    }
-    window.globals.dialogReturn(reply);
-  }
-
-  function setCurrentLineColor(c) {
-    window.globals.paperGlue.setCurrentLineColor(c);
-    var Dlg = document.getElementById('Overlay');
-    Dlg.style.visibility = 'hidden';
-    window.globals.paperGlue.setModalOpen(false);
-    window.globals.paperGlue.enableKeyFocus(true);
-  }
   </script>
   <style>
       .button {
@@ -70,7 +56,7 @@
         background-color: black;
       }
 
-      #Overlay {
+      #Dialog {
         visibility: hidden;
 
       position: absolute;
@@ -81,7 +67,7 @@
         border: solid;
         background-color: lightgray;
       }
-      #Overlay td {
+      #Dialog td {
         padding:2px;
       }
       #contextMenu {
@@ -89,8 +75,13 @@
         font-size:100px;
       }
 
-      #overlay {
+      #Dialog {
         font-size:100px;
+      }
+
+      table, th, td {
+        border: 1px solid black;
+        border-collapse:collapse;
       }
     </style>
 
@@ -161,20 +152,10 @@
     </table>
 </div>
 </div>
-<div id="Overlay" >
+<div id="Dialog" >
   <div>
     <div id="DlgContent">Content Goes Here</div>
-    <div id="replyButtons">
-    <input type="button"
-        value="Apply"
-      onclick="DlgHide('apply')" />
-      <input type="button"
-          value="Ok"
-        onclick="DlgHide('ok')" />
-    <input type="button"
-        value="Cancel"
-      onclick="DlgHide('cancel')" />
-    </div>
+    <div id="DlgReplyButtons"></div>
   </div>
 </div>
 </body>

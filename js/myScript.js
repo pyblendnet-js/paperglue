@@ -64,6 +64,7 @@ function initApp() {
   for(var i in defaultMenuAddendum)
     paperGlue.addToDefaultMenu(defaultMenuAddendum[i]);
   paperGlue.closeDialog = closeDialog;
+  paperGlue.fileSelector = fileSelectorDialog;
 }
 
 function drawGrid(spacing) {
@@ -355,14 +356,21 @@ function mouseMove(e) {
   //console.log('Move');
 }
 
-function openDialogCommon(show_reply_buttons) {
-  var rb = document.getElementById('replyButtons');
-  if(typeof show_reply_buttons === 'undefined' || show_reply_buttons)
-    rb.style.display = 'inline';
-  else
+function openDialogCommon(reply_buttons) {
+  var rb = document.getElementById('DlgReplyButtons');
+  if(typeof reply_buttons === 'undefined' || reply_buttons.length === 0)
     rb.style.display = 'none';
+  else {
+    rb.style.display = 'inline';
+    var p = "";
+    for(var bn in reply_buttons) {
+      var bns = "'"+bn+"'";
+      p += '<input type="button" value="'+bn+'" onclick="myScriptCmd("dialogReturn",'+bns+')" />';
+    }
+    rb.innerHTML = p;
+  }
   paperGlue.enableKeyFocus(false);
-  dialogDiv = document.getElementById('Overlay');
+  dialogDiv = document.getElementById('Dialog');
   dialogDiv.style.visibility = 'visible';
   paperGlue.setModalOpen(true);  //make dialog modalish
   //dialogDiv.style.fontSize = fontsize;
@@ -377,7 +385,7 @@ function closeDialog() {
 
 function openDialogPropCommon(id) {
   dialogType = 'property';
-  openDialogCommon();
+  openDialogCommon(['Apply','Ok','Cancel']);
   console.log("Opening property dialog:",id);
   var fontsize = window.innerWidth/80;
   var fs = 'style="font-size:'+fontsize+'px;"';
@@ -429,10 +437,14 @@ function dialogReturn(reply) {
     case 'state':
       stateDialogReturn(reply);
       break;
+    case 'file_sel':
+      fileSelectReturn(reply);
+      break;
     default:
       console.log("Unknown dialog type:"+dialogType);
       break;
   }
+  dialogType = null;  // force caller to set this
 }
 
 function propDialogReturn(reply) {
@@ -462,7 +474,7 @@ function propDialogReturn(reply) {
     paperGlue.moveCurrentImage(x,y,r);
   }
   paperGlue.hideCursor();
-  if(reply === 'apply') {
+  if(reply === 'Apply') {
     paperGlue.showImageCursors(obj,false);
     return;
   }
@@ -547,7 +559,7 @@ function areaDialogReturn(reply) {
   if(reply !== 'cancel') {
     paperGlue.changeAreaName(name);  // beware name is volitile
     paperGlue.moveCurrentArea(new Rectangle(x,y,w,h));
-    if(reply === 'apply')
+    if(reply === 'Apply')
       return;
   }
   paperGlue.setModalOpen(false);
@@ -576,7 +588,7 @@ var ega = { black:'#000000',
             white:'#FFFFFF' };
 
 function setLineColor() {
-  openDialogCommon(false);
+  openDialogCommon();
   var fontsize = window.innerWidth/80;
   console.log("Opening color select dialog");
   var fs = 'style="font-size:'+fontsize+'px;"';
@@ -584,7 +596,7 @@ function setLineColor() {
 
   var f = 'white';
   for(var c in ega) {
-    var cf = "setCurrentLineColor('"+ega[c]+"')";
+    var cf = "myScriptCmd('setCurrentLineColor','"+ega[c]+"')";
     p += '<tr><td><button style="color:'+f+';background-color:'+ega[c]+'" onclick="'+cf+'">'+c+'</button></td></tr>';
     f = 'black';
   }
@@ -592,7 +604,16 @@ function setLineColor() {
   //console.log(p);
   var content = document.getElementById('DlgContent');
   content.innerHTML = p;
-  return false;  //do not hide cursors yet
+  return false;
+}
+
+function setCurrentLineColor(c) {
+  window.globals.paperGlue.setCurrentLineColor(c);
+  closeDialog();
+  //var Dlg = document.getElementById('Dialog');
+  //Dlg.style.visibility = 'hidden';
+  //window.globals.paperGlue.setModalOpen(false);
+  //window.globals.paperGlue.enableKeyFocus(true);
 }
 
 var nextStateID = 0;
@@ -606,7 +627,7 @@ function setNewState() {
 
 function setState(state,id) {
   dialogType = 'state';
-  openDialogCommon();
+  openDialogCommon(['Okay','Cancel']);
   console.log("Opening set state dialog");
   var fontsize = window.innerWidth/80;
   var fs = 'style="font-size:'+fontsize+'px;"';
@@ -620,7 +641,7 @@ function setState(state,id) {
   var content = document.getElementById('DlgContent');
   content.innerHTML = p;
   setDialogMove("idRow");
-  return false;  //do not hide cursors yet
+  return false;
 }
 
 function stateDialogReturn(reply) {
@@ -632,15 +653,108 @@ function stateDialogReturn(reply) {
     paperGlue.setState({nm:nm,dt:dt});
   }
   paperGlue.hideCursor();
-  if(reply === 'apply') {
+  if(reply === 'Apply') {
     return;
   }
   paperGlue.setModalOpen(false);
   paperGlue.enableKeyFocus(true);
 }
 
+var savePath = "";  // kept from listing to give base path for save
+
+function fileSelectorDialog(objective,dir_obj) {
+  dialogType = 'fileSelect';
+  if(objective === 'saveRecord')
+    openDialogCommon(['Okay','Cancel']);
+  else
+    openDialogCommon();
+  console.log("Opening set state dialog");
+  var fontsize = window.innerWidth/80;
+  var fs = 'style="font-size:'+fontsize+'px;"';
+  var p = '<div id="fileSelectTitle">'+objective;
+  if(dir_obj.path === ".")
+    dir_obj.path = "";
+  if(dir_obj.path !== "")
+    p += " from "+dir_obj.path;
+  p += "</div>";
+  if(objective === 'saveRecord') {
+    dialogType = 'fileSel';
+    p += '<div>Save to:<input id="nameField" type="text" value=" "/></div>';
+    savePath = dir_obj.path;
+  }
+  p += '<table ' + fs + '>';
+  p += '<thead><tr><th>Name</th></tr></thead>';
+  p += '<tbody>';
+  var cf;
+  var col;
+  var btnstyle = ';width:100%;height:100%;'+
+                 'border:0px;padding:0px;' +
+                 'text-align:left;'+
+                 '" onclick="';
+  console.log("Listing for path:"+dir_obj.path);
+  if(dir_obj.path !== "") {
+    cf = "paperGlueCmd('listFiles','"+objective+"','"+dir_obj.path+"','parent_directory')";
+    p += '<tr><td><button style="color:red'+btnstyle+cf+'">..</button></td></tr>';
+  }
+  for(var i in dir_obj.dir) {
+    var fd = dir_obj.dir[i];
+    //console.log("fd:"+Object.keys(fd));
+    if(fd.type === 'dir') {
+     cf = "paperGlueCmd('listFiles','"+objective+"','"+dir_obj.path+"','"+fd.name+"')";
+     col = 'blue';
+    } else {
+      if(objective === 'loadRecord')
+        cf = "myScriptCmd('selectFile','"+objective+"','"+fd.name+"','"+dir_obj.path+"')";
+      else
+        cf = "myScriptCmd('setNameField','"+fd.name+"','"+dir_obj.path+"')";
+      col = 'black';
+    }
+    p += '<tr><td><button style="color:'+col+btnstyle+cf+'">'+fd.name+'</button></td></tr>';
+    f = 'black';
+  }
+  p += '</tbody></table>';
+  //console.log("Dialog content:"+p);
+  var content = document.getElementById('DlgContent');
+  content.innerHTML = p;
+  setDialogMove("fileSelectTitle");
+  return false;
+}
+// in initApp() you will find paperGlue.fileSelector = fileSelectorDialog;
+
+function setNameField(nm) {
+  var nmElement = document.getElementById('nameField');
+  nmElement.innerHtml = nm;
+}
+
+function selectFile(objective,path,subpath) {
+  switch(objective) {
+    case 'loadRecord':
+      paperGlue.loadRecord(path,subpath);
+      break;
+    case 'saveRecord':
+      paperGlue.saveRecord(path,subpath);
+      break;
+  }
+}
+
+function fileSelectReturn(reply) {
+  var nfield = document.getElementById('statename');
+  var nm = nfield.value;
+  if(reply !== 'Cancel')
+    paperGlue.saveRecord(savePath,nm);
+  closeDialog();
+}
+
 //window.globals.keyhandler = keyDown;  // requests paperglue to pass event here
-window.globals.listActions = openActionsWindow;
-window.globals.dialogReturn = dialogReturn;
+var globals = window.globals;
+var exports = {
+  listActions : openActionsWindow,
+  dialogReturn : dialogReturn,
+  setCurrentLineColor : setCurrentLineColor,
+  selectFile : selectFile,
+  setNameField : setNameField
+};
+globals.myScript = exports;
+
 //console.log("Globals:");
 //console.log(Object.keys(window.globals) ); //.onload();  //no use since it may not be added to globals yet

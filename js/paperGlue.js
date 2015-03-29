@@ -23,7 +23,11 @@
 */
 
 console.log("Loading paperGlue");
-
+// includes
+var globals = window.globals;
+var myScript = window.globals.myScript;
+var nodeComms = window.globals.nodeComms;
+// see exports at bottom for public functions
 //note:objects here are all somewhere within the paper scope
 // To make visibile to window, declare as window.object
 
@@ -70,7 +74,10 @@ var currentContextObject = null;
 var holdContext = false;  // don't reset contextMenu till after mouseUp
 var doRecord = [];  // record of all clonings and moves  {action:string,src_id:src.id,raster:image or line:path,pos:point}
 var doRecordIndex = 0;  // points to next do location
-var recordPath = "recordSave.json";
+var recordPath = "recordSave.json";  //default save path for node server
+var relativePath = "";
+var postObject;
+var listObjective;
 var imgListPath = "imgList.json";
 var cursorPos = [];  // mouse, raster, origin, center
 var cursorImage = null;  // to allow cursor hide in selectItem
@@ -1304,8 +1311,8 @@ var modPressDelay = 800;  //delay in ms since mod key pressed for modified actio
 function onKeyDown(event) {   //note: this is the paper.js handler - do not confuse with html
   if(modalOpen) {
     console.log("Modal key:"+ event.key);
-    if(event.key === 'escape' && globals.paperGlue.closeDialog !== 'undefined') {
-      window.globals.paperGlue.closeDialog();
+    if(event.key === 'escape' && paperGlue.closeDialog !== 'undefined') {
+      paperGlue.closeDialog();
       return false;
     }
     return true;  //this allows dialogs to receive key strokes
@@ -1371,8 +1378,9 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
       case 's':
         console.log("cntrlS");
         if(event.shiftPressed) {  // save as
+          listFiles("saveRecord");
         } else {
-          save();
+          saveRecord();
         }
         propagate = false;
         break;
@@ -1380,9 +1388,9 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
         console.log("cntrlO");
         if(confirm("Do you want to load from storage?"))
         { if(event.shiftPressed) {  // load from
-
+            listFiles("loadRecord");
           } else {
-            load();
+            loadRecord();
           }
         }
         propagate = false;
@@ -1534,11 +1542,11 @@ function buildRedoData() {
   return jdata;
 }
 
-function save() {
+function saveRecord(path,subpath) {
   var dolist = doRecord;  //pruneDo();
   console.log("Try to save");
   console.log("Globals:" + Object.keys(window.globals));
-  console.log("SendData:",typeof window.globals.sendData);
+  console.log("SendData:",typeof nodeComms.sendData);
   var jdata = buildRedoData();
   console.log("jdata:"+jdata);
   if(window.location.protocol == 'file:') {
@@ -1548,48 +1556,96 @@ function save() {
       console.log("Local storage not implemented");
     } else {
       console.log("Data:"+jdata);
-      localStorage.data = jdata;
+      if(typeof path === 'undefined')
+        path = "data";
+      localStorage[path] = jdata;
       console.log("Local storage:" + localStorage);
     }
-  } else if(typeof window.globals.sendData === 'function') {
-    //window.globals.onReply = onReply(response);
+  } else if(typeof nodeComms.sendData === 'function') {
+    //nodeComms.onReply = onReply(response);
     var save_data = {command:'save',path:recordPath,data:jdata};
-    window.globals.sendData(JSON.stringify(save_data));
+    if(typeof path !== 'undefined')
+      postObject.path = path;
+    if(typeof subpath !== 'undefined')
+      postObject.subpath = subpath;
+    nodeComms.sendData(JSON.stringify(save_data));
   }
 }
 
-function load() {
-  if(window.location.protocol == 'file:') {
-    // local storage
+function loadRecord(path,subpath) {
+  console.log("Load");
+  console.log(window.location.protocol);
+  if(window.location.protocol === 'file:') {
+    console.log("Using local storage");
     if(typeof(Storage) === "undefined") {
       console.log("Local storage not implemented");
     } else {
-      console.log("Parsing length = " + localStorage.data.length);
-      parseRecord(localStorage.data);
+      if(typeof path === 'undefined')
+        path = "data";
+      if(localStorage.hasOwnProperty(path)) {
+        console.log("Parsing length = " + localStorage[path].length);
+        parseRecord(localStorage[path]);
+      } else {
+        alert("Local storage has no item of name:"+path);
+      }
     }
-  } else if(typeof window.globals.sendData === 'function') {
+  } else if(typeof nodeComms.sendData === 'function') {
+    console.log("Loading from node js server storage");
+    nodeComms.onReply = onLoadReply;
+    console.log("Attempting to load:"+recordPath);
+    postObject = {command:'load',path:recordPath};
+    if(typeof path !== 'undefined')
+      postObject.path = path;
+    if(typeof subpath !== 'undefined')
+      postObject.subpath = subpath;
+    nodeComms.sendData(JSON.stringify(postObject));
+  }
+}
+
+function listFiles(objective,path,subpath) {
+  console.log("List "+objective+" from "+path+" + "+subpath);
+  listObjective = objective;
+  if(window.location.protocol === 'file:') {
+    console.log("Local storage  listing");
+    if(typeof paperGlue.fileSelector === 'function')
+      paperGlue.fileSelector(listObjective,{type:"dir",path:"localStorage",dir:Object.keys(localStorage)});
+  } else if(typeof nodeComms.sendData === 'function') {
     // node js storage
-    window.globals.onReply = onLoadReply;
-    console.log("Attempting to load:"+path.recordPath);
-    var load_data = {command:'load',path:recordPath};
-    window.globals.sendData(JSON.stringify(load_data));
+    nodeComms.onReply = onLoadReply;
+    if(typeof path !== 'undefined')
+      relativePath += path;
+    console.log("Attempting to list from:"+relativePath);
+    postObject = {command:'list',path:relativePath};
+    if(typeof subpath !== 'undefined')
+      postObject.subpath = subpath;
+    // note special subpath is "parent_directory"
+    // note: relativePath will be corrected by onLoadReply
+    nodeComms.sendData(JSON.stringify(postObject));
   }
 }
 
 function onLoadReply(res) {
   console.log("Onreply:"+res);
   if(false) { //res.indexof('500') === 0) {  //starts with error code
-  //   console.log("Report error:"+res);
+    console.log("Report error:"+res);
   } else {
-     console.log("attempting to parse json object");
-    try {
+    console.log("attempting to parse json object");
+    //try {
       var reply_obj = JSON.parse(res);
       console.log(reply_obj);
-      if(reply_obj.type == 'file')
-        parseRecord(reply_obj.data);
-    } catch(e1) {
-      console.log("Error parsing reply"+e1);
-    }
+      switch(reply_obj.type) {
+        case 'file':
+          parseRecord(reply_obj.data);
+          break;
+        case 'dir':
+          relativePath = reply_obj.path;
+          if(typeof paperGlue.fileSelector === 'function')
+            paperGlue.fileSelector(listObjective,reply_obj);
+          break;
+      }
+    //} catch(e1) {
+    //  console.log("Error parsing reply"+e1);
+    //}
   }
 }
 
@@ -2256,7 +2312,6 @@ function stepState(direction, rate) {
 // think this needs to be at the bottom so under scripts find things fully loaded
 console.log("PaperGlue functions to window globals");
 // window global are use for cross scope communications
-var globals = window.globals;
 var exports = {
   init:init,
   loadImages:loadImages,
@@ -2294,11 +2349,17 @@ var exports = {
   addToDefaultMenu:addToDefaultMenu,
   loadStaticRec:loadStaticRec,
   buildRedoData:buildRedoData,
+  saveRecord:saveRecord,
+  loadRecord:loadRecord,
+  listFiles:listFiles,
   parseRecord:parseRecord,
   addMeta:addMeta,
   setState:setState
 };
 globals.paperGlue = exports;
+paperGlue = globals.paperGlue;  // for dependant modules to add:
+// fileSelector(objective,dir_obj) = a gui to display directories returned by list()
+// closeDialog() = so pressing escape will close any modal dialogs
 
 if(typeof globals.onPaperGlueLoad == 'function')  { // myScript couldn't find loadImages so provided a call to repeat the request
   console.log("PaperGlue loaded now so can use onPaperLoad to load images.");

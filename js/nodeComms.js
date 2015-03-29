@@ -22,8 +22,8 @@
         if(xhr.responseText.length === 0) {
           console.log("Server listening!");
         } else {
-          if(typeof window.globals.onReply === 'function')
-            window.globals.onReply(xhr.responseText);
+          if(typeof nodeComms.onReply === 'function')
+            nodeComms.onReply(xhr.responseText);
         }
       } else {
         console.error("Error:"+xhr.statusText);
@@ -38,4 +38,6 @@
   // }
 
   // give other modules access to SendData
-  window.globals.sendData = SendData;
+  window.globals.nodeComms = { sendData: SendData};
+  nodeComms = window.globals.nodeComms;  // for dependant function
+  // to attach: onReply(res)
