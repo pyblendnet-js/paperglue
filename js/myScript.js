@@ -329,7 +329,7 @@ function loadDoRec() {
 var tempMouseUp;
 var dialogDiv;
 var idRow;
-var dialogType;
+var dialogType = "unknown";
 
 function mouseDown(e) {
   e.stopPropagation();
@@ -363,15 +363,20 @@ function openDialogCommon(reply_buttons) {
   else {
     rb.style.display = 'inline';
     var p = "";
-    for(var bn in reply_buttons) {
+    for(var bi in reply_buttons) {
+      var bn = reply_buttons[bi];
       var bns = "'"+bn+"'";
-      p += '<input type="button" value="'+bn+'" onclick="myScriptCmd("dialogReturn",'+bns+')" />';
+      p += '<input type="button" value="'+bn+'" onclick="myScriptCmd('+"'dialogReturn',"+bns+')" />';
+      console.log("Dialog button html:"+p);
     }
     rb.innerHTML = p;
   }
   paperGlue.enableKeyFocus(false);
   dialogDiv = document.getElementById('Dialog');
   dialogDiv.style.visibility = 'visible';
+  var fontsize = window.innerWidth/80;
+  var fs = 'style="font-size:'+fontsize+'px;"';
+  dialogDiv.style.fontSize = fontsize+'px';
   paperGlue.setModalOpen(true);  //make dialog modalish
   //dialogDiv.style.fontSize = fontsize;
   //dialogDiv.style = "font-size:"+fontsize+"px;visibility:visible;";
@@ -381,15 +386,14 @@ function closeDialog() {
   dialogDiv.style.visibility = 'hidden';
   paperGlue.setModalOpen(false);
   paperGlue.enableKeyFocus(true);
+  dialogType = "unknown";  // force caller to set this
 }
 
 function openDialogPropCommon(id) {
-  dialogType = 'property';
+  dialogType = 'obj_prop';
   openDialogCommon(['Apply','Ok','Cancel']);
   console.log("Opening property dialog:",id);
-  var fontsize = window.innerWidth/80;
-  var fs = 'style="font-size:'+fontsize+'px;"';
-  var p = '<table ' + fs + '><tr id="idRow"><td>ID</td><td>'+id+'</td></tr>';
+  var p = '<table><tr id="idRow"><td>ID</td><td>'+id+'</td></tr>';
   return p;
 }
 
@@ -437,14 +441,13 @@ function dialogReturn(reply) {
     case 'state':
       stateDialogReturn(reply);
       break;
-    case 'file_sel':
+    case 'file_select':
       fileSelectReturn(reply);
       break;
     default:
       console.log("Unknown dialog type:"+dialogType);
       break;
   }
-  dialogType = null;  // force caller to set this
 }
 
 function propDialogReturn(reply) {
@@ -478,8 +481,7 @@ function propDialogReturn(reply) {
     paperGlue.showImageCursors(obj,false);
     return;
   }
-  paperGlue.setModalOpen(false);
-  paperGlue.enableKeyFocus(true);
+  dialogClose();
 }
 
 function setCenterToCursor() {
@@ -562,8 +564,7 @@ function areaDialogReturn(reply) {
     if(reply === 'Apply')
       return;
   }
-  paperGlue.setModalOpen(false);
-  paperGlue.enableKeyFocus(true);
+  closeDialog();
 }
 
 function lineGetColor(obj) {
@@ -663,7 +664,6 @@ function stateDialogReturn(reply) {
 var savePath = "";  // kept from listing to give base path for save
 
 function fileSelectorDialog(objective,dir_obj) {
-  dialogType = 'fileSelect';
   if(objective === 'saveRecord')
     openDialogCommon(['Okay','Cancel']);
   else
@@ -678,7 +678,7 @@ function fileSelectorDialog(objective,dir_obj) {
     p += " from "+dir_obj.path;
   p += "</div>";
   if(objective === 'saveRecord') {
-    dialogType = 'fileSel';
+    dialogType = 'file_select';
     p += '<div>Save to:<input id="nameField" type="text" value=" "/></div>';
     savePath = dir_obj.path;
   }
@@ -723,13 +723,14 @@ function fileSelectorDialog(objective,dir_obj) {
 
 function setNameField(nm) {
   var nmElement = document.getElementById('nameField');
-  nmElement.innerHtml = nm;
+  nmElement.value = nm;
 }
 
 function selectFile(objective,path,subpath) {
   switch(objective) {
     case 'loadRecord':
       paperGlue.loadRecord(path,subpath);
+      closeDialog();
       break;
     case 'saveRecord':
       paperGlue.saveRecord(path,subpath);
@@ -738,7 +739,7 @@ function selectFile(objective,path,subpath) {
 }
 
 function fileSelectReturn(reply) {
-  var nfield = document.getElementById('statename');
+  var nfield = document.getElementById('nameField');
   var nm = nfield.value;
   if(reply !== 'Cancel')
     paperGlue.saveRecord(savePath,nm);

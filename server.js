@@ -3,6 +3,42 @@ var http = require('http'),
     path = require('path'),
     util = require('util');
 
+
+var workspace = "project";  // POST function can only access this subdirectory
+if(process.argv.length > 2)
+  workspace = process.argv[2];
+var pth = path.join(__dirname,workspace);  // first assume this is subdirectory
+try {
+  if(fs.lstatSync(pth).isDirectory())
+    workspace = pth;
+  else {
+    pth = null;
+    util.error("Workspace in relative path is not a directory.");
+  }
+} catch(err) {
+  pth = null;
+  util.error("Workspace not in relative path.");
+}
+if(pth)
+  workspace = pth;  // successfully found workspace in relative path
+else {
+  pth = workspace;
+  try {
+    if(!fs.lstatSync(workspace).isDirectory()) { // assume it is full path
+      workspace = null;
+      util.error("Workspace in absolute path is not a directory.");
+    } else {
+      util.log("WARNING!!! Workspace has absolute path. WARNING!!!");
+    }
+  } catch(err) {
+    workspace = null;
+    util.error("Workspace not in absolute path.");
+  }
+}
+if(!workspace)
+  util.log('Server workspace "'+pth+'" not found either relative or absolute.');
+
+
 function serveStaticFile(res, path, contentType, responseCode) {
   if(!responseCode) responseCode = 200;
   var read_path = __dirname + '/' + path;
@@ -75,6 +111,11 @@ function loadData(res,load_path) {
 var pathExt = "";
 
 function buildSafePath(res,rel_path) {
+  if(!workspace) {
+    response = '500 - Error: Server workspace not found.';
+    respondPost(res,response);
+    return null;
+  }
   var pathExt = decodeURI(rel_path);
   console.log("Path Extension:"+pathExt);
   if(pathExt.indexOf("..") >= 0) {  //we don't want anyone hacking into a parent directory
@@ -82,7 +123,7 @@ function buildSafePath(res,rel_path) {
     respondPost(res,response);
     return null;
   }
-  var pth = path.join(__dirname, pathExt);
+  var pth = path.join(workspace, pathExt);
   console.log(pth);
   return pth;
 }

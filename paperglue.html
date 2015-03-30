@@ -1,0 +1,54 @@
+<!doctype html>
+<html>
+<title>PAPERGLUE</title>
+<body>
+<h1>paperglue</h1>
+A sandbox template for use with paper.js and optionally node.js
+<h2>Introduction</h2>
+<p>paperglue.js is far from finished and
+  will not be a complete version until it is used in an application.
+  It began life as the basis for a strip board circuit designer
+  (inspired by <a href="http://www.heyrick.co.uk/software/verodes/">
+  verodes</a> ( and similar programs).</p>
+<p>The first use will be probably be as an editor for a flash style
+  animation.
+  In last application, the actual animation code will
+  reside in myScript.js and paperGlue.js will just be used
+  to edit and load the design.</p>
+<h2>Installation and Description</h2>
+<p>This document appears as paperglue.html file in this respository.</p>
+<p>The example application can be launched from either home.html or
+   using launcher.bat (under windows).</p>
+<p>By opening home.html, the only restriction is the edited design
+   can only be stored using local storage (which is browser dependant)
+   or by listing in another tab and copying this page to file.</p>
+<p>Using the launcher.bat assumed that you have
+   <a href="https://nodejs.org/">node.js</a> installed
+   and then storage is available by default to and
+   from a "project" subdirectory.  tghe launcher also opens your default
+   browser (tested on firefox and chrome only) addressed to the local host
+   on port 3000.  This could be edited in launcher.bat and server.js.</p>
+<p>Alternative, edit the launcher.bat and add another argument after
+   "node server.js" with either the relative or absolute path to the
+   workspace.</p>
+<p>Also in the base directory is dorec.js which is an example of a
+   project record that can be loaded as a static source.</p>
+<p>There are 4 javascript files in the js subdirectory:</p>
+<ul>
+<li>paper.js - which is a copy of the then current paper.js graphic library
+  script available from <a href="paperjs.org">paperjs.org</a> - god bless em.</li>
+<li>paperglue.js - a simple database to organise the editing of some simple
+  paper.js objects and to load these as a doRecord from various sources including
+  a node.js server.</li>
+<li>nodecomms.js - the client interface to the node server.js if it is running.</li>
+<li>myScript.js - the actual application where it all comes together to interface
+with the html canvas.</li>
+</ul>
+<h2>Applications</h2>
+<p>Public applications using paperglue.html will be listed here when they exist.
+Also look in the pyblendnet-js's
+ <a href="http://grapevine.com.au/~wisteria/index.html">home page</a>
+  and his github
+  <a href="https://github.com/pyblendnet-js/paperglue">respository</a></p>
+</body>
+</html>
