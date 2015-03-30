@@ -662,6 +662,7 @@ function stateDialogReturn(reply) {
 }
 
 var savePath = "";  // kept from listing to give base path for save
+var existingFileName = null; //used to determine is saving over
 
 function fileSelectorDialog(objective,dir_obj) {
   if(objective === 'saveRecord')
@@ -674,6 +675,7 @@ function fileSelectorDialog(objective,dir_obj) {
   var p = '<div id="fileSelectTitle">'+objective;
   if(dir_obj.path === ".")
     dir_obj.path = "";
+  existingFileName = null;  // nothing chosen yet
   if(dir_obj.path !== "")
     p += " from "+dir_obj.path;
   p += "</div>";
@@ -692,24 +694,32 @@ function fileSelectorDialog(objective,dir_obj) {
                  'text-align:left;'+
                  '" onclick="';
   console.log("Listing for path:"+dir_obj.path);
-  if(dir_obj.path !== "") {
+  if(dir_obj.path !== "" && dir_obj.path !== 'localStorage') {
     cf = "paperGlueCmd('listFiles','"+objective+"','"+dir_obj.path+"','parent_directory')";
     p += '<tr><td><button style="color:red'+btnstyle+cf+'">..</button></td></tr>';
   }
   for(var i in dir_obj.dir) {
     var fd = dir_obj.dir[i];
+    var type, name;
+    if(dir_obj.path === 'localStorage') {
+      type = 'object';
+      name = fd;
+    } else {
+      type = fd.type;
+      name = fd.name;
+    }
     //console.log("fd:"+Object.keys(fd));
-    if(fd.type === 'dir') {
-     cf = "paperGlueCmd('listFiles','"+objective+"','"+dir_obj.path+"','"+fd.name+"')";
-     col = 'blue';
+    if(type === 'dir') {
+      cf = "paperGlueCmd('listFiles','"+objective+"','"+dir_obj.path+"','"+fd.name+"')";
+      col = 'blue';
     } else {
       if(objective === 'loadRecord')
-        cf = "myScriptCmd('selectFile','"+objective+"','"+fd.name+"','"+dir_obj.path+"')";
+        cf = "myScriptCmd('selectFile','"+objective+"','"+dir_obj.path+"','"+name+"')";
       else
-        cf = "myScriptCmd('setNameField','"+fd.name+"','"+dir_obj.path+"')";
+        cf = "myScriptCmd('setNameField','"+name+"')";
       col = 'black';
     }
-    p += '<tr><td><button style="color:'+col+btnstyle+cf+'">'+fd.name+'</button></td></tr>';
+    p += '<tr><td><button style="color:'+col+btnstyle+cf+'">'+name+'</button></td></tr>';
     f = 'black';
   }
   p += '</tbody></table>';
@@ -724,6 +734,7 @@ function fileSelectorDialog(objective,dir_obj) {
 function setNameField(nm) {
   var nmElement = document.getElementById('nameField');
   nmElement.value = nm;
+  existingFileName = nm;
 }
 
 function selectFile(objective,path,subpath) {
@@ -732,17 +743,24 @@ function selectFile(objective,path,subpath) {
       paperGlue.loadRecord(path,subpath);
       closeDialog();
       break;
-    case 'saveRecord':
-      paperGlue.saveRecord(path,subpath);
-      break;
+    // case 'saveRecord':
+    //   paperGlue.saveRecord(path,subpath);
+    //   break;
   }
 }
 
 function fileSelectReturn(reply) {
   var nfield = document.getElementById('nameField');
   var nm = nfield.value;
-  if(reply !== 'Cancel')
+  if(reply !== 'Cancel') {
+    console.log("Save path:"+nm);
+    console.log("existing:"+existingFileName);
+    if(existingFileName === nm) {
+      if(!confirm("Save over existing?"))
+        return;
+    }
     paperGlue.saveRecord(savePath,nm);
+  }
   closeDialog();
 }
 

@@ -1557,8 +1557,12 @@ function saveRecord(path,subpath) {
     } else {
       console.log("Data:"+jdata);
       if(typeof path === 'undefined')
-        path = "data";
-      localStorage[path] = jdata;
+        subpath = "data";
+      // if(path === 'localStorage' && localStorage.hasOwnProperty(subpath)) {
+      //   if(confirm("Save over existing?"))
+      //     localStorage[subpath] = jdata;
+      // } else
+        localStorage[subpath] = jdata;
       console.log("Local storage:" + localStorage);
     }
   } else if(typeof nodeComms.sendData === 'function') {
@@ -1581,12 +1585,12 @@ function loadRecord(path,subpath) {
       console.log("Local storage not implemented");
     } else {
       if(typeof path === 'undefined')
-        path = "data";
-      if(localStorage.hasOwnProperty(path)) {
-        console.log("Parsing length = " + localStorage[path].length);
-        parseRecord(localStorage[path]);
+        subpath = "data";
+      if(localStorage.hasOwnProperty(subpath)) {
+        console.log("Parsing length = " + localStorage[subpath].length);
+        parseRecord(localStorage[subpath]);
       } else {
-        alert("Local storage has no item of name:"+path);
+        alert("Local storage has no item of name:"+subpath);
       }
     }
   } else if(typeof nodeComms.sendData === 'function') {
@@ -1607,8 +1611,11 @@ function listFiles(objective,path,subpath) {
   listObjective = objective;
   if(window.location.protocol === 'file:') {
     console.log("Local storage  listing");
-    if(typeof paperGlue.fileSelector === 'function')
-      paperGlue.fileSelector(listObjective,{type:"dir",path:"localStorage",dir:Object.keys(localStorage)});
+    if(typeof paperGlue.fileSelector === 'function') {
+      var local_storage_objects = Object.keys(localStorage);
+      console.log("Local storage objects:"+local_storage_objects);
+      paperGlue.fileSelector(listObjective,{type:"dir",path:"localStorage",dir:local_storage_objects});
+    }
   } else if(typeof nodeComms.sendData === 'function') {
     // node js storage
     nodeComms.onReply = onLoadReply;
