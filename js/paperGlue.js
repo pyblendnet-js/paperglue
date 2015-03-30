@@ -64,11 +64,18 @@ var selectedPos = {};  // for prev pos following are move
 var selectedMove = false;
 var imagesLoaded = {};
 var imageInstances = {};  //images that have been cloned from sybols in imagesLoaded.
+var fileContextMenu = [
+  {label:'open doRecord.json', callback:loadRecord},
+  {label:'open from',callback:loadRecordAs},
+  {label:'save as doRecord.json', callback:saveRecord},
+  {label:'save as',callback:saveRecordAs},
+];  // must appear before use in default menu
 var defaultContextMenu = [
-  {label:'view', callback:viewCall},
-  {label:'open',callback:openCall},
+  {label:'image', callback:addImageCall},
+  {label:'file', submenu:fileContextMenu},
   {label:'hide areas',callback:toggleAreas},
-   ];
+];
+
 var currentContextMenu = defaultContextMenu;
 var currentContextObject = null;
 var holdContext = false;  // don't reset contextMenu till after mouseUp
@@ -437,6 +444,10 @@ function loadImages(images_to_load, custom_default_props) {
   }
 }
 
+function addImageCall() {
+  // load images from directory or locals
+}
+
 function setContextMenu(context_type) {
   currentContextMenu = defaultContextMenu;
   if(window.globals.hasOwnProperty("menuLookup")) {
@@ -477,6 +488,14 @@ window.contextMenuCallback = function(menu_index){
         if(callback())
           hideCursor();
       }
+    } else if(menu_item.hasOwnProperty('submenu')) {
+      console.log("Loading sub menu length:"+menu_item.submenu.length);
+      if(Array.isArray(menu_item.submenu))
+        currentContextMenu = menu_item.submenu;
+      else  // assume it is a string descriptor
+        setContextMenu(menu_item.submenu);
+      loadCurrentContextMenu(currentContextTable);
+      return;
     }
   }
   hideContextMenu('contextMenu');
@@ -488,6 +507,7 @@ function viewCall(){
 
 function openCall(){
   console.log('open called');
+  loadRecord();
 }
 
 function stopEvent(event){
@@ -537,7 +557,7 @@ function loadCurrentContextMenu(tbl) {
   var fontsize = window.innerWidth/80;
   for(var mi in currentContextMenu) {
     var m = currentContextMenu[mi];
-    //console.log(m);
+    console.log(m);
     var txt = m.label;
     if(m.hasOwnProperty('propCall')) {
       //console.log("Has propCall");
@@ -1378,7 +1398,7 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
       case 's':
         console.log("cntrlS");
         if(event.shiftPressed) {  // save as
-          listFiles("saveRecord");
+          saveRecordAs();
         } else {
           saveRecord();
         }
@@ -1536,10 +1556,18 @@ function buildRedoData() {
   // build reduced image list
   var img_list = buildImgList();
   var project_data = {imglist:img_list,dolist:doRecord};
-  console.log("project data:"+Object.keys(project_data));
-  console.log("project data:"+Object.keys(project_data.imglist[0]));
-  var jdata = JSON.stringify(project_data);
+  //console.log("project data:"+Object.keys(project_data));
+  var jdata ="";
+  try {
+     jdata = JSON.stringify(project_data);
+  } catch(err) {
+    console.error("JSON Stringify error:"+err);
+  }
   return jdata;
+}
+
+function saveRecordAs() {
+  listFiles("saveRecord");
 }
 
 function saveRecord(path,subpath) {
@@ -1574,6 +1602,10 @@ function saveRecord(path,subpath) {
       postObject.subpath = subpath;
     nodeComms.sendData(JSON.stringify(save_data));
   }
+}
+
+function loadRecordAs() {
+  listFiles("loadRecord");
 }
 
 function loadRecord(path,subpath) {

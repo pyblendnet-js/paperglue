@@ -20,16 +20,21 @@ var newAreaMenu = [ {label:'set area#', propCall:getAreaCount, callback:setArea}
 var areaMenu = [ {label:'name', propCall:getAreaNameCall},
                  {label:'rect', propCall:getAreaRectCall},
                  {label:'properties',callback:openAreaPropDialog}];
+var exportMenu = [
+  {label:'list in new tab',callback:openActionsWindow},
+  {label:'json in new tab',callback:openJSONWindow},
+  {label:'  js in new tab',callback:openJSWindow}
+];
 window.globals.menuLookup = { symbolMenu:symbolMenu,
                               symbolInstanceMenu:symbolInstanceMenu,
                               lineInstanceMenu:lineInstanceMenu,
                               newAreaMenu:newAreaMenu,
-                              areaMenu:areaMenu
+                              areaMenu:areaMenu,
+                              exportMenu:exportMenu
                             };
+
 var defaultMenuAddendum = [
-  {label:'list in new tab',callback:openActionsWindow},
-  {label:'json in new tab',callback:openJSONWindow},
-  {label:'  js in new tab',callback:openJSWindow},
+  {label:'export',submenu:"exportMenu"},
   {label:'import dorec.js',callback:loadDoRec},
   {label:'set state',callback:setNewState}
 ];
@@ -239,11 +244,15 @@ function openJSWindow() {
   openRecordWindow(false,true);
 }
 
+var recordWindow = null;
+
 /* generate a browser page which can be saved as a js file for
    inclusion in a paperglue project.
 */
 function openRecordWindow(beautify,include_loader) {
-    var myWindow = window.open("", "Actions"); //, "width=200, height=100");
+    if(recordWindow)
+      recordWindow.close();
+    recordWindow = window.open("", "doRecord"); //, "width=200, height=100");
     //var q = globals.paperGlue.getDoRecord();
     //var dri = globals.paperGlue.getDoIndex();
     var txt = "";
@@ -261,8 +270,8 @@ function openRecordWindow(beautify,include_loader) {
     } else {
       txt += "</pre></body></html>";
     }
-    myWindow.document.write(txt);
-    myWindow.stop();
+    recordWindow.document.write(txt);
+    recordWindow.stop();
 }
 
 function buildRedoData(beautify) {
