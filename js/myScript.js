@@ -39,6 +39,10 @@ var defaultMenuAddendum = [
   {label:'set state',callback:setNewState}
 ];
 
+var optionsMenuAddendum = [
+  {label:'import defaults',callback:openImgLoadDefaultDialog}
+];
+
 var first_image = {src:"img/con_Block_5.08mm_12.png", scale:0.6, id:"conBlock1", isSymbol:true, dragClone:true, pos:view.center };
 var default_image_menus = { contextMenu:"symbolMenu", instanceContextMenu:"symbolInstanceMenu"};
 // other parameters:
@@ -68,6 +72,8 @@ function initApp() {
   paperGlue.showAreas();
   for(var i in defaultMenuAddendum)
     paperGlue.addToDefaultMenu(defaultMenuAddendum[i]);
+  for(i in optionsMenuAddendum)
+    paperGlue.addToOptionsMenu(optionsMenuAddendum[i]);
   paperGlue.closeDialog = closeDialog;
   paperGlue.fileSelector = fileSelectorDialog;
 }
@@ -429,6 +435,10 @@ function openImgPropDialog() {
   p += '<input id="ypos" type="number" value="'+obj.raster.position.y+'"/></td></tr>';
   p += '<tr><td>Rot</td><td>';
   p += '<input id="rot" type="number" value="'+obj.raster.rotation+'"/></td></tr>';
+  if(obj.type !== 'symbol') {
+    p += '<tr><td>Scale</td><td>';
+    p += '<input id="scale" type="text" value="'+obj.imgobj.scale+'"/></td></tr>';
+  }
   //}
   // var ks = Object.keys(obj);
   // for(var ki in ks ) {
@@ -447,6 +457,9 @@ function dialogReturn(reply) {
     case 'obj_prop':
       propDialogReturn(reply);
       break;
+    case 'img_default':
+      imgLoadDefaultDialogReturn(reply);
+      break;
     case 'state':
       stateDialogReturn(reply);
       break;
@@ -460,6 +473,8 @@ function dialogReturn(reply) {
 }
 
 function propDialogReturn(reply) {
+  if(reply === 'cancel')
+    return;
   var obj = paperGlue.getCurrentContextObject();
   console.log("Object type:" + obj.type);
   if(obj.type === 'area') {
@@ -477,20 +492,18 @@ function propDialogReturn(reply) {
   var y = parseFloat(yfield.value);
   var r = parseFloat(rfield.value);
   //console.log("X:"+x);
-  if(reply !== 'cancel') {
-    if(!!nmfield) {
-      var name = nmfield.value;
-      console.log("New name:"+name);
-      paperGlue.nameCurrentImage(name);
-    }
-    paperGlue.moveCurrentImage(x,y,r);
+  if(!!nmfield) {
+    var name = nmfield.value;
+    console.log("New name:"+name);
+    paperGlue.nameCurrentImage(name);
   }
+  paperGlue.moveCurrentImage(x,y,r);
   paperGlue.hideCursor();
   if(reply === 'Apply') {
     paperGlue.showImageCursors(obj,false);
     return;
   }
-  dialogClose();
+  closeDialog();
 }
 
 function setCenterToCursor() {
@@ -499,6 +512,31 @@ function setCenterToCursor() {
 
 function setOriginToCursor() {
   paperGlue.setOriginToCursor();
+}
+
+function openImgLoadDefaultDialog() {
+  openDialogCommon(['Okay','Cancel']);
+  dialogType = 'img_default';
+  console.log("Opening image load default dialog");
+  var fontsize = window.innerWidth/80;
+  var fs = 'style="font-size:'+fontsize+'px;"';
+  var p = '<div id="imgLoadOptionsTitle">Default Image Load Options</div>';
+  p += '<table ' + fs + '>';
+  p += '<tr><td>Scale</td><td>';
+  p += '<input id="imgscale" type="text" value="'+paperGlue.importDefaults.scale+'"/></td></tr>';
+  p += '</table>';
+  var content = document.getElementById('DlgContent');
+  content.innerHTML = p;
+  setDialogMove("imgLoadOptionsTitle");
+  return false;  //do not hide cursors yet
+}
+
+function imgLoadDefaultDialogReturn(reply) {
+  if(reply === 'cancel')
+    return;
+  var sfield = document.getElementById('imgscale');
+  paperGlue.importDefaults.scale = parseFloat(sfield.value);
+  closeDialog();
 }
 
 function areaSelect() {

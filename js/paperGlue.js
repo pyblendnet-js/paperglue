@@ -70,10 +70,13 @@ var fileContextMenu = [
   {label:'save as doRecord.json', callback:saveRecord},
   {label:'save as',callback:saveRecordAs},
 ];  // must appear before use in default menu
+var optionsContextMenu = [
+  {label:'hide areas',callback:toggleAreas},
+];
 var defaultContextMenu = [
   {label:'image', callback:loadImage},
   {label:'file', submenu:fileContextMenu},
-  {label:'hide areas',callback:toggleAreas},
+  {label:'options', submenu:optionsContextMenu}
 ];
 
 var currentContextMenu = defaultContextMenu;
@@ -87,6 +90,7 @@ var postObject;
 var listObjective;
 var listXtns;
 var imageExtensions = "jpg,png";
+var importDefaults = {scale:1.0,isSymbol:true, dragClone:true, pos:view.center};
 var cursorPos = [];  // mouse, raster, origin, center
 var cursorImage = null;  // to allow cursor hide in selectItem
 var cursorColors = ['#f00','#ff0','#88f','#8f8'];
@@ -472,12 +476,17 @@ function loadImage(path,subpath)  {
       }
       ilist = [];
       for(var i in full_list) {
-        console.log("i:"+i+" = "+full_list[i]);
-        var ip = full_list[i];
+        console.log("i:"+i+" = "+full_list[i].src);
+        var ip = full_list[i].src;
         if(typeof path !== 'undefined' && path.length > 0) {
           console.log("path:"+path.length);
+          id = "img" + imageInstances.length; // default id
           if(ip === path) {
-            loadSingleImage(path,subpath);
+            if(full_list[i].hasOwnProperty('id'))
+              id = full_list[i].id;
+            else if(typeof subpath !== 'undefined')  // should be
+              id = subpath;
+            loadSingleImage(path,id);
             return;
           }
           if(ip.indexOf(path) === 0) {
@@ -514,7 +523,9 @@ function loadImage(path,subpath)  {
 
 function loadSingleImage(full_path, subpath) {
   //e.g var first_image = {src:"img/con_Block_5.08mm_12.png", scale:0.6, id:"conBlock1", isSymbol:true, dragClone:true, pos:view.center };
-  var img = {src:full_path,id:subpath,isSymbol:true, dragClone:true, pos:view.center };
+  var img = importDefaults;
+  img.src = full_path;
+  img.id = subpath;
   var images_to_load = [img];
   loadImages(images_to_load);
 }
@@ -901,6 +912,9 @@ function toggleAreas() {
 
 function addToDefaultMenu(item) {
   defaultContextMenu.push(item);
+}
+function addToOptionsMenu(item) {
+  optionsContextMenu.push(item);
 }
 
 function hitTestArea(id,hit_point) {
@@ -2460,6 +2474,7 @@ var exports = {
   setModalOpen:setModalOpen,
   areaSelect:areaSelect,
   addToDefaultMenu:addToDefaultMenu,
+  addToOptionsMenu:addToOptionsMenu,
   loadStaticRec:loadStaticRec,
   buildRedoData:buildRedoData,
   saveRecord:saveRecord,
@@ -2467,7 +2482,8 @@ var exports = {
   listFiles:listFiles,
   parseRecord:parseRecord,
   addMeta:addMeta,
-  setState:setState
+  setState:setState,
+  importDefaults:importDefaults
 };
 globals.paperGlue = exports;
 paperGlue = globals.paperGlue;  // for dependant modules to add:
