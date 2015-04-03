@@ -673,7 +673,7 @@ function stateDialogReturn(reply) {
 var savePath = "";  // kept from listing to give base path for save
 var existingFileName = null; //used to determine is saving over
 
-function fileSelectorDialog(objective,dir_obj) {
+function fileSelectorDialog(objective,xtns,dir_obj) {
   if(objective === 'saveRecord')
     openDialogCommon(['Okay','Cancel']);
   else
@@ -684,6 +684,7 @@ function fileSelectorDialog(objective,dir_obj) {
   var p = '<div id="fileSelectTitle">'+objective;
   if(dir_obj.path === ".")
     dir_obj.path = "";
+  // xtnlist = xtns.split(",");
   existingFileName = null;  // nothing chosen yet
   if(dir_obj.path !== "")
     p += " from "+dir_obj.path;
@@ -704,7 +705,10 @@ function fileSelectorDialog(objective,dir_obj) {
                  '" onclick="';
   console.log("Listing for path:"+dir_obj.path);
   if(dir_obj.path !== "" && dir_obj.path !== 'localStorage') {
-    cf = "paperGlueCmd('listFiles','"+objective+"','"+dir_obj.path+"','parent_directory')";
+    if(xtns === 'localImages')
+      cf = "paperGlueCmd('loadImage','"+dir_obj.path+"','parent_directory')";
+    else
+      cf = "paperGlueCmd('listFiles','"+objective+"','"+xtns+"','"+dir_obj.path+"','parent_directory')";
     p += '<tr><td><button style="color:red'+btnstyle+cf+'">..</button></td></tr>';
   }
   for(var i in dir_obj.dir) {
@@ -716,16 +720,30 @@ function fileSelectorDialog(objective,dir_obj) {
     } else {
       type = fd.type;
       name = fd.name;
+      //if(type !== 'dir' && xtns.length > 0) {
+        // var xfound = false;
+        // for(var i in xtnlist) {
+        //   if(name.endsWith("."+xtns[i])) {
+        //     xfound = true;
+        //     break;
+        //   }
+        // }
+        // if(!xfound) // this file does not match any of the xtns
+        //   continue;
+      //}
     }
     //console.log("fd:"+Object.keys(fd));
     if(type === 'dir') {
-      cf = "paperGlueCmd('listFiles','"+objective+"','"+dir_obj.path+"','"+fd.name+"')";
+      if(xtns === 'localImages')
+        cf = "paperGlueCmd('loadImage','"+dir_obj.path+"','"+fd.name+"')";
+      else
+        cf = "paperGlueCmd('listFiles','"+objective+"','"+xtns+"','"+dir_obj.path+"','"+fd.name+"')";
       col = 'blue';
     } else {
-      if(objective === 'loadRecord')
-        cf = "myScriptCmd('selectFile','"+objective+"','"+dir_obj.path+"','"+name+"')";
-      else
+      if(objective === 'saveRecord' )
         cf = "myScriptCmd('setNameField','"+name+"')";
+      else   // includes loadRecord and loadImage
+        cf = "myScriptCmd('selectFile','"+objective+"','"+dir_obj.path+"','"+name+"')";
       col = 'black';
     }
     p += '<tr><td><button style="color:'+col+btnstyle+cf+'">'+name+'</button></td></tr>';
@@ -750,12 +768,15 @@ function selectFile(objective,path,subpath) {
   switch(objective) {
     case 'loadRecord':
       paperGlue.loadRecord(path,subpath);
-      closeDialog();
       break;
     // case 'saveRecord':
     //   paperGlue.saveRecord(path,subpath);
     //   break;
+    case 'loadImage':
+      paperGlue.loadImage(path,subpath);
+      break;
   }
+  closeDialog();
 }
 
 function fileSelectReturn(reply) {

@@ -71,7 +71,7 @@ var fileContextMenu = [
   {label:'save as',callback:saveRecordAs},
 ];  // must appear before use in default menu
 var defaultContextMenu = [
-  {label:'image', callback:addImageCall},
+  {label:'image', callback:loadImage},
   {label:'file', submenu:fileContextMenu},
   {label:'hide areas',callback:toggleAreas},
 ];
@@ -85,7 +85,8 @@ var recordPath = "recordSave.json";  //default save path for node server
 var relativePath = "";
 var postObject;
 var listObjective;
-var imgListPath = "imgList.json";
+var listXtns;
+var imageExtensions = "jpg,png";
 var cursorPos = [];  // mouse, raster, origin, center
 var cursorImage = null;  // to allow cursor hide in selectItem
 var cursorColors = ['#f00','#ff0','#88f','#8f8'];
@@ -160,6 +161,7 @@ function addImage(source, id) {
   img.id = id;
   img.hidden = true;
   body.appendChild(img);
+  return img;
 }
 
 // returns an array of keys matching search by for array or table of objects
@@ -405,7 +407,7 @@ function loadImages(images_to_load, custom_default_props) {
     var imgobj = images_to_load.pop();
     imgobj.initialProp = Object.keys(imgobj);
     imagesLoaded[imgobj.id]= imgobj;  // record master images
-    addImage(imgobj.src,imgobj.id);  // add image to document
+    imgobj.element = addImage(imgobj.src,imgobj.id);  // add image to document
     imgobj.raster = new Raster(imgobj.id);  // make this a paper image
     if(imgobj.hasOwnProperty('scale')) {
       imgobj.raster.scale(imgobj.scale);
@@ -444,8 +446,77 @@ function loadImages(images_to_load, custom_default_props) {
   }
 }
 
-function addImageCall() {
+function loadImage(path,subpath)  {
   // load images from directory or locals
+  if(window.location.protocol === 'file:') {  //local storage
+    console.log("No server so need to use prelisting");
+    // need to building a image load object for loadImages
+    if(typeof window.globals.imagesAvailable !== 'undefined') {
+      var full_list = window.globals.imagesAvailable;
+      console.log(full_list);
+      console.log("path:"+path+" subpath:"+subpath);
+      if(typeof path === 'undefined')
+        path = "";
+      if(typeof subpath !== 'undefined') {
+        if(subpath === 'parent_directory') {
+          var lp = path.lastIndexOf("/");
+          if(lp >= 0)
+            path = path.substring(0,lp);
+          else
+            path = "";
+        } else {
+          if(path.length > 0)
+            path += "/";
+          path += subpath;
+        }
+      }
+      ilist = [];
+      for(var i in full_list) {
+        console.log("i:"+i+" = "+full_list[i]);
+        var ip = full_list[i];
+        if(typeof path !== 'undefined' && path.length > 0) {
+          console.log("path:"+path.length);
+          if(ip === path) {
+            loadSingleImage(path,subpath);
+            return;
+          }
+          if(ip.indexOf(path) === 0) {
+            ip = ip.substring(path.length+1);
+            console.log("Entering subpath:"+ip);
+          } else
+            continue;
+        }
+        var parts = ip.split("/");
+        console.log("parts:"+parts+ " length="+parts.length);
+        var f = {name:parts[0]};
+        if(parts.length > 1)
+          f.type = "dir";
+        else {
+          f.type = "file";
+          var xp = parts[0].split('.');
+          console.log("xp:"+xp);
+          if(xp.length < 2 || imageExtensions.indexOf(xp[xp.length-1]) < 0)
+            continue;
+        }
+        ilist.push(f);
+      }
+      console.log("ilist:"+ilist);
+      paperGlue.fileSelector("loadImage","localImages",{type:"dir",path:path,dir:ilist});
+    } else
+      console.log("No images available object loaded");
+  } else if(typeof path === 'undefined') {
+    listFiles("loadImage",imageExtensions);
+  } else {  // assume we have a path to an image
+    var full_path = path + "/" + subpath;
+    loadSingleImage(full_path,subpath);
+  }
+}
+
+function loadSingleImage(full_path, subpath) {
+  //e.g var first_image = {src:"img/con_Block_5.08mm_12.png", scale:0.6, id:"conBlock1", isSymbol:true, dragClone:true, pos:view.center };
+  var img = {src:full_path,id:subpath,isSymbol:true, dragClone:true, pos:view.center };
+  var images_to_load = [img];
+  loadImages(images_to_load);
 }
 
 function setContextMenu(context_type) {
@@ -1408,7 +1479,7 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
         console.log("cntrlO");
         if(confirm("Do you want to load from storage?"))
         { if(event.shiftPressed) {  // load from
-            listFiles("loadRecord");
+            listFiles("loadRecord","pgl");
           } else {
             loadRecord();
           }
@@ -1537,20 +1608,19 @@ function buildImgList() {
     for(var ik in im) {
       if(ik === 'loadedProp')
         continue;
-
-              console.log(ik);
-              console.log("Loaded:"+im.loadedProp.indexOf(ik));
-              console.log("Initial:"+im.initialProp.indexOf(ik));
-              if((im.loadedProp.indexOf(ik) < 0) || (im.initialProp.indexOf(ik) >= 0))
-                img[ik] = im[ik];
-            }
-            console.log("Img:"+Object.keys(img));
-            img_list.push(img);
-            console.log("ImgList#:"+img_list);
-          }
-          console.log("ImgList:"+img_list);
-          return img_list;
-        }
+      console.log(ik);
+      console.log("Loaded:"+im.loadedProp.indexOf(ik));
+      console.log("Initial:"+im.initialProp.indexOf(ik));
+      if((im.loadedProp.indexOf(ik) < 0) || (im.initialProp.indexOf(ik) >= 0))
+        img[ik] = im[ik];
+      }
+      console.log("Img:"+Object.keys(img));
+      img_list.push(img);
+      console.log("ImgList#:"+img_list);
+    }
+    console.log("ImgList:"+img_list);
+  return img_list;
+}
 
 function buildRedoData() {
   // build reduced image list
@@ -1567,7 +1637,7 @@ function buildRedoData() {
 }
 
 function saveRecordAs() {
-  listFiles("saveRecord");
+  listFiles("saveRecord","pgl");
 }
 
 function saveRecord(path,subpath) {
@@ -1605,7 +1675,7 @@ function saveRecord(path,subpath) {
 }
 
 function loadRecordAs() {
-  listFiles("loadRecord");
+  listFiles("loadRecord","pgl");
 }
 
 function loadRecord(path,subpath) {
@@ -1638,15 +1708,17 @@ function loadRecord(path,subpath) {
   }
 }
 
-function listFiles(objective,path,subpath) {
-  console.log("List "+objective+" from "+path+" + "+subpath);
+function listFiles(objective,xtns,path,subpath) {
+  console.log("List "+xtns+" from "+path+" / "+subpath + "for " +objective);
   listObjective = objective;
+  listXtns = xtns;
   if(window.location.protocol === 'file:') {
     console.log("Local storage  listing");
     if(typeof paperGlue.fileSelector === 'function') {
       var local_storage_objects = Object.keys(localStorage);
       console.log("Local storage objects:"+local_storage_objects);
-      paperGlue.fileSelector(listObjective,{type:"dir",path:"localStorage",dir:local_storage_objects});
+      // xtns don't really apply to local storage
+      paperGlue.fileSelector(listObjective,listXtns,{type:"dir",path:"localStorage",dir:local_storage_objects});
     }
   } else if(typeof nodeComms.sendData === 'function') {
     // node js storage
@@ -1654,10 +1726,11 @@ function listFiles(objective,path,subpath) {
     if(typeof path !== 'undefined')
       relativePath += path;
     console.log("Attempting to list from:"+relativePath);
-    postObject = {command:'list',path:relativePath};
+    postObject = {command:'list',xtns:listXtns,path:relativePath};
     if(typeof subpath !== 'undefined')
       postObject.subpath = subpath;
-    // note special subpath is "parent_directory"
+    // note: a special subpath can be "parent_directory"
+    //       This is required as ".." is not allowed
     // note: relativePath will be corrected by onLoadReply
     nodeComms.sendData(JSON.stringify(postObject));
   }
@@ -1665,7 +1738,7 @@ function listFiles(objective,path,subpath) {
 
 function onLoadReply(res) {
   console.log("Onreply:"+res);
-  if(false) { //res.indexof('500') === 0) {  //starts with error code
+  if(res.indexOf('500') === 0) {  //starts with error code
     console.log("Report error:"+res);
   } else {
     console.log("attempting to parse json object");
@@ -1679,7 +1752,7 @@ function onLoadReply(res) {
         case 'dir':
           relativePath = reply_obj.path;
           if(typeof paperGlue.fileSelector === 'function')
-            paperGlue.fileSelector(listObjective,reply_obj);
+            paperGlue.fileSelector(listObjective,listXtns,reply_obj);
           break;
       }
     //} catch(e1) {
@@ -2354,6 +2427,7 @@ console.log("PaperGlue functions to window globals");
 var exports = {
   init:init,
   loadImages:loadImages,
+  loadImage:loadImage,
   getImages:getImageInstances,
   getLines:getLineInstances,
   getDoRecord:getDoRecord,

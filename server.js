@@ -57,11 +57,12 @@ function serveStaticFile(res, path, contentType, responseCode) {
   );
 }
 
-function loadData(res,load_path) {
+function loadData(res,load_path,xtns) {
   pth = buildSafePath(res,load_path);
   if(!pth)
     return;
   try {
+    var xtn_list = xtns.split(',');
     if(fs.lstatSync(pth).isDirectory()) {
       fs.readdir(pth,
         function(err,data) {
@@ -75,6 +76,8 @@ function loadData(res,load_path) {
               var t = "file";
               if(fs.lstatSync(p).isDirectory())
                 t = "dir";
+              else if(!(path.extname(p).substr(1) in xtn_list))
+                continue;  //this item not in path
               var ft = {type:t,name:data[i]};
               darray.push(ft);
             }
@@ -213,6 +216,7 @@ http.createServer(function(req,res){
       var pth = decodeURI(post_obj.path);
       if(post_obj.hasOwnProperty('subpath')) {
         if(post_obj.subpath === 'parent_directory') {
+          // this is special for returning to parent
           pth = path.dirname(pth);
         } else {
           pth = path.join(pth, decodeURI(post_obj.subpath));
@@ -225,7 +229,7 @@ http.createServer(function(req,res){
           break;
         case 'list':  // the same as load only using a path to a directory
         case 'load':
-          loadData(res,pth);
+          loadData(res,pth,post_obj.xtns);
           break;
         default:
           rtnval = {type:'ack',msg:'unknown command'};
