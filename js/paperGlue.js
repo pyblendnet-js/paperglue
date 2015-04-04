@@ -65,9 +65,9 @@ var selectedMove = false;
 var imagesLoaded = {};
 var imageInstances = {};  //images that have been cloned from sybols in imagesLoaded.
 var fileContextMenu = [
-  {label:'open doRecord.json', callback:loadRecord},
+  {label:'open doRecord.pgl', callback:loadRecord},
   {label:'open from',callback:loadRecordAs},
-  {label:'save as doRecord.json', callback:saveRecord},
+  {label:'save as doRecord.pgl', callback:saveRecord},
   {label:'save as',callback:saveRecordAs},
 ];  // must appear before use in default menu
 var optionsContextMenu = [
@@ -84,7 +84,7 @@ var currentContextObject = null;
 var holdContext = false;  // don't reset contextMenu till after mouseUp
 var doRecord = [];  // record of all clonings and moves  {action:string,src_id:src.id,raster:image or line:path,pos:point}
 var doRecordIndex = 0;  // points to next do location
-var recordPath = "recordSave.json";  //default save path for node server
+var recordPath = "recordSave.pgl";  //default save path for node server
 var relativePath = "";
 var postObject;
 var listObjective;
@@ -243,6 +243,7 @@ function init() {
 }
 
 function hideCursor() {
+  console.log("Hide cursor");
   cursorLayer.removeChildren();
   cursorLayer.position = [0,0];
   //console.log("cursorLayer:"+cursorLayer.position);
@@ -275,11 +276,18 @@ function showImageCursors(obj,show_mouse_cursor) {
   showCursor(1);
   console.log("Show cursors:"+Object.keys(imgobj));
   if(imgobj.hasOwnProperty('center')) {
-    cursorPos[2] = raster.position - imgobj.center.rotate(raster.rotation);
+    var cp = imgobj.center;
+    if(imgobj.hasOwnProperty('scale'))
+      cp *= imgobj.scale;
+    console.log("Scaled center:"+cp+" Scale:"+imgobj.scale);
+    cursorPos[2] = raster.position - cp.rotate(raster.rotation);
     showCursor(2);
   }
   if(imgobj.hasOwnProperty('origin')) {
-    cursorPos[3] = raster.position - imgobj.origin.rotate(raster.rotation);
+    var op = imgobj.origin;
+    if(imgobj.hasOwnProperty('scale'))
+      op *= imgobj.scale;
+    cursorPos[3] = raster.position - op.rotate(raster.rotation);
     showCursor(3);
   }
   project._activeLayer = baseLayer;
@@ -325,7 +333,9 @@ function onImageMouseDown(event) {
           var inst = symbolPlace(imgobj.id);  //sets imageSelected to the new raster
           imageSelected.opacity = 0.5;
           imageSelected.position = imgobj.raster.position;
+          imageSelected.rotation = imgobj.raster.rotation;
           imageSelectedPosition = null;  // so we can tell there was no prior position
+          imageSelectedRotation = imgobj.raster.rotation;
           showImageCursors(inst,false);
         }
       }
@@ -355,6 +365,7 @@ function onImageMouseDown(event) {
       imageSelected = this;
       imageSelected.opacity = 0.5;
       imageSelectedPosition = this.position.clone();  // need to dereference
+      imageSelectedRotation = null; // indicating it rotation is a seperate issue
       return false;  //found so done looking
     //}
   }
@@ -513,9 +524,9 @@ function loadImage(path,subpath)  {
       paperGlue.fileSelector("loadImage","localImages",{type:"dir",path:path,dir:ilist});
     } else
       console.log("No images available object loaded");
-  } else if(typeof path === 'undefined') {
-    listFiles("loadImage",imageExtensions);
-  } else {  // assume we have a path to an image
+  } else if(typeof path === 'undefined' ) {
+    listFiles("loadImage",imageExtensions);  // defaults to listfile from here
+  } else {  // assume we have a path to an image provided by listFile via myscript fileSelectDialog
     var full_path = path + "/" + subpath;
     loadSingleImage(full_path,subpath);
   }
@@ -1180,7 +1191,7 @@ function onMouseUp(event) {
             lineSelectedPosition = prev_pos;
             validatePath(item);
           } else if(imageInstances.hasOwnProperty(sid)) {
-            imageMoved(item,prev_pos,false);
+            imageMoved(item,prev_pos,false,null);
           } else if(areaInstances.hasOwnProperty(sid)) {
             areaMoved(item,prev_pos);
           }
@@ -1237,7 +1248,7 @@ function onMouseUp(event) {
       // continue through to path addition or removal
     } else if(!!imageSelected) {
       hideCursor();
-      imageMoved(imageSelected,imageSelectedPosition,(imageSelected.position == imageSelectedPosition));
+      imageMoved(imageSelected,imageSelectedPosition,(imageSelected.position == imageSelectedPosition),imageSelectedRotation);
       imageSelected = null;
     }  // end of edit mode
   } else {  // not edit mode
@@ -1253,7 +1264,8 @@ function onMouseUp(event) {
   return false;
 }
 
-function imageMoved(img,prev_pos,spot_rotate) {
+function imageMoved(img,prev_pos,spot_rotate,src_prev_rot) {
+  // note that src_prev_rot is only no null for first symbol creation
   var img_id = findInstance(imageInstances,'raster',img,true);
   if(!!img_id) {  // shouldn't be any trouble here
     console.log("instance found with id:"+img_id);  // need to keep id as well - might be null for master objects in layout mode
@@ -1262,13 +1274,19 @@ function imageMoved(img,prev_pos,spot_rotate) {
     if(inst.hasOwnProperty('snap'))
       round_only = !inst.snap;
     var src = imageInstances[img_id].src;
-    if(spot_rotate) { // no movement or no prior position it being null
-      rotateImage(img_id,img,src,90);
+    if(!src_prev_rot && spot_rotate) { // no movement or no prior position it being null
+      rotateImage(img_id,'symbol',img,src,90);
       correctPosition(img,src,round_only);
     } else {
       correctPosition(img,src,round_only);
       // keeping the obj as record is fine for undo but not so good for redo if the object gets deleted further back
       doRecordAdd({action:'imageMove',id:img_id,type:'symbol',oldValue:prev_pos,pos:img.position});
+    }
+    if(!!src_prev_rot) {
+      if(!prev_pos)  // raster is already rotated for initial drag
+        img.rotate(-img.rotation);
+      rotateImage(img_id,'symbol',img,src,src_prev_rot);
+      //correctPosition(img,src,round_only);
     }
   }
 }
@@ -1287,13 +1305,14 @@ function correctPosition(raster,src,round_only) {
   //console.log("After round:"+raster.position);
 }
 
-function rotateImage(id,raster,src,angle) {
-  var dorec = {action:'imageRotate',id:id,type:'symbol'};
-  // use mouseDownPosition or event.position to find the closest point of rotation in object
+function rotateImage(id,type,raster,src,angle) {
+  var dorec = {action:'imageRotate',id:id,type:type};
+  // use mouseDownPosition or event.posihtion to find the closest point of rotation in object
   var prev_rotation = Math.round(raster.rotation);
   var prev_pos = raster.position;
   if(src.hasOwnProperty('center')) {
-    raster.rotate(angle,raster.position-src.center.rotate(raster.rotation));  //(new Point(30,30)));  // need to look up source to find centre of rotation - could also have 45 deg mode
+    var cp = src.center * src.scale;
+    raster.rotate(angle,raster.position-cp.rotate(raster.rotation));  //(new Point(30,30)));  // need to look up source to find centre of rotation - could also have 45 deg mode
   } else
     raster.rotate(angle);  // need to look up source to find centre of rotation - could also have 45 deg mode
   raster.rotation = Math.round(raster.rotation);  // prevent error creaping in
@@ -1302,18 +1321,37 @@ function rotateImage(id,raster,src,angle) {
   doRecordAdd(dorec);
 }
 
+function scaleCurrentImage(scale) {
+  var obj = currentContextObject;
+  obj.raster.scale(scale/obj.inst.scale);
+  obj.inst.scale = scale;
+  if(obj.type === 'image') {
+    obj.symbol = new Symbol(obj.raster);
+    var pos = obj.raster.position;
+    var rot = obj.raster.rotation;
+    var md = obj.raster.onMouseDown;
+    console.log("Remove image raster"); // of keys:"+(Object.keys(obj.raster)));
+    obj.raster.remove();
+    obj.raster = obj.symbol.place();
+    console.log("Restore as new raster");
+    obj.raster.position = pos;
+    obj.raster.rotation = rot;
+    obj.inst.onMouseDown = md;
+  }
+}
+
 function moveCurrentImage(x,y,r) {
   var im = currentContextObject.raster;
   console.log("Move from pos:"+im.position+" to "+x+","+y+","+r);
   var p = new Point(x,y);
   if(x !== im.position.x || y !== im.position.y) {
     //console.log(p);
-    doRecordAdd({action:'imageMove',id:currentContextObject.id,type:'symbol',pos:[im.position,p]});
+    doRecordAdd({action:'imageMove',id:currentContextObject.id,type:currentContextObject.type,oldValue:im.position,pos:p});
     //console.log(doRecord[doRecordIndex-1].pos);
     im.position = p;
   }
   if(r !== im.rotation) {
-    rotateImage(currentContextObject.id,im,currentContextObject.src,r-im.rotation);
+    rotateImage(currentContextObject.id,currentContextObject.type,im,currentContextObject.src,r-im.rotation);
     // var rot = Math.round(r);
     // doRecordAdd({action:'imageRotate',id:currentContextObject.id,type:'symbol',rot:[im.rotation,rot],});
     // im.rotation = rot;
@@ -1713,7 +1751,7 @@ function loadRecord(path,subpath) {
     console.log("Loading from node js server storage");
     nodeComms.onReply = onLoadReply;
     console.log("Attempting to load:"+recordPath);
-    postObject = {command:'load',path:recordPath};
+    postObject = {command:'load',path:recordPath};  //xtns not required
     if(typeof path !== 'undefined')
       postObject.path = path;
     if(typeof subpath !== 'undefined')
@@ -1967,7 +2005,10 @@ function undo() {
         setLineColor(last_do.id,lineColor);
         break;
       case 'imageMove':
-        raster = imageInstances[last_do.id].raster;
+        if(last_do.type === 'image')
+          raster = imagesLoaded[last_do.id].raster;
+        else
+          raster = imageInstances[last_do.id].raster;
         if(doRecordIndex > 0) {
           var prev_do = doRecord[doRecordIndex-1];
           if(prev_do.action == 'symbolPlace') {  // this was the first drag
@@ -1984,7 +2025,10 @@ function undo() {
         }
         break;
       case 'imageRotate':
-        raster = imageInstances[last_do.id].raster;
+        if(last_do.type === 'image')
+          raster = imagesLoaded[last_do.id].raster;
+        else
+          raster = imageInstances[last_do.id].raster;
         console.log("oldValue:"+last_do.oldValue);
         if(typeof last_do.oldValue != 'undefined'){  // check it has a pos
           raster.position = last_do.oldValue[0];  // required for non centered rotation
@@ -2068,13 +2112,19 @@ function redo() {
       setLineColor(to_do.id,to_do.color);
       break;
     case 'imageMove':
-      imgobj = imageInstances[to_do.id];
+      if(to_do.type === 'image')
+        imgobj = imagesLoaded[to_do.id];
+      else
+        imgobj = imageInstances[to_do.id];
       raster = imgobj.raster;
       raster.position = to_do.pos;
       console.log("Moving to "+ to_do.pos);
       break;
     case 'imageRotate':
-      imgobj = imageInstances[to_do.id];
+      if(to_do.type === 'image')
+        imgobj = imagesLoaded[to_do.id];
+      else
+        imgobj = imageInstances[to_do.id];
       raster = imgobj.raster;
       raster.position = to_do.pos[0];  // required if rotation not about center
       raster.rotation = to_do.pos[1];
@@ -2232,7 +2282,7 @@ function setCenterToCursor() {
     if(currentContextObject.hasOwnProperty('raster')) {
       var raster = currentContextObject.raster;
       var dp = raster.position - cursorPos[0];
-      src.center = roundPoint(dp.rotate(-raster.rotation));
+      src.center = (roundPoint(dp.rotate(-raster.rotation)))/src.scale;
       cursorPos[2] = cursorPos[0];
       console.log("Center:" + src.center);
       if(!src.hasOwnProperty('origin'))   // probably the same if not set
@@ -2457,6 +2507,7 @@ var exports = {
   getCurrentContextObject:getCurrentContextObject,
   nameCurrentImage:nameCurrentImage,
   moveCurrentImage:moveCurrentImage,
+  scaleCurrentImage:scaleCurrentImage,
   setCenterToCursor:setCenterToCursor,
   setOriginToCursor:setOriginToCursor,
   showCursor:showCursor,

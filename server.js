@@ -61,8 +61,10 @@ function loadData(res,load_path,xtns) {
   pth = buildSafePath(res,load_path);
   if(!pth)
     return;
-  try {
-    var xtn_list = xtns.split(',');
+  //try {
+    var xtn_list;
+    if(typeof xtns !== 'undefined')
+      xtn_list = xtns.split(',');
     if(fs.lstatSync(pth).isDirectory()) {
       fs.readdir(pth,
         function(err,data) {
@@ -76,8 +78,8 @@ function loadData(res,load_path,xtns) {
               var t = "file";
               if(fs.lstatSync(p).isDirectory())
                 t = "dir";
-              else if(!(path.extname(p).substr(1) in xtn_list))
-                continue;  //this item not in path
+              else if(typeof xtns !== 'undefined' && xtn_list.indexOf(path.extname(p).substr(1)) < 0)
+                continue;  //xtn not in xnt_list so this item not in path
               var ft = {type:t,name:data[i]};
               darray.push(ft);
             }
@@ -106,9 +108,9 @@ function loadData(res,load_path,xtns) {
         }
       );
     }
-  } catch(err) {
-    respondPost(res,'500 - Internal Error:' + err.message);
-  }
+  //} catch(err) {
+  //  respondPost(res,'500 - Internal Error:' + err.message);
+  //}
 }
 
 var pathExt = "";

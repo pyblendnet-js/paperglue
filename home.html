@@ -30,14 +30,14 @@
     window.globals.importRecord = getRecord;
   }
 
-  function myScriptCmd(cmd, arg0,arg1,arg2) {
+  function myScriptCmd(cmd, arg0,arg1,arg2,arg3,arg4) {
     console.log(Object.keys(window.globals.myScript) );
     console.log(cmd,arg0,arg1,arg2);//.onload();  //no use since it may not be added to globals yet
-    window.globals.myScript[cmd](arg0,arg1,arg2);
+    window.globals.myScript[cmd](arg0,arg1,arg2,arg3,arg4);
   }
 
-  function paperGlueCmd(cmd,arg0,arg1,arg2) {
-    window.globals.paperGlue[cmd](arg0,arg1,arg2);
+  function paperGlueCmd(cmd,arg0,arg1,arg2,arg3,arg4) {
+    window.globals.paperGlue[cmd](arg0,arg1,arg2,arg3,arg4);
   }
 
   function DlgShow(Message)

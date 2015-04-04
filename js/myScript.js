@@ -437,7 +437,7 @@ function openImgPropDialog() {
   p += '<input id="rot" type="number" value="'+obj.raster.rotation+'"/></td></tr>';
   if(obj.type !== 'symbol') {
     p += '<tr><td>Scale</td><td>';
-    p += '<input id="scale" type="text" value="'+obj.imgobj.scale+'"/></td></tr>';
+    p += '<input id="scale" type="text" value="'+obj.src.scale+'"/></td></tr>';
   }
   //}
   // var ks = Object.keys(obj);
@@ -473,8 +473,11 @@ function dialogReturn(reply) {
 }
 
 function propDialogReturn(reply) {
-  if(reply === 'cancel')
+  if(reply === 'Cancel') {
+    paperGlue.hideCursor();
+    closeDialog();
     return;
+  }
   var obj = paperGlue.getCurrentContextObject();
   console.log("Object type:" + obj.type);
   if(obj.type === 'area') {
@@ -488,6 +491,13 @@ function propDialogReturn(reply) {
   var xfield = document.getElementById('xpos');
   var yfield = document.getElementById('ypos');
   var rfield = document.getElementById('rot');
+  if(obj.type !== 'symbol') {
+    var sfield = document.getElementById('scale');
+    var s = parseFloat(sfield.value);
+    if(obj.src.scale != s) {
+      paperGlue.scaleCurrentImage(s);
+    }
+  }
   var x = parseFloat(xfield.value);
   var y = parseFloat(yfield.value);
   var r = parseFloat(rfield.value);
@@ -498,11 +508,11 @@ function propDialogReturn(reply) {
     paperGlue.nameCurrentImage(name);
   }
   paperGlue.moveCurrentImage(x,y,r);
-  paperGlue.hideCursor();
   if(reply === 'Apply') {
     paperGlue.showImageCursors(obj,false);
     return;
   }
+  paperGlue.hideCursor();
   closeDialog();
 }
 
@@ -532,10 +542,10 @@ function openImgLoadDefaultDialog() {
 }
 
 function imgLoadDefaultDialogReturn(reply) {
-  if(reply === 'cancel')
-    return;
-  var sfield = document.getElementById('imgscale');
-  paperGlue.importDefaults.scale = parseFloat(sfield.value);
+  if(reply !== 'Cancel') {
+    var sfield = document.getElementById('imgscale');
+    paperGlue.importDefaults.scale = parseFloat(sfield.value);
+  }
   closeDialog();
 }
 
@@ -595,6 +605,10 @@ function openAreaPropDialog() {
 }
 
 function areaDialogReturn(reply) {
+  if(reply === 'Cancel') {
+    closeDialog();
+    return;
+  }
   var name = document.getElementById('name').value;
   var xfield = document.getElementById('xpos');
   var yfield = document.getElementById('ypos');
@@ -605,12 +619,10 @@ function areaDialogReturn(reply) {
   var w = parseFloat(wfield.value);
   var h = parseFloat(hfield.value);
   //console.log("X:"+x);
-  if(reply !== 'cancel') {
-    paperGlue.changeAreaName(name);  // beware name is volitile
-    paperGlue.moveCurrentArea(new Rectangle(x,y,w,h));
-    if(reply === 'Apply')
-      return;
-  }
+  paperGlue.changeAreaName(name);  // beware name is volitile
+  paperGlue.moveCurrentArea(new Rectangle(x,y,w,h));
+  if(reply === 'Apply')
+    return;
   closeDialog();
 }
 
@@ -697,7 +709,7 @@ function stateDialogReturn(reply) {
   var nm = nfield.value;
   var tfield = document.getElementById('deltatime');
   var dt = parseFloat(tfield.value);
-  if(reply !== 'cancel') {
+  if(reply !== 'Cancel') {
     paperGlue.setState({nm:nm,dt:dt});
   }
   paperGlue.hideCursor();
@@ -716,7 +728,7 @@ function fileSelectorDialog(objective,xtns,dir_obj) {
     openDialogCommon(['Okay','Cancel']);
   else
     openDialogCommon();
-  console.log("Opening set state dialog");
+  console.log("Opening file selector dialog");
   var fontsize = window.innerWidth/80;
   var fs = 'style="font-size:'+fontsize+'px;"';
   var p = '<div id="fileSelectTitle">'+objective;
@@ -788,7 +800,7 @@ function fileSelectorDialog(objective,xtns,dir_obj) {
     f = 'black';
   }
   p += '</tbody></table>';
-  //console.log("Dialog content:"+p);
+  console.log("Dialog content:"+p);
   var content = document.getElementById('DlgContent');
   content.innerHTML = p;
   setDialogMove("fileSelectTitle");
