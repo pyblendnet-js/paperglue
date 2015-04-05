@@ -65,11 +65,17 @@ var selectedMove = false;
 var imagesLoaded = {};
 var imageInstances = {};  //images that have been cloned from sybols in imagesLoaded.
 var fileContextMenu = [
-  {label:'open doRecord.pgl', callback:loadRecord},
   {label:'open from',callback:loadRecordAs},
-  {label:'save as doRecord.pgl', callback:saveRecord},
-  {label:'save as',callback:saveRecordAs},
+  {label:'save as',callback:saveRecordAs}
 ];  // must appear before use in default menu
+if(window.location.protocol === 'file:') {
+  fileContextMenu.push({label:'open doRecord', callback:loadRecord});
+  fileContextMenu.push({label:'save doRecord', callback:saveRecord});
+} else {
+  fileContextMenu.push({label:'open doRecord.pgl', callback:loadRecord});
+  fileContextMenu.push({label:'save doRecord.pgl', callback:saveRecord});
+  fileContextMenu.push({label:'save imgAvail.js',callback:buildImgAvail});
+}
 var optionsContextMenu = [
   {label:'hide areas',callback:toggleAreas},
 ];
@@ -91,6 +97,7 @@ var listObjective;
 var listXtns;
 var imageExtensions = "jpg,png";
 var importDefaults = {scale:1.0,isSymbol:true, dragClone:true, pos:view.center};
+var baseImportDefaults = cloneShallow(importDefaults);
 var cursorPos = [];  // mouse, raster, origin, center
 var cursorImage = null;  // to allow cursor hide in selectItem
 var cursorColors = ['#f00','#ff0','#88f','#8f8'];
@@ -98,6 +105,13 @@ var stateInstances = {};
 var currentStateRate = 0.0;  // immediate jumps to state
 //var ua = navigator.appName.toLowerCase();
 //console.log("Browser details:"+ua);  - not a lot of use
+
+function cloneShallow(obj) {
+  var ro = {};
+  for(var i in obj)
+    ro[i] = obj[i];
+  return ro;
+}
 
 /** Set quantum [x,y] for snap on lines and images
   @param {float} typically greater than 1
@@ -2485,6 +2499,101 @@ function stepState(direction, rate) {
   return null; // to indicate that we failed to find state point
 }
 
+// the following is used for adding a loader to a doRec.js include
+var doRecLoader = "';\nfunction getRecord() {return jdata;}\nwindow.globals.importRecord = getRecord;\n";
+var imgAvailLoader = "';\nfunction getImgAvail() { return idata; }\nwindow.globals.imagesAvailable = idata;\n";
+
+var walkerTree = [];
+var imgFileList;
+
+function buildImgAvail(res) {
+  var path, subpath;
+  if(typeof res === 'undefined') {
+    if(window.location.protocol === 'file:') {
+      alert("ABORT - Can only generate file list from server");
+      return;
+    }
+    if(typeof nodeComms.sendData !== 'function')  // very odd if this happens
+      return;
+    // node js storage
+    nodeComms.onReply = buildImgAvail;  // recursive call
+    path = "";
+    imgFileList = [];
+  } else {
+    console.log("Onreply:"+res);
+    if(res.indexOf('500') === 0) {  //starts with error code
+      console.log("Report error:"+res);
+    } else {
+      console.log("attempting to parse json object");
+      //try {
+        var reply_obj = JSON.parse(res);
+        console.log(reply_obj);
+        if(reply_obj.type !== 'dir') {
+          console.log("Failed to return dir from image list");
+          return;
+        }
+        // always arrives here with a new directory listing
+        path = reply_obj.path;
+        dir = reply_obj.dir;
+        // first record all the files in this directory
+        for(var i in dir) {
+          if(dir[i].type === 'file') {
+            var fo = {src:(path+'/'+dir[i].name)};
+            for(var j in importDefaults) {
+              if(importDefaults[j] != baseImportDefaults[j])
+                fo[j] = importDefaults[j];
+            }
+            imgFileList.push(fo);  // will use baseImportDefaults unless specified
+          }
+        }
+        // now look for subdirectories
+        index = 0;
+        walkerTree.push({path:path,dir:dir,index:0});
+        while(index >= 0) {
+          subpath = null;
+          for(i = index; i < dir.length; i++) {
+            var fd = dir[i];
+            if(fd.type === 'dir') {
+              subpath = fd.name;
+              walkerTree[walkerTree.length-1].index = i+1;
+              break;
+            }
+          }
+          if(!!subpath)
+            break;
+          if(walkerTree.length === 0) {
+              console.log("walker mission complete - "+imgFileList.length + " image found");
+            // buildingimgAvail.js
+            jdata = "var idata=\n'";
+            var json_txt = JSON.stringify(imgFileList);
+            for(var c in json_txt) {
+              jdata += json_txt[c];
+              if(json_txt[c] === '}')
+                jdata += '\n';
+            }
+            jdata += imgAvailLoader;
+            var save_data = {command:'save',path:"imgavail.js",data:jdata};
+            if(typeof path !== 'undefined')
+              postObject.path = path;
+            if(typeof subpath !== 'undefined')
+              postObject.subpath = subpath;
+            nodeComms.sendData(JSON.stringify(save_data));
+            return;
+          }
+          var wp = walkerTree.pop();
+          path = wp.path;
+          dir = wp.dir;
+          index = wp.index;
+        }
+      }
+      // catch(excpetion e) {}
+  }
+  console.log("Attempting to list from:" + path +" / "+subpath);
+  postObject = {command:'list',xtns:imageExtensions,path:path,subpath:subpath};
+  //if(typeof subpath !== 'undefined')
+  nodeComms.sendData(JSON.stringify(postObject));
+}
+
 // think this needs to be at the bottom so under scripts find things fully loaded
 console.log("PaperGlue functions to window globals");
 // window global are use for cross scope communications
@@ -2534,12 +2643,15 @@ var exports = {
   parseRecord:parseRecord,
   addMeta:addMeta,
   setState:setState,
-  importDefaults:importDefaults
+  importDefaults:importDefaults,
+  doRecLoader:doRecLoader
 };
 globals.paperGlue = exports;
 paperGlue = globals.paperGlue;  // for dependant modules to add:
 // fileSelector(objective,dir_obj) = a gui to display directories returned by list()
 // closeDialog() = so pressing escape will close any modal dialogs
+
+
 
 if(typeof globals.onPaperGlueLoad == 'function')  { // myScript couldn't find loadImages so provided a call to repeat the request
   console.log("PaperGlue loaded now so can use onPaperLoad to load images.");

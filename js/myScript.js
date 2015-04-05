@@ -23,7 +23,7 @@ var areaMenu = [ {label:'name', propCall:getAreaNameCall},
 var exportMenu = [
   {label:'list in new tab',callback:openActionsWindow},
   {label:'json in new tab',callback:openJSONWindow},
-  {label:'  js in new tab',callback:openJSWindow}
+  {label:'  js in new tab',callback:openJSWindow},
 ];
 window.globals.menuLookup = { symbolMenu:symbolMenu,
                               symbolInstanceMenu:symbolInstanceMenu,
@@ -269,10 +269,7 @@ function openRecordWindow(beautify,include_loader) {
       txt += "<html><body><pre>";
     txt += buildRedoData(beautify);
     if(include_loader) {
-      txt += "';\n";
-      txt += "function getRecord() {\n\t"+
-             "return jdata;\n}\n";
-      txt += "window.globals.importRecord = getRecord;\n";
+      txt += paperGlue.doRecLoader;
     } else {
       txt += "</pre></body></html>";
     }
