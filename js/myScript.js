@@ -212,7 +212,6 @@ function keyDown(event) {  // note: This is accessed from paperglue.js - not dir
       var ca = document.getElementById("clientArea");
       var canvasDiv = document.getElementById("canvasDiv");
       var canvas = document.getElementById('myCanvas');
-
       canvasDiv.style.height = ca.clientHeight/2 + 'px';
       var ad = document.getElementById("actionTableDiv");
       ad.style.height = ca.clientHeight/2 + 'px';
@@ -306,15 +305,8 @@ function buildRedoData(beautify) {
             bl--;
             indent -= 2;
             break;
-          //case '[':
-          //  lt[bl++] = 1;
-          //  break;
-          //case ']':
-          //  bl--;
-          //  break;
         }
         if(lc === ',') {
-          //if(col > 80 || llc === '}' || llc === ']')
             nl = true;
         }
         if(nl) {
@@ -797,7 +789,7 @@ function fileSelectorDialog(objective,xtns,dir_obj) {
     f = 'black';
   }
   p += '</tbody></table>';
-  console.log("Dialog content:"+p);
+  //console.log("Dialog content:"+p);
   var content = document.getElementById('DlgContent');
   content.innerHTML = p;
   setDialogMove("fileSelectTitle");

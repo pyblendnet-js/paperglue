@@ -14,14 +14,6 @@
   <script type="text/javascript" src="dorec.js"> </script>
   <script type="text/javascript" src="imgavail.js"> </script>
   <script>  // type="text/paperscript" canvas="myCanvas">
-    function hideCanvas() {
-      var canvas = document.getElementById('myCanvas');
-      if(canvas.style.display == "none")
-        canvas.style.display = "inline";
-      else
-        canvas.style.display = "none";
-    }
-
   function onload() {
     console.log("body loaded");
     console.log(Object.keys(window.globals) ); //.onload();  //no use since it may not be added to globals yet
@@ -88,13 +80,6 @@
 
 </head>
 <body id="body" onload="onload();" >
-  <button type="button" onclick="hideCanvas();" class="button" width="300">hide Canvas</button>
-  <button type="button" onclick="myScriptCmd('listActions');" class="button" width="300">List Content</button>
-  <button type="button" onclick="paperGlueCmd('removeAll');" class="button" width="300">Remove All</button>
-  <button type="button" onclick="DlgShow('A message');" class="button" width="300">Show dialog</button>
-  <button type="button" onclick="paperGlueCmd('showAreas');" class="button" width="300">Show Areas</button>
-  <button type="button" onclick="paperGlueCmd('hideAreas');" class="button" width="300">Hide Areas</button>
-  <!--<image src="img/verodes.png"/>-->
   <div id="clientArea">
   <div id="canvasDiv" style="height:100%;background-color:blue">
     <canvas id="myCanvas" resize></canvas>
@@ -135,21 +120,6 @@
     <table  border="0" cellpadding="0" cellspacing="0"
     style="border: thin solid #808080; cursor: default; white-space: nowrap"
     bgcolor="White">
-    <!-- <tr>
-      <td >
-        <div  class="ContextItem">View</div>
-      </td>
-    </tr>
-    <tr>
-      <td >
-        <div  class="ContextItem">Edit</div>
-      </td>
-    </tr>
-    <tr>
-      <td >
-        <div  class="ContextItem">Delete</div>
-      </td>
-    </tr> -->
     </table>
 </div>
 </div>

@@ -76,9 +76,8 @@ if(window.location.protocol === 'file:') {
   fileContextMenu.push({label:'save doRecord.pgl', callback:saveRecord});
   fileContextMenu.push({label:'save imgAvail.js',callback:buildImgAvail});
 }
-var optionsContextMenu = [
-  {label:'hide areas',callback:toggleAreas},
-];
+fileContextMenu.push({label:'new',callback:removeAll });
+var optionsContextMenu = [{label:'hide areas',callback:toggleAreas}];
 var defaultContextMenu = [
   {label:'image', callback:loadImage},
   {label:'file', submenu:fileContextMenu},
@@ -103,8 +102,6 @@ var cursorImage = null;  // to allow cursor hide in selectItem
 var cursorColors = ['#f00','#ff0','#88f','#8f8'];
 var stateInstances = {};
 var currentStateRate = 0.0;  // immediate jumps to state
-//var ua = navigator.appName.toLowerCase();
-//console.log("Browser details:"+ua);  - not a lot of use
 
 function cloneShallow(obj) {
   var ro = {};
@@ -242,31 +239,18 @@ function init() {
 // there may or maynot be an activeLayer when this code is run
   baseLayer = project.activeLayer;  //for some reason no layer exists yet
   cursorLayer = new Layer();
-  // Couldn't figure out how to add setActiveLayer
-  // if(typeof Project.setActiveLayer === 'undefined') {
-  //   var setActiveLayer = function(l) {
-  //     this._activeLayer = l;
-  //   }
-  //   console.log("Adding setActiveLayer to paper.js");
-  //   Project.setActiveLayer = setActiveLayer;
-  //  }
-  //.. but this works
   project._activeLayer = baseLayer;
-  //console.log("Layers&:"+project.layers);
-  //console.log("ActiveLayer&:"+project.activeLayer);
+
 }
 
 function hideCursor() {
   console.log("Hide cursor");
   cursorLayer.removeChildren();
   cursorLayer.position = [0,0];
-  //console.log("cursorLayer:"+cursorLayer.position);
   cursorImage = null;
 }
 
 function showCursor(ci) {
-  //console.log("Event:"+event);
-  //console.log("Image mouse down at:"+mouseDownPosition);
   console.log("Show cursor#" + ci + " @pos:" + cursorPos[ci]);
   drawCross(cursorPos[ci],20,'#000');
   drawCross(cursorPos[ci]-[1,1],20,cursorColors[ci]);
@@ -928,10 +912,10 @@ function hideAllAreas() {
 function toggleAreas() {
   if(areasVisible) {
     hideAllAreas();
-    defaultContextMenu[2].label = 'show areas';
+    optionsContextMenu[0].label = 'show areas';
   } else {
     showAllAreas();
-    defaultContextMenu[2].label = 'hide areas';
+    optionsContextMenu[0].label = 'hide areas';
   }
 }
 
@@ -1508,6 +1492,12 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
   if(event.controlPressed) {
     console.log("Key:"+event.key);
     switch(event.key) {
+      case '+':
+        console.log("Zoom screen");
+        return true;
+      case '-':
+        console.log("Unzoom screen");
+        return true;
       case 'z':
         console.log("cntrlZ");
         if(event.shiftPressed) {
@@ -1645,9 +1635,6 @@ function incMoveSymbol(obj,direction,snap) {
     obj.raster.position += direction;
   }
   doRecordAdd({action:'imageMove',id:img_id,type:'symbol',oldValue:objPosition,pos:obj.raster.position});
-  //console.log("Object moved to:"+obj.raster.position);
-  // if(typeof window.globals.updateStatus === 'function')
-  //   window.globals.updateStatus();
 }
 
 function incMoveArea(obj,direction,snap) {
@@ -1722,15 +1709,10 @@ function saveRecord(path,subpath) {
       console.log("Data:"+jdata);
       if(typeof path === 'undefined')
         subpath = "data";
-      // if(path === 'localStorage' && localStorage.hasOwnProperty(subpath)) {
-      //   if(confirm("Save over existing?"))
-      //     localStorage[subpath] = jdata;
-      // } else
         localStorage[subpath] = jdata;
       console.log("Local storage:" + localStorage);
     }
   } else if(typeof nodeComms.sendData === 'function') {
-    //nodeComms.onReply = onReply(response);
     var save_data = {command:'save',path:recordPath,data:jdata};
     if(typeof path !== 'undefined')
       postObject.path = path;
@@ -1808,7 +1790,7 @@ function onLoadReply(res) {
     console.log("Report error:"+res);
   } else {
     console.log("attempting to parse json object");
-    //try {
+    try {
       var reply_obj = JSON.parse(res);
       console.log(reply_obj);
       switch(reply_obj.type) {
@@ -1821,19 +1803,16 @@ function onLoadReply(res) {
             paperGlue.fileSelector(listObjective,listXtns,reply_obj);
           break;
       }
-    //} catch(e1) {
-    //  console.log("Error parsing reply"+e1);
-    //}
+    } catch(e1) {
+      console.log("Error parsing reply"+e1);
+    }
   }
 }
 
 function parseRecord(jdata) {
-    //try {
+    try {
       console.log("Data="+jdata);
       var project_data = JSON.parse(jdata);
-      // console.log("New record="+newRecord);
-      // console.log(typeof newRecord);
-      // console.log("New record has" + newRecord.length + " actions");
       removeAll();
       imglist = project_data.imglist;
       console.log("Images to load:"+imglist.length); //Array.isArray(imglist));
@@ -1842,7 +1821,6 @@ function parseRecord(jdata) {
       if(editMode && imglist.length > 0)
         overload_images = confirm("Overload existing images with same name?");
       var imgs_to_load = [];
-      //for(var ii in img_keys) {
       for(var ik in imglist) {
         //var ik = img_keys[ii];
         console.log("ik:"+ik+"="+imglist[ik].id);
@@ -1859,9 +1837,9 @@ function parseRecord(jdata) {
       correctPosPoints(doRecord);
       doRecordIndex = 0;
       doAll();
-    // } catch(e2) {
-    //   console.log("Error parsing file data"+e2);
-    // }
+    } catch(e2) {
+       console.log("Error parsing file data"+e2);
+    }
 }
 
 function correctPosPoints(do_record) {
@@ -1987,28 +1965,17 @@ function undo() {
     var raster;
     switch(last_do.action) {
       case 'lineMove':
-        //console.log(lineInstances[0]);
-        //console.log("line instances:" + (lineInstances.length));
-
-        //console.log("line instances:" + (Object.keys(lineInstances)));
-        //console.log("line instances:" + Object.keys(lineInstances).indexOf(String(last_do.id)));
         if(Object.keys(lineInstances).indexOf(String(last_do.id)) < 0) {
           console.log('No instance of line id:' + last_do.id);
           break;
         }
         var path = lineInstances[last_do.id].path;
-        // console.log("Obj pos1:",path.firstSegment.point);
-        // console.log("path pos2:",path.lastSegment.point);
-        // console.log("path pos:",path.position);
         if(!last_do.hasOwnProperty('oldValue') || !last_do.oldValue) {  // no previous existance
           removeLine(last_do.id);
         } else {
           path.firstSegment.point = last_do.oldValue[0];
           path.lastSegment.point = last_do.oldValue[1];
           console.log("Return path to " + last_do.oldValue);
-          // console.log("path pos1:",path.firstSegment.point);
-          // console.log("path pos2:",path.lastSegment.point);
-          // console.log("path pos:",path.position);
         }
         break;
       case 'lineColor':  // also applies to all new lines
@@ -2203,13 +2170,6 @@ function pruneDo(remove_undo) {
   for(var di = doRecordIndex-1; di >= 0; di--) {  // work backwards through do list
     //console.log("Do#"+di);
     to_do = doRecord[di];
-    //console.log("ids found:"+Object.keys(ids_found));
-    //for(var idk in ids_found) {
-    //  console.log(idk + " = " + ids_found[idk]);
-    //}
-    //console.log(typeof to_do.id);
-    //if(ids_found.length > 0)
-    //console.log(typeof ids_found[0]);
     if(keep_all) {
       prunedDo.splice(0,0,to_do);
       continue;
@@ -2233,7 +2193,6 @@ function pruneDo(remove_undo) {
           continue;
         break;
     }
-    //if(ids_found.indexOf(String(to_do.id))>= 0) // this object already sorted
     if(ids_found.hasOwnProperty(to_do.id)) {
       if(ids_found[to_do.id].indexOf(to_do.action) >= 0)
         continue;
@@ -2648,8 +2607,8 @@ var exports = {
 };
 globals.paperGlue = exports;
 paperGlue = globals.paperGlue;  // for dependant modules to add:
-// fileSelector(objective,dir_obj) = a gui to display directories returned by list()
-// closeDialog() = so pressing escape will close any modal dialogs
+// - fileSelector(objective,dir_obj) = a gui to display directories returned by list()
+// - closeDialog() = so pressing escape will close any modal dialogs
 
 
 
