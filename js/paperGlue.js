@@ -1929,7 +1929,7 @@ function onLoadReply(res) {
     console.log("Report error:"+res);
   } else {
     console.log("attempting to parse json object");
-    try {
+    //try {
       var reply_obj = JSON.parse(res);
       console.log(reply_obj);
       switch(reply_obj.type) {
@@ -1942,14 +1942,14 @@ function onLoadReply(res) {
             paperGlue.fileSelector(listObjective,listXtns,reply_obj);
           break;
       }
-    } catch(e1) {
-      console.log("Error parsing reply"+e1);
-    }
+    //} catch(e1) {
+    //  console.log("Error parsing reply"+e1);
+    //}
   }
 }
 
 function parseRecord(jdata) {
-    try {
+    //try {
       console.log("Data="+jdata);
       var project_data = JSON.parse(jdata);
       if(doRecord.length > 0)
@@ -1973,20 +1973,27 @@ function parseRecord(jdata) {
       }
       console.log("Images to load:"+imgs_to_load);
       loadImages(imgs_to_load);  //will add to previously set defaults
-      doRecord = project_data.dolist;
-      correctPosPoints(doRecord);
+      var do_record = project_data.dolist;
+      for(var di in do_record) {
+        console.log("ID:"+do_record[di].id);
+      }
+      parsePaperRecord(do_record);
+      for(di in doRecord) {
+        console.log("ID:"+doRecord[di].id);
+      }
       doRecordIndex = 0;
       doAll();
-    } catch(e2) {
-       console.log("Error parsing file data"+e2);
-    }
+
+    //} catch(e2) {
+    //   console.log("Error parsing file data"+e2);
+    //}
 }
 
-function correctPosPoints(do_record) {
+function parsePaperRecord(do_record) {
   var new_nextID = 0;  // nextID will be set to this after finding highest ID
   for(var di in do_record) {
     var to_do = do_record[di];
-    to_do.id += nextID;
+    to_do.id = parseInt(to_do.id) + nextID;
     if(to_do.id >= new_nextID)
       new_nextID = to_do.id + 1;
     if(to_do.hasOwnProperty('pos')) {
@@ -2003,7 +2010,7 @@ function correctPosPoints(do_record) {
       console.log("Fix size");
       to_do.size = parseRect(to_do.size);  // check for paper.js object JSON conversion problems
     }
-    doRecord[di] = to_do;
+    doRecord.push(to_do);
   }
   nextID = new_nextID;
   console.log("NextID will be "+nextID);
@@ -2257,6 +2264,7 @@ function redo() {
       to_do = doRecord[doRecordIndex+1];
       if(to_do.action == 'imageMove') {
         doRecordIndex++;
+        console.log("ID:"+to_do.id);
         raster = imageInstances[to_do.id].raster;
         raster.position = to_do.pos;
       }
@@ -2373,6 +2381,16 @@ function getImageInstances() {
 function getLineInstances() {
   console.log("Returning line instances:", Object.keys(lineInstances).length);
   return lineInstances;
+}
+
+function getAreaInstances() {
+  console.log("Returning area instances:", Object.keys(areaInstances).length);
+  return areaInstances;
+}
+
+function getStateInstances() {
+  console.log("Returning state instances:", Object.keys(stateInstances).length);
+  return stateInstances;
 }
 
 function getDoRecord() {
@@ -2548,10 +2566,20 @@ function setState(state) {
   return doRecordIndex;
 }
 
-function scanStateForward() {
+function getNextState(start_index) {
+  var dorec = scanStateForward(start_index);
+  if(!!dorec && stateInstances.hasOwnProperty(dorec.id))
+    return stateInstances[dorec.id];
+  return null;
+}
+
+function scanStateForward(state_point) {
+  if(typeof start_index === 'undefined')
+    start_index = doRecordIndex;
   for(var di = doRecordIndex; di < doRecord.length; di++) {
     var dorec = doRecord[di];
     if(dorec.type === 'state') {
+      console.log("Found state at:"+di);
       return dorec;
     }
   }
@@ -2709,6 +2737,8 @@ var exports = {
   loadImage:loadImage,
   getImages:getImageInstances,
   getLines:getLineInstances,
+  getAreas:getAreaInstances,
+  getStates:getStateInstances,
   getDoRecord:getDoRecord,
   getDoIndex:getDoIndex,
   setSnap:setSnap,
@@ -2747,6 +2777,7 @@ var exports = {
   parseRecord:parseRecord,
   addMeta:addMeta,
   setState:setState,
+  getNextState:getNextState,
   importDefaults:importDefaults,
 };
 globals.paperGlue = exports;

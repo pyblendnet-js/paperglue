@@ -34,7 +34,9 @@ var exportMenu = [
   {label:'  js in new tab',callback:openJSWindow},
 ];
 var stateMenu = [
-  {label:'set state',callback:setNewState}
+  {label:'set state',callback:setNewState},
+  {label:'forward to state',callback:forwardToState},
+  {label:'skip to state',callback:skipToState},
 ];
 var optionsMenu = [
   {label:'import defaults',callback:openImgLoadDefaultDialog}
@@ -406,8 +408,11 @@ function dialogReturn(reply) {
     case 'img_default':
       imgLoadDefaultDialogReturn(reply);
       break;
-    case 'state':
-      stateDialogReturn(reply);
+    case 'set_state':
+      setStateDialogReturn(reply);
+      break;
+    case 'select_state':
+      selectStateDialogReturn(reply);
       break;
     case 'file_select':
       fileSelectReturn(reply);
@@ -628,11 +633,11 @@ var nextStateTime = 0;
 function setNewState() {
   var new_state = {nm:"state#"+nextStateID,dt:0};
   nextStateID++;
-  setState(new_state,'new');
+  setStateDialog(new_state,'new');
 }
 
-function setState(state,id) {
-  dialogType = 'state';
+function setStateDialog(state,id) {
+  dialogType = 'set_state';
   openDialogCommon(['Okay','Cancel']);
   console.log("Opening set state dialog");
   var fontsize = window.innerWidth/80;
@@ -650,7 +655,92 @@ function setState(state,id) {
   return false;
 }
 
-function stateDialogReturn(reply) {
+function setStateDialogReturn(reply) {
+  var nfield = document.getElementById('statename');
+  var nm = nfield.value;
+  var tfield = document.getElementById('deltatime');
+  var dt = parseFloat(tfield.value);
+  if(reply !== 'Cancel') {
+    paperGlue.setState({nm:nm,dt:dt});
+  }
+  paperGlue.hideCursor();
+  if(reply === 'Apply') {
+    return;
+  }
+  //paperGlue.setModalOpen(false);
+  //paperGlue.enableKeyFocus(true);
+  closeDialog();
+}
+
+var stateSkipMode;
+
+function forwardToState() {
+  stateSkipMode = false;
+  selectStateDialog(paperGlue.getNextState());
+}
+
+function skipToState() {
+  stateSkipMode = true;
+  selectStateDialog(paperGlue.getNextState());
+}
+
+function selectStateDialog(def_state) {
+  var states = paperGlue.getStates();
+  var states_count = Object.keys(states).length;
+  if( states_count === 0) {
+    alert("No states have been defined");
+    return;
+  }
+  console.log("Currently " + states_count + " states");
+  dialogType = 'select_state';
+  openDialogCommon(['Okay','Cancel']);
+  console.log("Opening select state dialog");
+  var state = def_state;
+  if(!state) {
+    console.log("No state given for default target so going to start");
+    state = paperGlue.getNextState(0);
+  }
+  console.log("Default to state"+state.name);
+  var fontsize = window.innerWidth/80;
+  var fs = 'style="font-size:'+fontsize+'px;"';
+  var p = '<h2 id="state_select_heading">State Selector</h2>';
+  p += '<div><select ' + fs + 'id="state_select" onchange="myScriptCmd(stateSelected,this.value)"></select></div>';
+  p += '<table' + fs + '>';
+  if(state.hasOwnProperty("dt"))
+    p += '<tr><td>DeltaTime</td><td>'+state.dt+'</td></tr>';
+  p += '</table>';
+  var content = document.getElementById('DlgContent');
+  content.innerHTML = p;
+  var ss = document.getElementById("state_select");
+  //fs.style.display = "inline";
+  ss.length = 0;  // may hang for very long lists - see: http://www.somacon.com/p542.php
+  for(var id in states) {
+    state = states[id];
+    var option = document.createElement("option");
+    option.text = state.name;
+    // option.onclick = fileSelected; - only works in firefox
+    option.value = option.text;
+    ss.add(option);
+  }
+  setDialogMove("state_select_heading");
+  return false;
+}
+
+function stateSelected(state_name) {
+  var states = paperGlue.getStates();
+  var ss = null;
+  for(var id in states) {
+    state = states[id];
+    if(state === state_name) {
+      ss = state;
+      console.log("Selecting state:"+state.name);
+      break;
+    }
+  }
+  selectStateDialog(ss);
+}
+
+function selectStateDialogReturn(reply) {
   var nfield = document.getElementById('statename');
   var nm = nfield.value;
   var tfield = document.getElementById('deltatime');
@@ -798,7 +888,8 @@ var exports = {
   dialogReturn : dialogReturn,
   setCurrentLineColor : setCurrentLineColor,
   selectFile : selectFile,
-  setNameField : setNameField
+  setNameField : setNameField,
+  stateSelected : stateSelected
 };
 globals.myScript = exports;
 
