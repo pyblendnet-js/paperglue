@@ -13,13 +13,10 @@
   <!-- should have the same scope as per https://github.com/paperjs/paper.js/issues/153 -->
   <script type="text/javascript" src="dorec.js"> </script>
   <script type="text/javascript" src="imgavail.js"> </script>
-  <script>  // type="text/paperscript" canvas="myCanvas">
+  <script>  
   function onload() {
     console.log("body loaded");
     console.log(Object.keys(window.globals) ); //.onload();  //no use since it may not be added to globals yet
-    //myScriptInit();
-
-    window.globals.importRecord = getRecord;
   }
 
   function myScriptCmd(cmd, arg0,arg1,arg2,arg3,arg4) {

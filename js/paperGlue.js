@@ -312,6 +312,11 @@ function onImageMouseDown(event) {
 
     if(this === imgobj.raster) {  //master image found
       console.log("Master image found");
+      if(!editMode) {
+        if(imgobj.hasOwnProperty('hitCallback'))
+          imgobj.hitCallback(mouseDownPosition,event,hit_id,imgobj);
+        return false;
+      }
       if(rightButton) {
         if(imgobj.hasOwnProperty('contextMenu')) {  // if not defined then stay with default
           console.log("Attaching image context menu");
@@ -345,7 +350,12 @@ function onImageMouseDown(event) {
   if(!!id) {
     console.log("Clone image found ID=" + id);
     imgobj = imageInstances[id];
-    //if(this == imginst.raster) {  // clone image found
+    if(!editMode) {
+      if(imgobj.hasOwnProperty('hitCallback'))
+        imgobj.hitCallback(mouseDownPosition,event,hit_id,imgobj);
+      return false;
+    }
+      //if(this == imginst.raster) {  // clone image found
       src = imgobj.src;
       showImageCursors(imgobj,false);
       if(rightButton) {
@@ -613,6 +623,8 @@ function stopEvent(event){
 function onContextMenu(event) {
   console.log("Call for context menu");
   stopEvent(event);
+  if(!editMode)
+    return false;
   if(modalOpen || !currentContextMenu) {
     console.log("Modal or no currentContextMenu");
     return false;
@@ -628,13 +640,15 @@ function showContextMenu(control, e) {
   var posx = e.clientX +window.pageXOffset +'px'; //Left Position of Mouse Pointer
   var posy = e.clientY + window.pageYOffset + 'px'; //Top Position of Mouse Pointer
   var el = document.getElementById(control);
-  el.style.position = 'absolute';
-  el.style.display = 'inline';
-  el.style.left = posx;
-  el.style.top = posy;
-  var tbl = el.children[0];  //assumes menu has table as first child
-  currentContextTable = tbl;
-  loadCurrentContextMenu(tbl);
+  if(!!el) {
+    el.style.position = 'absolute';
+    el.style.display = 'inline';
+    el.style.left = posx;
+    el.style.top = posy;
+    var tbl = el.children[0];  //assumes menu has table as first child
+    currentContextTable = tbl;
+    loadCurrentContextMenu(tbl);
+  }
 }
 
 /* Call to generate and show the contextmenu for the current object if any
@@ -663,9 +677,11 @@ function loadCurrentContextMenu(tbl) {
 
 function hideContextMenu(control) {
   var el = document.getElementById(control);
-  el.style.display = 'none';
-  var tbl = el.children[0];  //assumes menu has table as first
-  tbl.innerHTML = "";
+  if(!!el) {
+    el.style.display = 'none';
+    var tbl = el.children[0];  //assumes menu has table as first
+    tbl.innerHTML = "";
+  }
   currentContextMenu = defaultContextMenu;
   //cursorPos[0] = currentContextObject.raster.position;
   //hideCursor();
@@ -703,13 +719,15 @@ function onMouseDown(event) {
   mouseDownPosition = event.point;
   hideArea();
   hideContextMenu('contextMenu');
-  if(!!lineSelected || !!imageSelected) {     // an existing line has been selected
-    console.log("Something selected");
-  } else {
-    var id = hitTestLines(mouseDownPosition);
-    if(!!id) {
-      lineSelected = lineInstances[id].path;
-      selectLine(event);
+  if(editMode) {
+    if(!!lineSelected || !!imageSelected) {     // an existing line has been selected
+      console.log("Something selected");
+    } else {
+      var id = hitTestLines(mouseDownPosition);
+      if(!!id) {
+        lineSelected = lineInstances[id].path;
+        selectLine(event);
+      }
     }
   }
   if(rightButtonCheck(event)) {
@@ -1015,6 +1033,8 @@ function selectItem(id,item) {
 // onmousedown callback for two point paths
 // harder to use than picking the ends but the only way to drag whole line
 function onLineMouseDown(event) {
+  if(!editMode)
+    return true;
   stopEvent(event);
   mouseDownHandled = true;
   console.log("Line mouse down");
@@ -1059,7 +1079,7 @@ function selectLine(event) {
 // universal mouse drag function can drag lines or images or create rubber band new line
 function onMouseDrag(event) {
   // only fires when the mouse button is pressed
-  if(modalOpen)
+  if(modalOpen || !editMode)
     return;
   if(rightButton) {
     var v = event.point - mouseDownPosition;
@@ -1252,6 +1272,9 @@ function onMouseUp(event) {
   } else {  // not edit mode
     var hit_id = hitTestAreas(mouseDownPosition);
     if(!!hit_id) {
+      var area = areaInstances[hit_id];
+      if(area.hasOwnProperty('hitCallback'))
+        area.hitCallback(mouseDownPosition,event,hit_id,area);
       if(typeof window.globals.hitCallback === 'function')
         window.globals.hitCallback(hit_id);
     }
@@ -1601,8 +1624,18 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
         hideCursor();
         break;
       case 'escape':
-        hideContextMenu('contextMenu');
-        hideCursor();
+        if(!editMode) {
+          if(confirm("Exit to edit mode?"))
+            setEditMode(true);
+        } else {
+          if(event.shiftPressed) {
+            if(confirm("Exit edit mode?"))
+              setEditMode(false);
+          } else {
+            hideContextMenu('contextMenu');
+            hideCursor();
+          }
+        }
         break;
     }
   }
@@ -1675,6 +1708,60 @@ function buildImgList() {
   return img_list;
 }
 
+function buildRedoTxt(beautify,include_loader) {
+  // made sort of JSON beautifier but may not use
+  var txt = "";
+  if(include_loader)
+    txt += "var jdata='";
+  var json_txt = buildRedoData();
+  var indent = 0;
+  var llc = null;
+  var lc = null;
+  var lt = [];  // whether brace level caused indent
+  var bl = 0;
+  var col = 0;
+  for(var ji in json_txt) {
+    var c = json_txt[ji];
+    if(beautify) {
+      var nl = false;  // assumption
+      switch(c) {
+        case '{':
+        case '[':
+          //if(lc === ':')
+          //  break;
+          //if(lc !== ',')  // array
+          indent++;
+          //lt[bl++] = 0;
+          nl = true;
+          break;
+        case '}':
+        case ']':
+          bl--;
+          indent -= 2;
+          break;
+      }
+      if(lc === ',') {
+        nl = true;
+      }
+      if(nl) {
+        txt += "\n";
+        for(var ti = 0; ti < indent; ti++)
+          txt += "  ";
+        col = indent*2;
+      }
+      if(nl && lc !== ',')
+        indent++;
+    }
+    txt += c;
+    col++;
+    llc = c;
+    lc = c;
+  }
+  if(include_loader)
+    txt += doRecLoader;
+  return txt;
+}
+
 function buildRedoData() {
   // build reduced image list
   var img_list = buildImgList();
@@ -1687,6 +1774,17 @@ function buildRedoData() {
     console.error("JSON Stringify error:"+err);
   }
   return jdata;
+}
+
+function saveDoRec() {
+  if(window.location.protocol == 'file:') {
+    alert("Can only save dorec.js with server active.");
+  }
+  if(typeof nodeComms.sendData !== 'function')
+    return;
+  var jtxt = buildRedoTxt(true,true);
+  var save_data = {command:'save',path:"dorec.js",data:jtxt};
+  nodeComms.sendData(JSON.stringify(save_data));
 }
 
 function saveRecordAs() {
@@ -1715,9 +1813,9 @@ function saveRecord(path,subpath) {
   } else if(typeof nodeComms.sendData === 'function') {
     var save_data = {command:'save',path:recordPath,data:jdata};
     if(typeof path !== 'undefined')
-      postObject.path = path;
+      save_data.path = path;
     if(typeof subpath !== 'undefined')
-      postObject.subpath = subpath;
+      save_data.subpath = subpath;
     nodeComms.sendData(JSON.stringify(save_data));
   }
 }
@@ -1813,12 +1911,13 @@ function parseRecord(jdata) {
     try {
       console.log("Data="+jdata);
       var project_data = JSON.parse(jdata);
-      removeAll();
+      if(doRecord.length > 0)
+        removeAll();
       imglist = project_data.imglist;
       console.log("Images to load:"+imglist.length); //Array.isArray(imglist));
       // add any images not already loaded - does not check date
       var overload_images = true;
-      if(editMode && imglist.length > 0)
+      if(editMode && imglist.length > 0 && Object.keys(imagesLoaded) > 0)
         overload_images = confirm("Overload existing images with same name?");
       var imgs_to_load = [];
       for(var ik in imglist) {
@@ -2289,6 +2388,10 @@ function enableKeyFocus(state) {
 
 function setEditMode(state) {
   editMode = state;
+  if(editMode)
+    console.log("**EDIT MODE**");
+  else
+    console.log("**RUN MODE**");
 }
 
 function setModalOpen(state) {
@@ -2337,7 +2440,7 @@ function areaSelect() {
 // for loading a static js doRecord
 function loadStaticRec(fname) {
   console.log("Run global function "+fname);
-  parseRecord(window.globals[fname]());
+  parseRecord(window.globals[fname]);
 }
 
 /* Add meta data to do record from external
@@ -2459,8 +2562,8 @@ function stepState(direction, rate) {
 }
 
 // the following is used for adding a loader to a doRec.js include
-var doRecLoader = "';\nfunction getRecord() {return jdata;}\nwindow.globals.importRecord = getRecord;\n";
-var imgAvailLoader = "';\nfunction getImgAvail() { return idata; }\nwindow.globals.imagesAvailable = idata;\n";
+var doRecLoader = "';\nwindow.globals.importRecord = jdata;\n";
+var imgAvailLoader = "';\nwindow.globals.imagesAvailable = idata;\n";
 
 var walkerTree = [];
 var imgFileList;
@@ -2595,7 +2698,8 @@ var exports = {
   addToDefaultMenu:addToDefaultMenu,
   addToOptionsMenu:addToOptionsMenu,
   loadStaticRec:loadStaticRec,
-  buildRedoData:buildRedoData,
+  buildRedoTxt:buildRedoTxt,
+  saveDoRec:saveDoRec,
   saveRecord:saveRecord,
   loadRecord:loadRecord,
   listFiles:listFiles,
@@ -2603,7 +2707,6 @@ var exports = {
   addMeta:addMeta,
   setState:setState,
   importDefaults:importDefaults,
-  doRecLoader:doRecLoader
 };
 globals.paperGlue = exports;
 paperGlue = globals.paperGlue;  // for dependant modules to add:

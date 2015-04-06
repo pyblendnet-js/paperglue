@@ -24,6 +24,7 @@ var exportMenu = [
   {label:'list in new tab',callback:openActionsWindow},
   {label:'json in new tab',callback:openJSONWindow},
   {label:'  js in new tab',callback:openJSWindow},
+  {label:'  js as doRec.js',callback:saveJS},
 ];
 window.globals.menuLookup = { symbolMenu:symbolMenu,
                               symbolInstanceMenu:symbolInstanceMenu,
@@ -76,6 +77,9 @@ function initApp() {
     paperGlue.addToOptionsMenu(optionsMenuAddendum[i]);
   paperGlue.closeDialog = closeDialog;
   paperGlue.fileSelector = fileSelectorDialog;
+  loadDoRec();
+  paperGlue.setEditMode(false);  // begin in run mode
+  console.log("Press SHIFT ESC to exit run mode");
 }
 
 function drawGrid(spacing) {
@@ -249,6 +253,10 @@ function openJSWindow() {
   openRecordWindow(false,true);
 }
 
+function saveJS() {
+  paperGlue.saveDoRec();
+}
+
 var recordWindow = null;
 
 /* generate a browser page which can be saved as a js file for
@@ -262,68 +270,14 @@ function openRecordWindow(beautify,include_loader) {
     //var dri = globals.paperGlue.getDoIndex();
     var txt = "";
     txt = "";
-    if(include_loader)
-      txt += "var jdata='";
-    else
+    if(!include_loader)
       txt += "<html><body><pre>";
-    txt += buildRedoData(beautify);
-    if(include_loader) {
-      txt += paperGlue.doRecLoader;
-    } else {
+    txt += paperGlue.buildRedoTxt(beautify,include_loader);
+    if(!include_loader) {
       txt += "</pre></body></html>";
     }
     recordWindow.document.write(txt);
     recordWindow.stop();
-}
-
-function buildRedoData(beautify) {
-  // made sort of JSON beautifier but may not use
-    var txt = "";
-    var json_txt = paperGlue.buildRedoData();
-    var indent = 0;
-    var llc = null;
-    var lc = null;
-    var lt = [];  // whether brace level caused indent
-    var bl = 0;
-    var col = 0;
-    for(var ji in json_txt) {
-      var c = json_txt[ji];
-      if(beautify) {
-        var nl = false;  // assumption
-        switch(c) {
-          case '{':
-          case '[':
-            //if(lc === ':')
-            //  break;
-            //if(lc !== ',')  // array
-            indent++;
-            //lt[bl++] = 0;
-            nl = true;
-            break;
-          case '}':
-          case ']':
-            bl--;
-            indent -= 2;
-            break;
-        }
-        if(lc === ',') {
-            nl = true;
-        }
-        if(nl) {
-          txt += "\n";
-          for(var ti = 0; ti < indent; ti++)
-            txt += "  ";
-          col = indent*2;
-        }
-        if(nl && lc !== ',')
-          indent++;
-      }
-      txt += c;
-      col++;
-      llc = c;
-      lc = c;
-    }
-    return txt;
 }
 
 function loadDoRec() {
@@ -705,8 +659,9 @@ function stateDialogReturn(reply) {
   if(reply === 'Apply') {
     return;
   }
-  paperGlue.setModalOpen(false);
-  paperGlue.enableKeyFocus(true);
+  //paperGlue.setModalOpen(false);
+  //paperGlue.enableKeyFocus(true);
+  closeDialog();
 }
 
 var savePath = "";  // kept from listing to give base path for save
