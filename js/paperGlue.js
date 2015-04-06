@@ -77,10 +77,22 @@ if(window.location.protocol === 'file:') {
   fileContextMenu.push({label:'save imgAvail.js',callback:buildImgAvail});
 }
 fileContextMenu.push({label:'new',callback:removeAll });
+
+var exportMenu = [
+  {label:'  js as doRec.js',callback:saveDoRec},
+];
+var importMenu = [
+  {label:'import dorec.js',callback:loadDoRec},
+];
+var stateMenu = [];
+
 var optionsContextMenu = [{label:'hide areas',callback:toggleAreas}];
 var defaultContextMenu = [
   {label:'image', callback:loadImage},
   {label:'file', submenu:fileContextMenu},
+  {label:'export', submenu:exportMenu},
+  {label:'import', submenu:importMenu},
+  {label:'state', submenu:stateMenu},
   {label:'options', submenu:optionsContextMenu}
 ];
 
@@ -108,6 +120,42 @@ function cloneShallow(obj) {
   for(var i in obj)
     ro[i] = obj[i];
   return ro;
+}
+
+// assumes for the moment that each menu item has a unique label
+function findMenu(m,base) {
+  if(typeof base === 'undefined')
+    base = defaultContextMenu;
+  for(var i in base) {
+    var mi = base[i];
+    if(mi.hasOwnProperty('submenu')) {
+      if(mi.label === m)
+        return base[i].submenu;
+      var rv = findMenu(m,mi.submenu);
+      if(!!rv)
+        return rv;
+    }
+  }
+  return null;
+}
+
+function appendMenus(menus_to_append) {
+  // console.log("ThisVars:"+Object.keys(this));
+  // console.log("WindowVars:"+Object.keys(window));
+  for(var m in menus_to_append) {
+    var dm = defaultContextMenu;
+    if(m !== 'defaultContextMenu') {
+      dm = findMenu(m);
+      if(!dm) {
+        alert("Could not find default menu "+m+" to append");
+        continue;
+      }
+    }
+    console.log("Found menu to append:"+dm);
+    var am = menus_to_append[m];
+    for(var i in am)
+      dm.push(am[i]);
+  }
 }
 
 /** Set quantum [x,y] for snap on lines and images
@@ -935,13 +983,6 @@ function toggleAreas() {
     showAllAreas();
     optionsContextMenu[0].label = 'hide areas';
   }
-}
-
-function addToDefaultMenu(item) {
-  defaultContextMenu.push(item);
-}
-function addToOptionsMenu(item) {
-  optionsContextMenu.push(item);
 }
 
 function hitTestArea(id,hit_point) {
@@ -2438,7 +2479,9 @@ function areaSelect() {
 }
 
 // for loading a static js doRecord
-function loadStaticRec(fname) {
+function loadDoRec(fname) {
+  if(typeof fname === 'undefined')
+    fname = "importRecord";
   console.log("Run global function "+fname);
   parseRecord(window.globals[fname]);
 }
@@ -2661,6 +2704,7 @@ console.log("PaperGlue functions to window globals");
 // window global are use for cross scope communications
 var exports = {
   init:init,
+  appendMenus:appendMenus,
   loadImages:loadImages,
   loadImage:loadImage,
   getImages:getImageInstances,
@@ -2695,11 +2739,8 @@ var exports = {
   setEditMode:setEditMode,  // change this to false for application
   setModalOpen:setModalOpen,
   areaSelect:areaSelect,
-  addToDefaultMenu:addToDefaultMenu,
-  addToOptionsMenu:addToOptionsMenu,
-  loadStaticRec:loadStaticRec,
+  loadDoRec:loadDoRec,
   buildRedoTxt:buildRedoTxt,
-  saveDoRec:saveDoRec,
   saveRecord:saveRecord,
   loadRecord:loadRecord,
   listFiles:listFiles,

@@ -20,29 +20,39 @@ var newAreaMenu = [ {label:'set area#', propCall:getAreaCount, callback:setArea}
 var areaMenu = [ {label:'name', propCall:getAreaNameCall},
                  {label:'rect', propCall:getAreaRectCall},
                  {label:'properties',callback:openAreaPropDialog}];
-var exportMenu = [
-  {label:'list in new tab',callback:openActionsWindow},
-  {label:'json in new tab',callback:openJSONWindow},
-  {label:'  js in new tab',callback:openJSWindow},
-  {label:'  js as doRec.js',callback:saveJS},
-];
+
+// paperGlue will be looking for the following menus
 window.globals.menuLookup = { symbolMenu:symbolMenu,
                               symbolInstanceMenu:symbolInstanceMenu,
                               lineInstanceMenu:lineInstanceMenu,
                               newAreaMenu:newAreaMenu,
-                              areaMenu:areaMenu,
-                              exportMenu:exportMenu
+                              areaMenu:areaMenu
                             };
-
-var defaultMenuAddendum = [
-  {label:'export',submenu:"exportMenu"},
-  {label:'import dorec.js',callback:loadDoRec},
+var exportMenu = [
+  {label:'list in new tab',callback:openActionsWindow},
+  {label:'json in new tab',callback:openJSONWindow},
+  {label:'  js in new tab',callback:openJSWindow},
+];
+var stateMenu = [
   {label:'set state',callback:setNewState}
 ];
-
-var optionsMenuAddendum = [
+var optionsMenu = [
   {label:'import defaults',callback:openImgLoadDefaultDialog}
 ];
+
+// menus to append keys must match the label for the desired submenu
+// special case is defaultContextMenu
+// tree by using underline eg. menu_submenu
+menusToAppend = {
+  export:exportMenu,
+  options:optionsMenu,
+  state:stateMenu
+};
+
+var defaultMenuAddendum = [
+];
+
+
 
 var first_image = {src:"img/con_Block_5.08mm_12.png", scale:0.6, id:"conBlock1", isSymbol:true, dragClone:true, pos:view.center };
 var default_image_menus = { contextMenu:"symbolMenu", instanceContextMenu:"symbolInstanceMenu"};
@@ -70,11 +80,8 @@ function initApp() {
   paperGlue.init();  // sets up extra layers
   paperGlue.loadImages([],default_image_menus);  //first_image
   paperGlue.setSnap([5,5,10,10]);
+  paperGlue.appendMenus(menusToAppend);
   paperGlue.showAreas();
-  for(var i in defaultMenuAddendum)
-    paperGlue.addToDefaultMenu(defaultMenuAddendum[i]);
-  for(i in optionsMenuAddendum)
-    paperGlue.addToOptionsMenu(optionsMenuAddendum[i]);
   paperGlue.closeDialog = closeDialog;
   paperGlue.fileSelector = fileSelectorDialog;
   loadDoRec();
@@ -253,10 +260,6 @@ function openJSWindow() {
   openRecordWindow(false,true);
 }
 
-function saveJS() {
-  paperGlue.saveDoRec();
-}
-
 var recordWindow = null;
 
 /* generate a browser page which can be saved as a js file for
@@ -281,7 +284,7 @@ function openRecordWindow(beautify,include_loader) {
 }
 
 function loadDoRec() {
-  paperGlue.loadStaticRec("importRecord");
+  paperGlue.loadDoRec();
 }
 
 var tempMouseUp;
