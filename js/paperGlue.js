@@ -227,45 +227,32 @@ function addImage(source, id) {
   return img;
 }
 
-// returns an array of keys matching search by for array or table of objects
-function findKey(dict,search_by,search_key) {
-  var keys = [];
-  for(var i in dict) {
-    console.log("i:"+i);
-    var inst = dict[i];
-    console.log("Inst:"+inst.hasOwnProperty(search_by));
-    console.log("ByInst:"+inst[search_by]+" ?= "+search_key);
-    if(inst[search_by] === search_key)
-      keys.push(i);
-  }
-  return keys;
-}
-
-// finds an instance of an image clone based on id, raster or src
-// If src then returns a list of matching ids, otherwise first instance
-function findInstance(obj,search_by,search_key,first_only) {
+// finds an instance of an object based on element key and value
+// if first_only is true then the key for one instance is returned
+// otherwise an array of keys is returned
+// if search value is undefined then all instances with the search_by
+// element are returned
+function findInstance(obj,search_by,first_only,search_value) {
   // search through obj.search_by == search_key
   // if first_only is true then return first match
-  console.log("Find instance of "+search_by+ " in "+Object.keys(obj).length + " instances");
-  if(search_key === 'id') {
-    if(obj.hasOwnProperty(search_key)) {
-      return search_key;
-    }
-    return null;
-  }
-  var ids = [];
-  for(var id in obj) {
-    console.log("Checking id:"+id);
-    var inst = obj[id];
-    if(inst.hasOwnProperty(search_by) && inst[search_by] == search_key) {
-      if(first_only)
-        return id;
-      ids.push(id);
+  if(typeof first_only === 'undefined')
+    first_only = false;
+  var keys = [];
+  for(var key in obj) {
+    //console.log("Checking id:"+id);
+    var inst = obj[key];
+    if(inst.hasOwnProperty(search_by)) {
+      if((typeof search_value === 'undefined') ||
+           inst[search_by] == search_value) {
+        if(first_only)
+          return key;
+        keys.push(key);
+      }
     }
   }
   if(first_only)
     return null;
-  return ids;
+  return keys;
 }
 
 function drawCross(pos, size, color) {
@@ -394,7 +381,7 @@ function onImageMouseDown(event) {
     }
   }
   // no master image found, so maybe this is a clone
-  id = findInstance(imageInstances,"raster",this,true);
+  id = findInstance(imageInstances,"raster",true,this);
   if(!!id) {
     console.log("Clone image found ID=" + id);
     imgobj = imageInstances[id];
@@ -896,7 +883,7 @@ function removeAreaInstance(id, record) {
       // note: name may not be defined
       doRecordAdd({action:'areaDelete',id:id,rect:a.rect,name:a.name});
     }
-    delete areaInstances[id];  // removes from list
+    delete areaInstances[id];  // removes from object items
     if(selectedItems.hasOwnProperty(id))
       delete selectedItems[id];
   }
@@ -1004,7 +991,7 @@ function hitTestAreas(hit_point) {
 
 function areaMoved(path,prev_pos) {
   console.log("Area moved");
-  var aid = findInstance(areaInstances,'path',path,true);
+  var aid = findInstance(areaInstances,'path',true,path);
   if(!!aid) {  // shouldn't be any trouble here
     console.log("area instance found with id:"+aid);  // need to keep id as well - might be null for master objects in layout mode
     var inst = areaInstances[aid];
@@ -1093,7 +1080,7 @@ function onLineMouseDown(event) {
 function selectLine(event) {
   if(rightButtonCheck(event)) {
     console.log("Right button down");
-    var ids = findKey(lineInstances,'path',lineSelected);
+    var ids = findInstance(lineInstances,'path',true,lineSelected);
     if(ids.length > 0) {
       console.log("Line found:"+ ids[0]);
       currentContextObject = {id:ids[0],type:'line',inst:lineSelected};  //to match image instance object
@@ -1328,7 +1315,7 @@ function onMouseUp(event) {
 
 function imageMoved(img,prev_pos,spot_rotate,src_prev_rot) {
   // note that src_prev_rot is only no null for first symbol creation
-  var img_id = findInstance(imageInstances,'raster',img,true);
+  var img_id = findInstance(imageInstances,'raster',true,img);
   if(!!img_id) {  // shouldn't be any trouble here
     console.log("instance found with id:"+img_id);  // need to keep id as well - might be null for master objects in layout mode
     var round_only = !snapDefault;
@@ -1506,6 +1493,7 @@ function doRecordAdd(action) {
     doRecord.splice(doRecordIndex,0,action);
   }
   doRecordIndex++;
+  writeEditStatus();
 }
 
 var controlPressMs = 0;
@@ -1691,7 +1679,7 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
 
 function incMoveSymbol(obj,direction,snap) {
   objPosition = obj.raster.position;
-  var img_id = findInstance(imageInstances,'raster',obj.raster,true);
+  var img_id = findInstance(imageInstances,'raster',true,obj.raster);
   if(snap) {
     obj.raster.position += [direction[0]*snapRect[2],direction[1]*snapRect[3]];
     if(!!img_id) {
@@ -1714,7 +1702,7 @@ function incMoveSymbol(obj,direction,snap) {
 function incMoveArea(obj,direction,snap) {
   objRect = obj.inst.rect;
   var inst = obj.inst;
-  var area_id = findInstance(areaInstances,'path',inst.path,true);
+  var area_id = findInstance(areaInstances,'path',true,inst.path);
   var delta = direction;
   if(snap) {
     delta[0] *= snapRect[2];
@@ -1974,13 +1962,13 @@ function parseRecord(jdata) {
       console.log("Images to load:"+imgs_to_load);
       loadImages(imgs_to_load);  //will add to previously set defaults
       var do_record = project_data.dolist;
-      for(var di in do_record) {
-        console.log("ID:"+do_record[di].id);
-      }
-      parsePaperRecord(do_record);
-      for(di in doRecord) {
-        console.log("ID:"+doRecord[di].id);
-      }
+      //for(var di in do_record) {
+      //  console.log("ID:"+do_record[di].id);
+      //}
+      parsePaperRecord(do_record);  // fixes point & rect data + to_do.id s
+      //for(di in doRecord) {
+      //  console.log("ID:"+doRecord[di].id);
+      //}
       doRecordIndex = 0;
       doAll();
 
@@ -2082,11 +2070,19 @@ function removeSymbols() {
   }
 }
 
-function removeAll(){
-  if(editMode && confirm("Do you want to clear current workspace?"))
-  { removeLines();
-    removeSymbols();
-    removeAreas();
+function removeAll(including_record){
+  // if including_record then this is effectively a new sandpit
+  // if not including_record then it just clears the instances
+  if(typeof including_record === 'undefined')
+    including_record = true;
+  if(including_record) {
+    if(editMode && !confirm("Do you want to clear current workspace?"))
+      return;
+  }
+  removeLines();
+  removeSymbols();
+  removeAreas();
+  if(including_record) {
     doRecord = [];
     doRecordIndex = 0;
     nextID = 0;  // start again
@@ -2198,7 +2194,17 @@ function undo() {
           areaInstances[last_do.id] = last_do.name;
         if(areasVisible)
           showArea(last_do.id);
+        break;
+      case 'state':
+        if(last_do.clearFlag) {
+          // somehow need to restore everything that was there?
+          alert("Current action cleared canvas, so state uncertain.");
+        } else {
+          //undo();  //skip back one more
+        }
+        break;
     }
+    writeEditStatus();
 }
 
 function remakeLine(to_do,pos) {
@@ -2216,6 +2222,8 @@ function redo() {
   console.log("Redo");
   if(doRecordIndex >= doRecord.length)
     return false;  // nothing to undo
+  console.log("doRecordIndex:"+doRecordIndex);
+  console.log("doRecord.length:"+doRecord.length);
   var to_do = doRecord[doRecordIndex];
   if(to_do.id > nextID)
     nextID = to_do.id;  // this used to happen with loading of old data
@@ -2293,8 +2301,28 @@ function redo() {
     case 'areaDelete':
       removeAreaInstance(to_do.id,false);
       break;
+    case 'state':
+      // only needs to make state if it doesn't already exist
+      // this should only happen in redo for parseRecord from load
+      if(!stateInstances.hasOwnProperty(to_do.id)) {
+        var inst = {};
+        for(var k in to_do) {
+          if(k == 'id' || k == 'type')
+            continue;
+          inst[k] = to_do[k];
+        }
+        stateInstances[to_do.id] = inst;
+      }
+      if(to_do.hasOwnProperty('clearFlag') && to_do.clearflag) {
+        console.log("Remove line, area and images - ie start again");
+        removeAll(false);
+      } //doRecordIndex++;
+      //redo();  // then skip to next do
+      //writeEditStatus();
+      //return;
   }
   doRecordIndex++;
+  writeEditStatus();
   return true;  // something done
 }
 
@@ -2374,6 +2402,11 @@ function pruneDo(remove_undo) {
 
 
 // global hooks for created objects
+
+function getNextID() {
+  return nextID;
+}
+
 function getImageInstances() {
   return imageInstances;
 }
@@ -2538,32 +2571,57 @@ function getState() {
 
 function setState(state) {
   var id = null;
+  var to_do;
   if(doRecordIndex > 0) {
-    var to_do = doRecord[doRecordIndex-1];
+    to_do = doRecord[doRecordIndex-1];
+    if(to_do.type === 'state') {  // this position already stated
+      if(confirm("Previous action is state of name:"+to_do.name+"\nDo you wish to replace?")) {
+        id = to_do.id;
+        doRecord.splice(--doRecordIndex,1);
+      }
+    }
+  }
+  console.log("doRecordIndex:"+doRecordIndex);
+  console.log("doRecord.length:"+doRecord.length);
+  if(doRecordIndex < doRecord.length) {  //replacing current state
+    to_do = doRecord[doRecordIndex];
     if(to_do.type === 'state') {  // this position already stated
       id = to_do.id;
-      delete doRecord[--doRecordIndex];
+      console.log("Length:"+doRecord.length);
+      doRecord.splice(doRecordIndex,1);
+      console.log("Length:"+doRecord.length);
     }
   }
   if(!id) {
-    if(stateInstances.hasOwnProperty(state.nm)) {
+    var id2 = findInstance(stateInstances,'nm',true,state.nm);
+    if(!!id2) {
       alert("A state with name " + state.nm + " already exists");
       return;
     }
     id = nextID;
     nextID++;
   }
-  var inst = {id:nextID};
+  var inst = state;
   var dorec = {action:'state',id:id,type:'state'};
   for(var k in state) {
     dorec[k] = state[k];
-    inst[k] = state[k];
     console.log("State key:"+k+" = "+state[k]);
   }
-  stateInstances[state.nm] = inst;
+  stateInstances[id] = inst;
   console.log("Adding state:"+ Object.keys(state));
   doRecordAdd(dorec);  // where state is an object
   return doRecordIndex;
+}
+
+function getCurrentStateRec() {
+  if(doRecordIndex >= doRecord.length)
+    return null;
+  var dorec = doRecord[doRecordIndex];
+  if(dorec.action !== 'state')
+    return null;
+  if(!stateInstances.hasOwnProperty(dorec.id))
+    return null;
+  return {state:stateInstances[dorec.id],id:dorec.id};
 }
 
 function getNextState(start_index) {
@@ -2735,6 +2793,7 @@ var exports = {
   appendMenus:appendMenus,
   loadImages:loadImages,
   loadImage:loadImage,
+  getNextID:getNextID,
   getImages:getImageInstances,
   getLines:getLineInstances,
   getAreas:getAreaInstances,
@@ -2777,6 +2836,7 @@ var exports = {
   parseRecord:parseRecord,
   addMeta:addMeta,
   setState:setState,
+  getCurrentStateRec:getCurrentStateRec,
   getNextState:getNextState,
   importDefaults:importDefaults,
 };
@@ -2785,11 +2845,29 @@ paperGlue = globals.paperGlue;  // for dependant modules to add:
 // - fileSelector(objective,dir_obj) = a gui to display directories returned by list()
 // - closeDialog() = so pressing escape will close any modal dialogs
 
-
-
 if(typeof globals.onPaperGlueLoad == 'function')  { // myScript couldn't find loadImages so provided a call to repeat the request
   console.log("PaperGlue loaded now so can use onPaperLoad to load images.");
   console.log(typeof globals.loadImages);
   globals.onPaperGlueLoad();
 }
-// that was a bit messy and my be avoided if I used requirejs or browserify - though I suspect that paper.js will not like it.
+// that was a bit messy and may be avoided if I used requirejs or browserify - though I suspect that paper.js will not like it.
+
+function writeStatus(msg) {
+  if(typeof window.globals.writeStatus === 'function')
+    window.globals.writeStatus(msg);
+}
+
+function writeEditStatus() {
+  var msg = 'EditMode Next do#'+doRecordIndex+'(of '+doRecord.length+')';
+  if(doRecordIndex < doRecord.length) {
+    var dorec = doRecord[doRecordIndex];
+    // msg += " = "+dorec.action;
+    // if(dorec.hasOwnProperty("id")) {
+    //   msg += " for "+dorec.id;
+    //   if(dorec.hasOwnProperty("type"))
+    //     msg += " of "+dorec.type;
+    // }
+    msg += ' = ' + JSON.stringify(dorec);
+  }
+  writeStatus(msg);
+}

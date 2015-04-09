@@ -628,12 +628,24 @@ function setCurrentLineColor(c) {
 }
 
 var nextStateID = 0;
-var nextStateTime = 0;
 
 function setNewState() {
-  var new_state = {nm:"state#"+nextStateID,dt:0};
+  var staterec = paperGlue.getCurrentStateRec();
+  var state;
+  var id;
+  if(!staterec) {
+    state = {name:"state#"+nextStateID,dt:0};
+    console.log("Create new state of name:"+state.name);
+    id = paperGlue.getNextID();
+  } else {
+    id = staterec.id;
+    state = staterec.state;
+    console.log("Found state of name:"+state.name);
+    if(state.hasOwnProperty("clearFlag"))
+      console.log("ClearFlag:"+state.clearFlag);
+  }
   nextStateID++;
-  setStateDialog(new_state,'new');
+  setStateDialog(state,id);
 }
 
 function setStateDialog(state,id) {
@@ -645,9 +657,16 @@ function setStateDialog(state,id) {
   var p = '<table ' + fs + '>';
   p += '<tr id="idRow"><td>ID</td><td>'+id+'</td></tr>';
   p += '<tr><td>State Name</td><td>';
-  p += '<input id="statename" type="text" value="'+state.nm+'"/></td></tr>';
+  p += '<input id="statename" type="text" value="'+state.name+'"/></td></tr>';
+  if(!state.hasOwnProperty('dt'))
+    state.dt = 0;
   p += '<tr><td>DeltaTime</td><td>';
   p += '<input id="deltatime" type="number" value="'+state.dt+'"/></td></tr>';
+  p += '<tr><td>Clear After</td><td>';
+  var clearFlag = "";
+  if(state.hasOwnProperty('clearFlag') && state.clearFlag)
+    clearFlag = 'checked="true"';
+  p += '<input id="clearflag" type="checkbox"'+clearFlag+'/></td></tr>';
   p += '</table>';
   var content = document.getElementById('DlgContent');
   content.innerHTML = p;
@@ -657,11 +676,18 @@ function setStateDialog(state,id) {
 
 function setStateDialogReturn(reply) {
   var nfield = document.getElementById('statename');
-  var nm = nfield.value;
+  var name = nfield.value;
   var tfield = document.getElementById('deltatime');
   var dt = parseFloat(tfield.value);
+  var cfield = document.getElementById('clearflag');
+  var clearFlag = cfield.checked;
   if(reply !== 'Cancel') {
-    paperGlue.setState({nm:nm,dt:dt});
+    var state = {name:name};
+    if(dt !== 0)
+      paperGlue.dt = dt;
+    if(clearFlag)
+      state.clearFlag = clearFlag;
+    paperGlue.setState(state);
   }
   paperGlue.hideCursor();
   if(reply === 'Apply') {
@@ -880,6 +906,12 @@ function fileSelectReturn(reply) {
   }
   closeDialog();
 }
+
+function writeStatusLine(msg) {
+  var se = document.getElementById('statusInfo');
+  se.innerHTML = msg;
+}
+window.globals.writeStatus = writeStatusLine;
 
 //window.globals.keyhandler = keyDown;  // requests paperglue to pass event here
 var globals = window.globals;
