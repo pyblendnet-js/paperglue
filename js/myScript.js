@@ -630,32 +630,29 @@ function setCurrentLineColor(c) {
 var nextStateID = 0;
 
 function setNewState() {
-  var staterec = paperGlue.getCurrentStateRec();
-  var state;
-  var id;
-  if(!staterec) {
-    state = {name:"state#"+nextStateID,dt:0};
+  var state = paperGlue.getCurrentState();
+  if(!state) {
+    state = {id:paperGlue.getNextID(),
+                name:"state#"+nextStateID};
     console.log("Create new state of name:"+state.name);
-    id = paperGlue.getNextID();
+    nextStateID++;
   } else {
-    id = staterec.id;
-    state = staterec.state;
-    console.log("Found state of name:"+state.name);
+    if(state.hasOwnProperty("name"))
+      console.log("Found state of name:"+state.name);
     if(state.hasOwnProperty("clearFlag"))
       console.log("ClearFlag:"+state.clearFlag);
   }
-  nextStateID++;
-  setStateDialog(state,id);
+  setStateDialog(state);
 }
 
-function setStateDialog(state,id) {
+function setStateDialog(state) {
   dialogType = 'set_state';
   openDialogCommon(['Okay','Cancel']);
   console.log("Opening set state dialog");
   var fontsize = window.innerWidth/80;
   var fs = 'style="font-size:'+fontsize+'px;"';
   var p = '<table ' + fs + '>';
-  p += '<tr id="idRow"><td>ID</td><td>'+id+'</td></tr>';
+  p += '<tr id="idRow"><td>ID</td><td>'+state.id+'</td></tr>';
   p += '<tr><td>State Name</td><td>';
   p += '<input id="statename" type="text" value="'+state.name+'"/></td></tr>';
   if(!state.hasOwnProperty('dt'))
@@ -713,73 +710,75 @@ function skipToState() {
 function selectStateDialog(def_state) {
   var states = paperGlue.getStates();
   var states_count = Object.keys(states).length;
-  if( states_count === 0) {
-    alert("No states have been defined");
-    return;
-  }
   console.log("Currently " + states_count + " states");
   dialogType = 'select_state';
-  openDialogCommon(['Okay','Cancel']);
+  openDialogCommon();
   console.log("Opening select state dialog");
-  var state = def_state;
-  if(!state) {
-    console.log("No state given for default target so going to start");
-    state = paperGlue.getNextState(0);
-  }
-  console.log("Default to state"+state.name);
+  // var state = def_state;
+  // if(!state) {
+  //   console.log("No state given for default target so going to start");
+  //   state = paperGlue.getNextState(0);
+  // }
+  //console.log("Default to state"+state.name);
   var fontsize = window.innerWidth/80;
   var fs = 'style="font-size:'+fontsize+'px;"';
   var p = '<h2 id="state_select_heading">State Selector</h2>';
-  p += '<div><select ' + fs + 'id="state_select" onchange="myScriptCmd(stateSelected,this.value)"></select></div>';
-  p += '<table' + fs + '>';
-  if(state.hasOwnProperty("dt"))
-    p += '<tr><td>DeltaTime</td><td>'+state.dt+'</td></tr>';
-  p += '</table>';
+  var cf = "myScriptCmd('stateSelected',this.value)";
+  p += '<div><select ' + fs + 'id="state_select" onchange="' + cf + '"></select></div>';
+  // p += '<table' + fs + '>';
+  // if(state.hasOwnProperty("dt"))
+  //   p += '<tr><td>DeltaTime</td><td>'+state.dt+'</td></tr>';
+  // p += '</table>';
   var content = document.getElementById('DlgContent');
   content.innerHTML = p;
   var ss = document.getElementById("state_select");
   //fs.style.display = "inline";
   ss.length = 0;  // may hang for very long lists - see: http://www.somacon.com/p542.php
-  for(var id in states) {
-    state = states[id];
+  if(stateSkipMode) {
+    var doption = document.createElement("option");
+    doption.text = "START";
+    doption.value = 0;
+    ss.add(doption);
+  }
+  for(var i in states) {
+    state = states[i].state;
     var option = document.createElement("option");
-    option.text = state.name;
+    option.text = state.name + " @ " + states[i].index;
     // option.onclick = fileSelected; - only works in firefox
-    option.value = option.text;
+    option.value = states[i].index;
     ss.add(option);
+  }
+  eoption = document.createElement("option");
+  eoption.text = "END";
+  eoption.value = paperGlue.getDoLength();
+  ss.add(eoption);
+  // set option to current location
+  var ci = paperGlue.getDoIndex();
+  for(var si in ss.children) {
+    var v = ss.children[si].value;
+    if(v === ci) {
+      ss.value = v;
+      break;
+    }
+  }
+  if(ss.value != ci) {
+    eoption = document.createElement("option");
+    eoption.text = "select";
+    eoption.value = -1;  // dummy option
+    ss.add(eoption);
+    ss.value = -1;
   }
   setDialogMove("state_select_heading");
   return false;
 }
 
-function stateSelected(state_name) {
-  var states = paperGlue.getStates();
-  var ss = null;
-  for(var id in states) {
-    state = states[id];
-    if(state === state_name) {
-      ss = state;
-      console.log("Selecting state:"+state.name);
-      break;
-    }
-  }
-  selectStateDialog(ss);
-}
-
-function selectStateDialogReturn(reply) {
-  var nfield = document.getElementById('statename');
-  var nm = nfield.value;
-  var tfield = document.getElementById('deltatime');
-  var dt = parseFloat(tfield.value);
-  if(reply !== 'Cancel') {
-    paperGlue.setState({nm:nm,dt:dt});
-  }
-  paperGlue.hideCursor();
-  if(reply === 'Apply') {
-    return;
-  }
-  //paperGlue.setModalOpen(false);
-  //paperGlue.enableKeyFocus(true);
+function stateSelected(value) {
+  var index = parseInt(value);
+  console.log("Going to index:"+ index);
+  if(stateSkipMode)
+    paperGlue.skipToIndex(index);
+  else
+    paperGlue.forardToIndex(index);
   closeDialog();
 }
 

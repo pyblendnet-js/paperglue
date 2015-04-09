@@ -112,7 +112,6 @@ var baseImportDefaults = cloneShallow(importDefaults);
 var cursorPos = [];  // mouse, raster, origin, center
 var cursorImage = null;  // to allow cursor hide in selectItem
 var cursorColors = ['#f00','#ff0','#88f','#8f8'];
-var stateInstances = {};
 var currentStateRate = 0.0;  // immediate jumps to state
 
 function cloneShallow(obj) {
@@ -418,6 +417,12 @@ function onImageMouseDown(event) {
 // uses master image raster to create clone
 // only use force_id for redo so that it uses old id
 function symbolPlace(imgid, force_id) {
+  if(typeof force_id !== 'undefined') {
+    if(imageInstances.hasOwnProperty(force_id)) {
+      console.log("This image symbol still exists");
+      return;
+    }
+  }
   var imgobj = imagesLoaded[imgid];
   console.log("Placing clone of:"+imgobj.id);
   imageSelected = imgobj.symbol.place();
@@ -697,7 +702,7 @@ function loadCurrentContextMenu(tbl) {
   var fontsize = window.innerWidth/80;
   for(var mi in currentContextMenu) {
     var m = currentContextMenu[mi];
-    console.log(m);
+    //console.log(m);
     var txt = m.label;
     if(m.hasOwnProperty('propCall')) {
       //console.log("Has propCall");
@@ -1421,7 +1426,7 @@ function validatePath(path, force_id) {
   // only use force id for redo where the old id must be reused
   var next_id = nextID;
   var line_id = null;
-  if(typeof force_id == 'undefined') {
+  if(typeof force_id === 'undefined') {
     line_id = getLineID(path);
   } else {
     console.log("Force new line to id:",force_id);
@@ -1595,16 +1600,16 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
         propagate = false;
         break;
       case '.':
-        if(event.shiftPressed)
-          stepState(1,1);
-        else
-          stepState(1,0);
+        stepState(1,1);
+        break;
+      case '>':
+        stepState(1,0);
         break;
       case ',':
-        if(event.shiftPressed)
-          stepState(-1,1);
-        else
-          stepState(-1,0);
+        stepState(-1,1);
+        break;
+      case '<':
+        stepState(-1,0);
         break;
       case 'left':
         delta = [-1,0];
@@ -2195,12 +2200,11 @@ function undo() {
         if(areasVisible)
           showArea(last_do.id);
         break;
-      case 'state':
-        if(last_do.clearFlag) {
+      case 'setState':
+        if(last_do.hasOwnProperty('clearFlag') && last_do.clearFlag) {
           // somehow need to restore everything that was there?
-          alert("Current action cleared canvas, so state uncertain.");
-        } else {
-          //undo();  //skip back one more
+          alert("State clear flag set. Go forward or skip to state.");
+          doRecordIndex++;
         }
         break;
     }
@@ -2229,7 +2233,7 @@ function redo() {
     nextID = to_do.id;  // this used to happen with loading of old data
   // now loads should advance all to_do ids to start after nextID
   //console.log(Object.keys(to_do));
-  console.log("Redoing " + to_do.action);
+  console.log("Redoing " + to_do.action + " @ " + doRecordIndex);
   var raster;
   var imgobj;
   switch(to_do.action) {
@@ -2270,6 +2274,7 @@ function redo() {
       imageSelected = null;
       // this is normally followed by a drag move, so do this too
       to_do = doRecord[doRecordIndex+1];
+      //console.log("Index:"+(doRecordIndex+1)+" out of"+doRecord.length);
       if(to_do.action == 'imageMove') {
         doRecordIndex++;
         console.log("ID:"+to_do.id);
@@ -2283,8 +2288,10 @@ function redo() {
     case 'symbolDelete':
       removeImage(to_do.id,false);   // delete is already in records
       break;
-    case 'setArea':
-      areaInstances[to_do.id] = {rect:to_do.rect};
+    case 'setArea':   // doesn't matter if area still exists
+      if(!areaInstances.hasOwnProperty(to_do.id))
+        areaInstances[to_do.id] = {};
+      areaInstances[to_do.id].rect = to_do.rect;
       if(areasVisible)
         showArea(to_do.id);
       break;
@@ -2301,25 +2308,20 @@ function redo() {
     case 'areaDelete':
       removeAreaInstance(to_do.id,false);
       break;
-    case 'state':
-      // only needs to make state if it doesn't already exist
-      // this should only happen in redo for parseRecord from load
-      if(!stateInstances.hasOwnProperty(to_do.id)) {
-        var inst = {};
-        for(var k in to_do) {
-          if(k == 'id' || k == 'type')
-            continue;
-          inst[k] = to_do[k];
+    case 'setState':
+      console.log("SETSTATE");
+      console.log(Object.keys(to_do));
+      if(to_do.hasOwnProperty('clearFlag')) {
+        console.log("clearFlag"+to_do.clearFlag);
+        if(to_do.clearFlag) {
+          console.log("Remove line, area and images - ie start again");
+          removeAll(false);
         }
-        stateInstances[to_do.id] = inst;
-      }
-      if(to_do.hasOwnProperty('clearFlag') && to_do.clearflag) {
-        console.log("Remove line, area and images - ie start again");
-        removeAll(false);
       } //doRecordIndex++;
       //redo();  // then skip to next do
       //writeEditStatus();
       //return;
+      break;
   }
   doRecordIndex++;
   writeEditStatus();
@@ -2351,7 +2353,7 @@ function pruneDo(remove_undo) {
       continue;
     }
     switch(to_do.type) {
-      case 'state':
+      case 'setState':
         prunedDo.splice(0,0,to_do);
         if(di < doRecordIndex-1)
           keep_all = true;
@@ -2382,13 +2384,13 @@ function pruneDo(remove_undo) {
     //console.log("Pruned adding:"+to_do.action + " for:"+to_do.id);
   }
   keep_all = false;
-  if(doRecordIndex > 0 && doRecord[doRecordIndex-1].type === 'state')
+  if(doRecordIndex > 0 && doRecord[doRecordIndex-1].type === 'setState')
     keep_all = true;
   for(di = doRecordIndex; di < doRecord.length; di++) {
     // work forwards to look for future states
     //console.log("Do#"+di);
     to_do = doRecord[di];
-    if(to_do.type === 'state')
+    if(to_do.type === 'setState')
       keep_all = true;
     if(keep_all)
       prunedDo.push(to_do);
@@ -2421,9 +2423,15 @@ function getAreaInstances() {
   return areaInstances;
 }
 
-function getStateInstances() {
-  console.log("Returning state instances:", Object.keys(stateInstances).length);
-  return stateInstances;
+function getStates() {
+  console.log("Returning do record state instances");
+  var states = [];
+  for(var i in doRecord) {
+    var do_rec = doRecord[i];
+    if(do_rec.action === 'setState')
+      states.push({index:i,state:do_rec});
+  }
+  return states;
 }
 
 function getDoRecord() {
@@ -2434,6 +2442,11 @@ function getDoRecord() {
 function getDoIndex() {
   //console.log("Returning do record index:", doRecordIndex);
   return doRecordIndex;
+}
+
+function getDoLength() {
+  //console.log("Returning do record index:", doRecordIndex);
+  return doRecord.Length;
 }
 
 function getCurrentContextObject() {
@@ -2574,7 +2587,7 @@ function setState(state) {
   var to_do;
   if(doRecordIndex > 0) {
     to_do = doRecord[doRecordIndex-1];
-    if(to_do.type === 'state') {  // this position already stated
+    if(to_do.type === 'setState') {  // this position already stated
       if(confirm("Previous action is state of name:"+to_do.name+"\nDo you wish to replace?")) {
         id = to_do.id;
         doRecord.splice(--doRecordIndex,1);
@@ -2585,58 +2598,70 @@ function setState(state) {
   console.log("doRecord.length:"+doRecord.length);
   if(doRecordIndex < doRecord.length) {  //replacing current state
     to_do = doRecord[doRecordIndex];
-    if(to_do.type === 'state') {  // this position already stated
+    if(to_do.type === 'setState') {  // this position already stated
       id = to_do.id;
       console.log("Length:"+doRecord.length);
       doRecord.splice(doRecordIndex,1);
       console.log("Length:"+doRecord.length);
     }
   }
-  if(!id) {
-    var id2 = findInstance(stateInstances,'nm',true,state.nm);
-    if(!!id2) {
-      alert("A state with name " + state.nm + " already exists");
-      return;
-    }
-    id = nextID;
-    nextID++;
-  }
   var inst = state;
-  var dorec = {action:'state',id:id,type:'state'};
+  var dorec = {action:'setState',id:id,type:'state'};
   for(var k in state) {
     dorec[k] = state[k];
     console.log("State key:"+k+" = "+state[k]);
   }
-  stateInstances[id] = inst;
   console.log("Adding state:"+ Object.keys(state));
   doRecordAdd(dorec);  // where state is an object
   return doRecordIndex;
 }
 
-function getCurrentStateRec() {
+function getCurrentState() {
   if(doRecordIndex >= doRecord.length)
     return null;
   var dorec = doRecord[doRecordIndex];
-  if(dorec.action !== 'state')
+  if(dorec.action !== 'setState')
     return null;
-  if(!stateInstances.hasOwnProperty(dorec.id))
-    return null;
-  return {state:stateInstances[dorec.id],id:dorec.id};
+  return dorec;
 }
 
 function getNextState(start_index) {
   var dorec = scanStateForward(start_index);
-  if(!!dorec && stateInstances.hasOwnProperty(dorec.id))
-    return stateInstances[dorec.id];
-  return null;
+  return dorec;
 }
+
+function skipToIndex(index){
+  if(index > doRecord.length)
+    index = doRecord.length;
+  doRecordIndex = index;
+  console.log("Skipping to index:"+index);
+  if(editMode)
+    writeEditStatus();
+}
+
+function forwardToIndex(index){
+  if(index < doRecordIndex) {
+    if(editMode) {
+      if(confirm("Do you want to scan from start?")) {
+        removeAll(false);
+        doRecordIndex = 0;
+      }
+    } else {
+      console.error("Trying to go to older state");
+      return;
+    }
+  }
+  while(doRecordIndex < index)
+    redo();
+}
+
 
 function scanStateForward(state_point) {
   if(typeof start_index === 'undefined')
     start_index = doRecordIndex;
   for(var di = doRecordIndex; di < doRecord.length; di++) {
     var dorec = doRecord[di];
-    if(dorec.type === 'state') {
+    if(dorec.type === 'setState') {
       console.log("Found state at:"+di);
       return dorec;
     }
@@ -2648,7 +2673,7 @@ function gotoState(nm,direction,rate) {
   var dorec;
   do {
     dorec = stepState(direction,rate);
-  } while(!!dorec && dorec.nm !== nm);
+  } while(!!dorec && dorec.name !== nm);
 }
 /* Go to a particular state
 
@@ -2664,20 +2689,20 @@ function stepState(direction, rate) {
         (direction > 0 && doRecordIndex < doRecord.length)) {
     if(doRecordIndex > 0) {
       var dorec = doRecord[doRecordIndex-1];
-      if(dorec.action === 'state') {
+      if(dorec.action === 'setState') {
         console.log("Just past state:" + dorec.nm);
-        if(direction < 0)
-          currentStateRate = dorec.dt;
-        else {  // scan forward for next state
-          var dr = scanStateForward();
-          if(!!dr) {
-            currentStateRate = dr.dt;
-          } else
-            currentStateRate = 0.0;
+        if(direction > 0) // use this states rate
+          currentStateRate = dorec.dt*rate;
+        else {  // scan backwards for previous state to get rate
+          // var dr = scanStateForward();
+          // if(!!dr) {
+          //   currentStateRate = dr.dt*rate;
+          // } else  // no previous state
+          currentStateRate = 0.0;
         }
+        if(steps > 0)
+          return dorec.name;
       }
-      if(steps > 0)
-        return dorec.nm;
     }
     console.log("Step");
     if(direction < 0)
@@ -2686,6 +2711,7 @@ function stepState(direction, rate) {
       redo();
     steps++;
     console.log("RecordIndex:"+doRecordIndex);
+    console.log(direction+","+doRecord.length);
   }
   return null; // to indicate that we failed to find state point
 }
@@ -2797,9 +2823,10 @@ var exports = {
   getImages:getImageInstances,
   getLines:getLineInstances,
   getAreas:getAreaInstances,
-  getStates:getStateInstances,
+  getStates:getStates,
   getDoRecord:getDoRecord,
   getDoIndex:getDoIndex,
+  getDoLength:getDoLength,
   setSnap:setSnap,
   setLineThickness:setLineThickness,
   getLineColor:getLineColor,
@@ -2836,8 +2863,10 @@ var exports = {
   parseRecord:parseRecord,
   addMeta:addMeta,
   setState:setState,
-  getCurrentStateRec:getCurrentStateRec,
+  getCurrentState:getCurrentState,
   getNextState:getNextState,
+  skipToIndex:skipToIndex,
+  forwardToIndex:forwardToIndex,
   importDefaults:importDefaults,
 };
 globals.paperGlue = exports;

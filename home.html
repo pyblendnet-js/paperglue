@@ -20,12 +20,14 @@
   }
 
   function myScriptCmd(cmd, arg0,arg1,arg2,arg3,arg4) {
-    console.log(Object.keys(window.globals.myScript) );
-    console.log(cmd,arg0,arg1,arg2);//.onload();  //no use since it may not be added to globals yet
+    //console.log(Object.keys(window.globals.myScript) );
+    //console.log(cmd,arg0,arg1,arg2);//.onload();  //no use since it may not be added to globals yet
     window.globals.myScript[cmd](arg0,arg1,arg2,arg3,arg4);
   }
 
   function paperGlueCmd(cmd,arg0,arg1,arg2,arg3,arg4) {
+    //console.log("PaperGlue commands:"+Object.keys(window.globals.paperGlue) );
+    //console.log(cmd,arg0,arg1,arg2);//.onload();  //no use since it may not be added to globals yet
     window.globals.paperGlue[cmd](arg0,arg1,arg2,arg3,arg4);
   }
 
