@@ -8,7 +8,8 @@ var symbolMenu = [ {label:'name', propCall:imgGetNameCall},
                    {label:'pos',propCall:imgGetPosCall},
                    {label:'properties',callback:openImgPropDialog},
                    {label:'setCenter',propCall:imgGetCenterCall,callback:setCenterToCursor},
-                   {label:'setOrigin',propCall:imgGetOriginCall,callback:setOriginToCursor}
+                   {label:'setOrigin',propCall:imgGetOriginCall,callback:setOriginToCursor},
+                   {label:'remove',callback:objRemove}
                  ];
 var symbolInstanceMenu = [ {label:'name', propCall:imgGetInstanceNameCall},
                            {label:'pos',propCall:imgGetPosCall},
@@ -151,6 +152,11 @@ function imgGetPosCall(obj){
   console.log('pos called');
   console.log(Object.keys(obj));
   return obj.raster.position;
+}
+
+function objRemove(obj){
+  console.log("remove called");
+  paperGlue.delCurrentContextObject();
 }
 
 function getSnapModeCall(obj){
@@ -912,6 +918,15 @@ function writeStatusLine(msg) {
 }
 window.globals.writeStatus = writeStatusLine;
 
+function setMode(state) {
+  var se = document.getElementById('statusInfo');
+  if(state === 'edit')
+    se.style.display = 'inline';
+  else
+    se.style.display = 'none';
+}
+window.globals.setMode = setMode;
+
 //window.globals.keyhandler = keyDown;  // requests paperglue to pass event here
 var globals = window.globals;
 var exports = {
@@ -920,7 +935,7 @@ var exports = {
   setCurrentLineColor : setCurrentLineColor,
   selectFile : selectFile,
   setNameField : setNameField,
-  stateSelected : stateSelected
+  stateSelected : stateSelected,
 };
 globals.myScript = exports;
 

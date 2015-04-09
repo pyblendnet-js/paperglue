@@ -84,7 +84,10 @@ var exportMenu = [
 var importMenu = [
   {label:'import dorec.js',callback:loadDoRec},
 ];
-var stateMenu = [];
+var stateMenu = [
+  {label:'clear',callback:clearAll},
+  {label:'delete',callback:deleteState},
+];
 
 var optionsContextMenu = [{label:'hide areas',callback:toggleAreas}];
 var defaultContextMenu = [
@@ -98,6 +101,7 @@ var defaultContextMenu = [
 
 var currentContextMenu = defaultContextMenu;
 var currentContextObject = null;
+var contextEvent = null;
 var holdContext = false;  // don't reset contextMenu till after mouseUp
 var doRecord = [];  // record of all clonings and moves  {action:string,src_id:src.id,raster:image or line:path,pos:point}
 var doRecordIndex = 0;  // points to next do location
@@ -469,6 +473,14 @@ function loadImages(images_to_load, custom_default_props) {
   while(images_to_load.length > 0) {  // continue till empty - not sure if this is valid
     var imgobj = images_to_load.pop();
     imgobj.initialProp = Object.keys(imgobj);
+    if(imagesLoaded.hasOwnProperty(imgobj.id)) {
+      if(confirm("Already loaded. Add 'C' to id?")) {
+        imgobj.id += 'C';
+      } else {
+        var previous = imagesLoaded[imgobj.id];
+        previous.raster.remove();  // assume this is a reload
+      }
+    }
     imagesLoaded[imgobj.id]= imgobj;  // record master images
     imgobj.element = addImage(imgobj.src,imgobj.id);  // add image to document
     imgobj.raster = new Raster(imgobj.id);  // make this a paper image
@@ -583,6 +595,10 @@ function loadImage(path,subpath)  {
 function loadSingleImage(full_path, subpath) {
   //e.g var first_image = {src:"img/con_Block_5.08mm_12.png", scale:0.6, id:"conBlock1", isSymbol:true, dragClone:true, pos:view.center };
   var img = importDefaults;
+  if(!!contextEvent) {
+    console.log("Context event:"+contextEvent.clientX);
+    img.pos = new Point(contextEvent.clientX,contextEvent.clientY);
+  }
   img.src = full_path;
   img.id = subpath;
   var images_to_load = [img];
@@ -677,6 +693,7 @@ function onContextMenu(event) {
 // mostly from http://www.codeproject.com/Tips/630793/Context-Menu-on-Right-Click-in-Webpage
 // called by onContextMenu above
 function showContextMenu(control, e) {
+  contextEvent = e;
   var posx = e.clientX +window.pageXOffset +'px'; //Left Position of Mouse Pointer
   var posy = e.clientY + window.pageYOffset + 'px'; //Top Position of Mouse Pointer
   var el = document.getElementById(control);
@@ -2075,18 +2092,16 @@ function removeSymbols() {
   }
 }
 
-function removeAll(including_record){
-  // if including_record then this is effectively a new sandpit
-  // if not including_record then it just clears the instances
-  if(typeof including_record === 'undefined')
-    including_record = true;
-  if(including_record) {
-    if(editMode && !confirm("Do you want to clear current workspace?"))
-      return;
-  }
+function clearAll() {
   removeLines();
   removeSymbols();
   removeAreas();
+}
+
+function removeAll(){
+  if(editMode && !confirm("Do you want to clear current workspace?"))
+      return;
+  clearAll();
   if(including_record) {
     doRecord = [];
     doRecordIndex = 0;
@@ -2315,7 +2330,7 @@ function redo() {
         console.log("clearFlag"+to_do.clearFlag);
         if(to_do.clearFlag) {
           console.log("Remove line, area and images - ie start again");
-          removeAll(false);
+          clearAll(false);
         }
       } //doRecordIndex++;
       //redo();  // then skip to next do
@@ -2453,6 +2468,70 @@ function getCurrentContextObject() {
   return currentContextObject;  // remeber this is not an instance - contains id into instance
 }
 
+function removeImageRecord(src) {
+  // removes all instances of an image with src from doRecord
+  var found = false;
+  var symbols = [];
+  do {
+    for(var i in doRecord) {
+      var dorec = doRecord[i];
+      var del = false;
+      if(dorec.action === 'symbolPlace' && dorec.src_id === src) {
+        symbol_ids.push(dorec.img_id);
+        del = true;  // remove image creations
+      } else if(dorec.type === 'symbol' && dorec.id in symbol_ids)
+        del = true;  // remove every symbol that used this img
+      if(del) {
+        delete doRecord[i];
+        found = true;
+        break;
+      }
+    }
+  } while(found);  // have to start again each time an instance is found
+}
+
+function delCurrentContextObject() {
+  //{id:id,type:'image',inst:imgobj,src:imgobj,raster:imgobj.raster}
+  switch(currentContextObject.type) {
+    case 'image':
+      currentContextObject.raster.remove();
+      var instances = 0;
+      for(var symb in imageInstances) {
+        if(symb.src === currentContextObject.inst)
+          instances++;
+      }
+      console.log("Found this image being used "+ instances + "times");
+      if(instances === 0) {  // safe to delete for current state
+        var pot_instances = 0;
+        for(var i in doRecord) {
+          var dorec = doRecord[i];
+          if(dorec.action === 'symbolPlace' && dorec.src_id === currentContextObject.id)
+            pot_instances++;
+        }
+        console.log("found this image in record "+pot_instances);
+        if(pot_instances === 0 ||
+          confirm("Remove "+pot_instances + "instances from doRecord also?")) {
+          if(pot_instances > 0) {
+            removeImageRecord(currentContextObject.id);
+          }
+          delete imagesLoaded[currentContextObject.id];
+        }
+      }
+      hideCursor();
+      break;
+    case 'symbol':
+      removeImage(currentContextObject.id,true);
+      hideCursor();
+      break;
+    case 'line':
+      removeLine(currentContextObject.id,true);
+      break;
+    case 'area':
+      removeArea(currentContextObject.id,true);
+      break;
+  }
+}
+
 function setCenterToCursor() {
   if(currentContextObject.hasOwnProperty('src')) {
     var src = currentContextObject.src;
@@ -2493,10 +2572,16 @@ function enableKeyFocus(state) {
 
 function setEditMode(state) {
   editMode = state;
-  if(editMode)
+  var mode;
+  if(editMode) {
+    mode = 'edit';
     console.log("**EDIT MODE**");
-  else
+  } else {
+    mode = 'run';
     console.log("**RUN MODE**");
+  }
+  if(typeof window.globals.setMode !== 'undefined')
+    window.globals.setMode(mode);
 }
 
 function setModalOpen(state) {
@@ -2582,6 +2667,19 @@ function getState() {
   // do we delete anything in between?
 }
 
+function deleteState() {
+  if(doRecordIndex >= doRecord.length)
+    return;
+  var dorec = doRecord[doRecordIndex];
+  if(dorec.type != 'state')
+    return;  // no state here
+  if(confirm("Remove state @ "+doRecordIndex+"?")) {
+    doRecord.splice(doRecordIndex,1);
+  }
+  if(editMode)
+    writeEditStatus();
+}
+
 function setState(state) {
   var id = null;
   var to_do;
@@ -2643,7 +2741,7 @@ function forwardToIndex(index){
   if(index < doRecordIndex) {
     if(editMode) {
       if(confirm("Do you want to scan from start?")) {
-        removeAll(false);
+        clearAll(false);
         doRecordIndex = 0;
       }
     } else {
@@ -2834,8 +2932,9 @@ var exports = {
   setCurrentLineColor:setCurrentLineColor,
   keyHandler:null,
   enableKeyFocus:enableKeyFocus,
-  removeAll:removeAll,
+  //removeAll:removeAll,
   getCurrentContextObject:getCurrentContextObject,
+  delCurrentContextObject:delCurrentContextObject,
   nameCurrentImage:nameCurrentImage,
   moveCurrentImage:moveCurrentImage,
   scaleCurrentImage:scaleCurrentImage,
@@ -2896,7 +2995,15 @@ function writeEditStatus() {
     //   if(dorec.hasOwnProperty("type"))
     //     msg += " of "+dorec.type;
     // }
-    msg += ' = ' + JSON.stringify(dorec);
+    var col = null;
+    var dorecColors = {state:'red',line:'yellow',image:'blue',area:'violet'};
+    if(dorecColors.hasOwnProperty(dorec.type)) {
+      col = dorecColors[dorec.type];
+      msg += ' = <FONT style="BACKGROUND-COLOR: '+col+'">';
+    }
+    msg += JSON.stringify(dorec);
+    if(!!col)
+      msg += '</FONT>';
   }
   writeStatus(msg);
 }
