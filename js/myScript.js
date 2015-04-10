@@ -4,8 +4,10 @@ var paperGlue;  // see initApp below
 var wireLinks = [];
 
 var symbolMenu = [ {label:'name', propCall:imgGetNameCall},
-                   {label:'size', propCall:imgGetSizeCall},
                    {label:'pos',propCall:imgGetPosCall},
+                   {label:'size', propCall:imgGetSizeCall},
+                   {label:'snap',propCall:getSnapModeCall,callback:toggleSnap},
+                   {label:'drag',propCall:getDragModeCall,callback:toggleDrag},
                    {label:'properties',callback:openImgPropDialog},
                    {label:'setCenter',propCall:imgGetCenterCall,callback:setCenterToCursor},
                    {label:'setOrigin',propCall:imgGetOriginCall,callback:setOriginToCursor},
@@ -135,10 +137,15 @@ function imgGetNameCall(obj){
 }
 
 function imgGetSizeCall(obj){
-  console.log('get size called');
-  console.log("Obj raster keys:"+Object.keys(obj.raster));
-  console.log(obj.raster.bounds);
-  return new Size(obj.raster.bounds.width,obj.raster.bounds.height);
+  //console.log('get size called');
+  //console.log("Obj raster keys:"+Object.keys(obj.raster));
+  //console.log(obj.raster.bounds);
+  var rs= "W:"+Math.round(obj.raster.bounds.width)+" H:"+Math.round(obj.raster.bounds.height);
+  if(obj.hasOwnProperty('src')) {
+    if(obj.src.hasOwnProperty('scale') && obj.scale !== 1.0)
+      rs +=" @ Scale:"+obj.src.scale;
+  }
+  return rs;
 }
 
 function imgGetInstanceNameCall(obj){
@@ -148,10 +155,15 @@ function imgGetInstanceNameCall(obj){
   return nm;
 }
 
+function roundPoint(p) {
+  return "X:"+Math.round(p.x)+
+         " Y:"+Math.round(p.y);
+}
+
 function imgGetPosCall(obj){
   console.log('pos called');
   console.log(Object.keys(obj));
-  return obj.raster.position;
+  return roundPoint(obj.raster.position);
 }
 
 function objRemove(obj){
@@ -172,16 +184,28 @@ function toggleSnap() {
   return true;
 }
 
+function getDragModeCall(obj){
+  console.log("GetSnapMode for:"+obj);
+  if(obj.src.hasOwnProperty('dragClone'))
+    return obj.src.dragClone;
+  return paperGlue.getDragDefault();
+}
+
+function toggleDrag() {
+  paperGlue.toggleDrag();
+  return true;
+}
+
 function imgGetCenterCall(obj){
-  console.log('pos called');
-  console.log(Object.keys(obj));
-  return obj.src.center;
+  //console.log('pos called');
+  //console.log(Object.keys(obj));
+  return roundPoint(obj.src.center);
 }
 
 function imgGetOriginCall(obj){
-  console.log('pos called');
-  console.log(Object.keys(obj));
-  return obj.src.origin;
+  //console.log('pos called');
+  //console.log(Object.keys(obj));
+  return roundPoint(obj.src.origin);
 }
 
 function createActionTableBody() {

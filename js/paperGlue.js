@@ -32,6 +32,9 @@ var nodeComms = window.globals.nodeComms;
 // To make visibile to window, declare as window.object
 
 var body;  // cached in init()
+var bodyLayer;
+var areaLayer;
+var cursorLayer;
 var editMode = true;
 var modalOpen = false;
 var mouseDownHandled = false;  // prevent propogation to onMouseDown
@@ -53,6 +56,7 @@ var minAreaSide = 10;
 var areaStrokeThickness = 2;
 var snapRect = [5,5,10,10];   // offset x,y and then quantum x, y
 var snapDefault = true;
+var dragDefault = true;
 var lineThickness = 3;
 var defaultLineColor = 'black';
 var lineColor = 'black';
@@ -176,6 +180,10 @@ function getSnapDefault() {
   return snapDefault;
 }
 
+function getDragDefault() {
+  return dragDefault;
+}
+
 function toggleSnap() {
   var obj = currentContextObject.inst;
   console.log(Object.keys(obj));
@@ -187,6 +195,14 @@ function toggleSnap() {
   if(currentContextObject.hasOwnProperty('raster'))
     obj.raster.position = snapPoint(obj.raster.position,!obj.snap);
   console.log("Toggle snap now:" + obj.snap);
+}
+
+function toggleDrag() {
+  var obj = currentContextObject.inst;
+  if(obj.hasOwnProperty('dragClone'))
+    obj.dragClone = !obj.dragClone;
+  else
+    obj.dragClone = !dragDefault;
 }
 
 function setLineThickness(t) {
@@ -276,6 +292,7 @@ function init() {
   body = document.getElementById("body");
 // there may or maynot be an activeLayer when this code is run
   baseLayer = project.activeLayer;  //for some reason no layer exists yet
+  areaLayer = new Layer();
   cursorLayer = new Layer();
   project._activeLayer = baseLayer;
 
@@ -378,8 +395,13 @@ function onImageMouseDown(event) {
           imageSelectedPosition = null;  // so we can tell there was no prior position
           imageSelectedRotation = imgobj.raster.rotation;
           showImageCursors(inst,false);
+          return false;
         }
-      }
+      }  // otherwise this image is dragable
+      imageSelected = this;
+      imageSelected.opacity = 0.5;
+      imageSelectedPosition = this.position.clone();  // need to dereference
+      imageSelectedRotation = null; // indicating it rotation is a seperate issue
       return false;  // master image found, so no need to look at clones in imageInstances
     }
   }
@@ -935,7 +957,9 @@ function showArea(id) {
   var rect = a.rect;
   console.log("Rect:"+rect);
   if(!a.hasOwnProperty('path')) {
+    project._activeLayer = areaLayer;
     var path = new Path();
+    project._activeLayer = baseLayer;
     a.path = path;
   }
   a.path.strokeColor = areaColor;
@@ -1340,6 +1364,10 @@ function imageMoved(img,prev_pos,spot_rotate,src_prev_rot) {
   var img_id = findInstance(imageInstances,'raster',true,img);
   if(!!img_id) {  // shouldn't be any trouble here
     console.log("instance found with id:"+img_id);  // need to keep id as well - might be null for master objects in layout mode
+    console.log(Object.keys(img));
+    console.log(img.index);
+    console.log(Object.keys(img.parent));
+    console.log(Object.keys(img.parent.children[0]));
     var round_only = !snapDefault;
     var inst = imageInstances[img_id];
     if(inst.hasOwnProperty('snap'))
@@ -1654,20 +1682,14 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
     }
   } else {
     switch(event.key) {
+      case '+':
+        raiseSelected(1);
+        break;
+      case '-':
+        raiseSelected(-1);
+        break;
       case 'delete':
-        var c = Object.keys(selectedItems).length;
-        console.log("Selected items:"+c);
-        if(c > 0 && confirm("Remove " + c + " items?")) {
-          for(var id in selectedItems) {
-            console.log("Delete "+id);
-            if(lineInstances.hasOwnProperty(id))
-              removeLine(id,true);
-            else if(imageInstances.hasOwnProperty(id))
-              removeImage(id,true);
-            else if(areaInstances.hasOwnProperty(id))
-              removeAreaInstance(id,true);
-          }
-        }
+        deleteSelected();
         console.log("Selected items:"+Object.keys(selectedItems));
         currentContextObject = null;
         propagate = false;
@@ -1699,6 +1721,55 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
   return propagate;
 }
 
+function raiseSelected(raise_by) {
+  for(var id in selectedItems) {
+    console.log("Raise "+id+" by "+raise_by);
+    raiseItem(id,raise_by,true);
+  }
+}
+
+function raiseItem(id,raise_by,record) {
+  if(lineInstances.hasOwnProperty(id)) {
+    obj = lineInstances[id].path;
+    type = 'line';
+  } else if(imageInstances.hasOwnProperty(id)) {
+    obj = imageInstances[id].raster;
+    type = 'symbol';
+  }
+  // raise is not applicable to raise
+  // else if(areaInstances.hasOwnProperty(id))
+  //   removeAreaInstance(id,true);
+  if(!obj)
+    return;
+  if(typeof record !== 'undefined' && record)
+    doRecordAdd({action:'raise',type:type,id:id,by:raise_by});
+  var p = obj.parent;
+  console.log("Layer children:"+p.children.length);
+  console.log("Index:"+obj.index);
+  if(raise_by < 0) {
+    if(obj.index > 0)
+      obj.insertBelow(p.children[obj.index-1]);
+  } else if(obj.index < p.children.length - 1) {
+    obj.insertAbove(p.children[obj.index+1]);
+  }
+}
+
+function deleteSelected() {
+  var c = Object.keys(selectedItems).length;
+  console.log("Selected items:"+c);
+  if(c > 0 && confirm("Remove " + c + " items?")) {
+    for(var id in selectedItems) {
+      console.log("Delete "+id);
+      if(lineInstances.hasOwnProperty(id))
+        removeLine(id,true);
+      else if(imageInstances.hasOwnProperty(id))
+        removeImage(id,true);
+      else if(areaInstances.hasOwnProperty(id))
+        removeAreaInstance(id,true);
+    }
+  }
+}
+
 function incMoveSymbol(obj,direction,snap) {
   objPosition = obj.raster.position;
   var img_id = findInstance(imageInstances,'raster',true,obj.raster);
@@ -1718,7 +1789,7 @@ function incMoveSymbol(obj,direction,snap) {
   } else {
     obj.raster.position += direction;
   }
-  doRecordAdd({action:'imageMove',id:img_id,type:'symbol',oldValue:objPosition,pos:obj.raster.position});
+  doRecordAdd({action:'imageMove',id:img_id,type:currentContextObject.type,oldValue:objPosition,pos:obj.raster.position});
 }
 
 function incMoveArea(obj,direction,snap) {
@@ -2222,6 +2293,9 @@ function undo() {
           doRecordIndex++;
         }
         break;
+      case 'raise':
+        raiseItem(last_do.id,-last_do.by);
+        break;
     }
     writeEditStatus();
 }
@@ -2336,6 +2410,9 @@ function redo() {
       //redo();  // then skip to next do
       //writeEditStatus();
       //return;
+      break;
+    case 'raise':
+      raiseItem(to_do.id,to_do.by);
       break;
   }
   doRecordIndex++;
@@ -2554,7 +2631,7 @@ function setOriginToCursor() {
     if(currentContextObject.hasOwnProperty('raster')) {
       var raster = currentContextObject.raster;
       var dp = raster.position - cursorPos[0];
-      src.origin = roundPoint(dp.rotate(-raster.rotation));
+      src.origin = (roundPoint(dp.rotate(-raster.rotation)))/src.scale;
       cursorPos[3] = cursorPos[0];
       console.log("Origin:" + src.origin);
       if(!src.hasOwnProperty('center'))  // probably the same if not set
@@ -2945,6 +3022,8 @@ var exports = {
   showImageCursors:showImageCursors,
   getSnapDefault:getSnapDefault,
   toggleSnap:toggleSnap,
+  getDragDefault:getDragDefault,
+  toggleDrag:toggleDrag,
   getAreaCount:getAreaCount,
   setArea:setArea,
   showAreas:showAllAreas,
