@@ -32,7 +32,7 @@ var nodeComms = window.globals.nodeComms;
 // To make visibile to window, declare as window.object
 
 var body;  // cached in init()
-var bodyLayer;
+var baseLayer;
 var areaLayer;
 var cursorLayer;
 var editMode = true;
@@ -291,7 +291,7 @@ function drawCross(pos, size, color) {
 function init() {
   body = document.getElementById("body");
 // there may or maynot be an activeLayer when this code is run
-  baseLayer = project.activeLayer;  //for some reason no layer exists yet
+  baseLayer = project._activeLayer;  //for some reason no layer exists yet
   areaLayer = new Layer();
   cursorLayer = new Layer();
   project._activeLayer = baseLayer;
@@ -1364,10 +1364,10 @@ function imageMoved(img,prev_pos,spot_rotate,src_prev_rot) {
   var img_id = findInstance(imageInstances,'raster',true,img);
   if(!!img_id) {  // shouldn't be any trouble here
     console.log("instance found with id:"+img_id);  // need to keep id as well - might be null for master objects in layout mode
-    console.log(Object.keys(img));
-    console.log(img.index);
-    console.log(Object.keys(img.parent));
-    console.log(Object.keys(img.parent.children[0]));
+    //console.log(Object.keys(img));
+    //console.log(img.index);
+    //console.log(Object.keys(img.parent));
+    //console.log(Object.keys(img.parent.children[0]));
     var round_only = !snapDefault;
     var inst = imageInstances[img_id];
     if(inst.hasOwnProperty('snap'))
@@ -1688,6 +1688,9 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
       case '-':
         raiseSelected(-1);
         break;
+      case '=':
+        raiseSwap();
+        break;
       case 'delete':
         deleteSelected();
         console.log("Selected items:"+Object.keys(selectedItems));
@@ -1728,7 +1731,55 @@ function raiseSelected(raise_by) {
   }
 }
 
+function raiseSwap() {
+  var ids = Object.keys(selectedItems);
+  if(ids.length !== 2)
+    return;
+  swapItems(ids[0],ids[1],true);
+}
+
+function swapItems(id1,id2,record) {
+  var obj1 = null;
+  var obj2 = null;
+  var type1, type2;
+  var id, idt;
+  console.log("Swapping items:"+id1+"+"+id2);
+  if(lineInstances.hasOwnProperty(id1)) {
+    obj1 = lineInstances[id1].path;
+    type1 = 'line';
+  } else if(imageInstances.hasOwnProperty(id1)) {
+    obj1 = imageInstances[id1].raster;
+    type1 = 'symbol';
+  }
+  if(lineInstances.hasOwnProperty(id2)) {
+    obj2 = lineInstances[id2].path;
+    type2 = 'line';
+  } else if(imageInstances.hasOwnProperty(id2)) {
+    obj2 = imageInstances[id2].raster;
+    type2 = 'symbol';
+  }
+  if(!obj1 || !obj2)
+    return;
+  console.log("obj1:"+obj1.index);
+  console.log("obj2:"+obj2.index);
+  if(obj1.index < obj2.index) {
+    obj1.insertAbove(obj2);
+    id = id1;
+    idt = id2;
+    type = type1;
+  } else {
+    obj2.insertAbove(obj1);
+    id = id2;
+    idt = id1;
+    type = type2;
+  }
+  if(typeof record !== 'undefined' && record)
+    doRecordAdd({action:'swap',type:type,id:id,id2:idt});
+}
+
 function raiseItem(id,raise_by,record) {
+  var obj;
+  var type;
   if(lineInstances.hasOwnProperty(id)) {
     obj = lineInstances[id].path;
     type = 'line';
@@ -2173,11 +2224,9 @@ function removeAll(){
   if(editMode && !confirm("Do you want to clear current workspace?"))
       return;
   clearAll();
-  if(including_record) {
-    doRecord = [];
-    doRecordIndex = 0;
-    nextID = 0;  // start again
-  }
+  doRecord = [];
+  doRecordIndex = 0;
+  nextID = 0;  // start again
 }
 
 function removeImage(id,record) {
@@ -2296,6 +2345,9 @@ function undo() {
       case 'raise':
         raiseItem(last_do.id,-last_do.by);
         break;
+      case 'swap':
+        swapItems(last_do.id2,last_do.id);
+        break;
     }
     writeEditStatus();
 }
@@ -2413,6 +2465,9 @@ function redo() {
       break;
     case 'raise':
       raiseItem(to_do.id,to_do.by);
+      break;
+    case 'swap':
+      swapItems(to_do.id,to_do.id2);
       break;
   }
   doRecordIndex++;
