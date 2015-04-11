@@ -1596,9 +1596,13 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
     switch(event.key) {
       case '+':
         console.log("Zoom screen");
+        console.log("Center:"+view.center);
+        console.log("Zoom:"+view.zoom);
+        view.zoom *= 1.2;
         return true;
       case '-':
         console.log("Unzoom screen");
+        view.zoom /= 1.2;
         return true;
       case 'z':
         console.log("cntrlZ");
@@ -1713,6 +1717,32 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
           }
         }
         break;
+      case 'left':
+        delta = [-1,0];
+        break;
+      case 'right':
+        delta = [1,0];
+        break;
+      case 'up':
+        delta = [0,-1];
+        break;
+      case 'down':
+        delta = [0,1];
+        break;
+    }
+    var grad;
+    if(event.shiftPressed)
+      grad = view.size*0.1;
+    else
+      grad = view.size*0.025;
+    if(!!delta) {
+      console.log("Center:"+view.center);
+      console.log("delta:"+delta);
+      console.log("grad:"+grad);
+      var moveby = [Math.round(delta[0]*grad.width),Math.round(delta[1]*grad.height)];
+      console.log("moveby:"+moveby);
+      view.center += moveby;
+      console.log("Center:"+view.center);
     }
   }
   if(propagate && (typeof globals.keyhandler == 'function')) {
