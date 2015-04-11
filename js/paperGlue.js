@@ -35,6 +35,7 @@ var body;  // cached in init()
 var baseLayer;
 var areaLayer;
 var cursorLayer;
+var layerFlip = [1,1];
 var editMode = true;
 var modalOpen = false;
 var mouseDownHandled = false;  // prevent propogation to onMouseDown
@@ -295,7 +296,6 @@ function init() {
   areaLayer = new Layer();
   cursorLayer = new Layer();
   project._activeLayer = baseLayer;
-
 }
 
 function hideCursor() {
@@ -979,7 +979,9 @@ function showArea(id) {
 function showAreaText(a,id) {
   if(a.hasOwnProperty('text'))
     a.text.remove();
+  project._activeLayer = areaLayer;
   var text = new PointText();
+  project._activeLayer = baseLayer;
   a.text = text;
   a.text.point = a.rect.topLeft + [20,20,];
   if(a.hasOwnProperty('name'))
@@ -1595,15 +1597,41 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
     console.log("Key:"+event.key);
     switch(event.key) {
       case '+':
+      case '=':
         console.log("Zoom screen");
         console.log("Center:"+view.center);
         console.log("Zoom:"+view.zoom);
         view.zoom *= 1.2;
         return true;
       case '-':
+      case '_':
         console.log("Unzoom screen");
         view.zoom /= 1.2;
         return true;
+      case 'backspace':
+        baseLayer.scale(-1,1,view.center);
+        areaLayer.scale(-1,1,view.center);
+        cursorLayer.scale(-1,1,view.center);
+        layerFlip = [-layerFlip[0],layerFlip[1]];
+        break;
+      case 'f':
+        baseLayer.scale(1,-1,view.center);
+        areaLayer.scale(1,-1,view.center);
+        cursorLayer.scale(1,-1,view.center);
+        layerFlip = [layerFlip[0],-layerFlip[1]];
+        break;
+      case '[':
+        if(editMode)
+          raiseSelected(1);
+        break;
+      case ']':
+        if(editMode)
+          raiseSelected(-1);
+        break;
+      case '\\':
+        if(editMode)
+          raiseSwap();
+        break;
       case 'z':
         console.log("cntrlZ");
         if(event.shiftPressed) {
@@ -1686,15 +1714,6 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
     }
   } else {
     switch(event.key) {
-      case '+':
-        raiseSelected(1);
-        break;
-      case '-':
-        raiseSelected(-1);
-        break;
-      case '=':
-        raiseSwap();
-        break;
       case 'delete':
         deleteSelected();
         console.log("Selected items:"+Object.keys(selectedItems));
@@ -1745,6 +1764,7 @@ function onKeyDown(event) {   //note: this is the paper.js handler - do not conf
       console.log("Center:"+view.center);
     }
   }
+  writeEditStatus();
   if(propagate && (typeof globals.keyhandler == 'function')) {
     console.log("Passing key upwards");
     propagate = globals.keyhandler(event);
@@ -1822,17 +1842,22 @@ function raiseItem(id,raise_by,record) {
   //   removeAreaInstance(id,true);
   if(!obj)
     return;
-  if(typeof record !== 'undefined' && record)
-    doRecordAdd({action:'raise',type:type,id:id,by:raise_by});
   var p = obj.parent;
   console.log("Layer children:"+p.children.length);
   console.log("Index:"+obj.index);
   if(raise_by < 0) {
     if(obj.index > 0)
       obj.insertBelow(p.children[obj.index-1]);
-  } else if(obj.index < p.children.length - 1) {
-    obj.insertAbove(p.children[obj.index+1]);
+    else
+      return;  //failed to happen so do't record
+  } else {
+    if(obj.index < p.children.length - 1)
+      obj.insertAbove(p.children[obj.index+1]);
+    else
+      return;  // failed
   }
+  if(typeof record !== 'undefined' && record)
+    doRecordAdd({action:'raise',type:type,id:id,by:raise_by});
 }
 
 function deleteSelected() {
@@ -3150,7 +3175,10 @@ function writeStatus(msg) {
 }
 
 function writeEditStatus() {
-  var msg = 'EditMode Next do#'+doRecordIndex+'(of '+doRecord.length+')';
+  var msg = "";
+  msg += "Zoom:"+view.zoom+" Center:"+view.center+" Flip:"+layerFlip+" ";
+  msg += 'EditMode Next do#'+doRecordIndex+'(of '+doRecord.length+')';
+
   if(doRecordIndex < doRecord.length) {
     var dorec = doRecord[doRecordIndex];
     // msg += " = "+dorec.action;

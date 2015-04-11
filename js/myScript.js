@@ -127,8 +127,8 @@ function drawStripBoard(spacing,length,width) {
   var lr = project.layers[0];
   //console.log("Layer counter:"+lr._children.length);
   var top_layer = lr.rasterize();
-  lr.removeChildren();
-  lr.addChild(top_layer);
+  lr.removeChildren();  // too many children slows things down
+  lr.addChild(top_layer);  // now stripboard is one child
 }
 
 function imgGetNameCall(obj){
