@@ -69,6 +69,7 @@ var selectedPos = {};  // for prev pos following are move
 var selectedMove = false;
 var imagesLoaded = {};
 var imageInstances = {};  //images that have been cloned from sybols in imagesLoaded.
+var flashingImages = [];
 var fileContextMenu = [
   {label:'open from',callback:loadRecordAs},
   {label:'save as',callback:saveRecordAs}
@@ -2403,6 +2404,12 @@ function undo() {
       case 'swap':
         swapItems(last_do.id2,last_do.id);
         break;
+      case 'flash':
+        setImageOpacity({id:last_do.id});
+        break;
+      case 'opacity':
+        setImageOpacity({id:last_do.id,opacity:last_do.oldValue});
+        break;
     }
     writeEditStatus();
 }
@@ -2523,6 +2530,13 @@ function redo() {
       break;
     case 'swap':
       swapItems(to_do.id,to_do.id2);
+      break;
+    case 'flash':
+      if(!editMode)
+        flashImage(to_do);
+      break;
+    case 'opacity':
+      setImageOpacity(to_do);
       break;
   }
   doRecordIndex++;
@@ -2940,7 +2954,6 @@ function forwardToIndex(index){
     redo();
 }
 
-
 function scanStateForward(state_point) {
   if(typeof start_index === 'undefined')
     start_index = doRecordIndex;
@@ -3096,6 +3109,97 @@ function buildImgAvail(res) {
   nodeComms.sendData(JSON.stringify(postObject));
 }
 
+function recordFlash(id,para) {
+  doRecordAdd({action:'flash',id:id,type:getIdType(id),
+    flashUp:para.flashup,flashDown:para.flashdown,
+    flashHigh:para.flashhigh,flashLow:para.flashlow});
+}
+
+function flashImage(dorec){
+  if(imageInstances.hasOwnProperty(dorec.id))
+    img = imageInstances[dorec.id];
+  else if(imagesLoaded.hasOwnProperty(dorec.id))
+    img = imagesLoaded[dorec.id];
+  else {
+    console.error("Could not find image with id ="+dorec.id);
+    return;
+  }
+  img.flashUp = dorec.flashUp;
+  img.flashDown = dorec.flashDown;
+  img.flashHigh = dorec.flashHigh;
+  img.flashLow = dorec.flashLow;
+  img.flashUp = true;
+  flashingImages[dorec.id] = img;
+}
+
+function recordOpacity(id,op) {
+  var img, typ;
+  if(imageInstances.hasOwnProperty(id)) {
+    img = imageInstances[id];
+    typ = 'image';
+  } else if(imagesLoaded.hasOwnProperty(id)) {
+    img = imagesLoaded[id];
+    typ = 'symbol';
+  }
+  var dorec = {action:'opacity',id:id,type:typ,opacity:op};
+  if(img.hasOwnProperty("opacity"))
+    dorec.oldValue = img.opacity;
+  doRecordAdd(dorec);
+}
+
+function getIdType(id) {
+  if(imageInstances.hasOwnProperty(id))
+    return 'symbol';
+  else if(imagesLoaded.hasOwnProperty(id))
+    return 'image';
+  else if(lineInstances.hasOwnProperty(id))
+    return 'line';
+  else if(areaInstances.hasOwnProperty(id))
+    return 'area';
+  else
+    return null;
+}
+
+function setImageOpacity(dorec) {
+  if(imageInstances.hasOwnProperty(dorec.id))
+    img = imageInstances[dorec.id];
+  else if(imagesLoaded.hasOwnProperty(dorec.id))
+    img = imagesLoaded[dorec.id];
+  else {
+    console.error("Could not find image with id ="+dorec.id);
+    return;
+  }
+  if(dorec.hasOwnProperty('opacity'))
+    img.raster.opacity = dorec.opacity;
+  else
+    img.raster.opacity = 1.0;
+  if(flashingImages.hasOwnProperty(dorec.id)) {
+    delete flashingImages[dorec.id];
+    if(img.hasOwnProperty('flashUp'))
+      delete img.flashUp;  // so that flash is over
+  }
+}
+
+function onFrame(event){
+  for(var id in flashingImages) {
+    var img = flashingImgs[id];
+    var op;
+    if(img.flashUp) {
+      op = img.raster.opacity + img.flashUpRate;
+      if(op > img.flashHigh) {
+        op = img.flashHigh;
+        img.flashup = false;
+      }
+    } else {
+      op = img.raster.opacity + img.flashDownRate;
+      if(op < img.flashLow) {
+        op = img.flashLow;
+        img.flashup = true;
+      }
+    }
+  }
+}
+
 // think this needs to be at the bottom so under scripts find things fully loaded
 console.log("PaperGlue functions to window globals");
 // window global are use for cross scope communications
@@ -3156,6 +3260,8 @@ var exports = {
   skipToIndex:skipToIndex,
   forwardToIndex:forwardToIndex,
   importDefaults:importDefaults,
+  recordOpacity:recordOpacity,
+  recordFlash:recordFlash
 };
 globals.paperGlue = exports;
 paperGlue = globals.paperGlue;  // for dependant modules to add:

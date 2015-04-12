@@ -162,7 +162,7 @@ function roundPoint(p) {
 
 function imgGetPosCall(obj){
   console.log('pos called');
-  console.log(Object.keys(obj));
+  //console.log(Object.keys(obj));
   return roundPoint(obj.raster.position);
 }
 
@@ -373,6 +373,7 @@ function openDialogCommon(reply_buttons) {
   paperGlue.setModalOpen(true);  //make dialog modalish
   //dialogDiv.style.fontSize = fontsize;
   //dialogDiv.style = "font-size:"+fontsize+"px;visibility:visible;";
+  dialogProp = {};
 }
 
 function closeDialog() {
@@ -395,27 +396,107 @@ function setDialogMove(id) {
   row.onmousedown=mouseDown;
 }
 
-function openImgPropDialog() {
+var dialogProp = {};
+
+function propertyRow(obj,ele,def,nm,le) {
+  console.log(obj,ele,def,nm,le);
+  if(typeof nm === 'undefined')
+    nm = ele;
+  if(typeof le === 'undefined')
+    le = ele;
+  var p = '<tr><td>'+nm+'</td><td>';
+  var val = "";
+  var para = "";
+  if(typeof def === 'number') {
+    para = ' defaultValue="'+def+'"';
+    val  = def;
+  } else if(typeof def === 'object') {  // can include value, step, max, min etc.
+    for(var pn in def) {
+      para += ' '+pn+'="'+ def[pn] + '"';
+    }
+    if(def.hasOwnProperty('defaultValue'))
+      val = def.defaultValue;
+    // any type value will be overridden if object iis set
+  }
+  if(obj.hasOwnProperty(ele)) {
+    val = obj[ele];
+  }
+  if(val !== "")
+    para += ' value="'+val+'"';
+  para += ' type="'+(typeof val)+'"';
+  dialogProp[le] = {value:val};
+  //if(typeof val === 'number')
+  //console.log("Value type:"+(typeof val));
+  p += '<input id="'+le+'" '+para+'/></td></tr>';
+  return p;
+}
+
+function getDialogPropValues() {
+  var rtnval = {};
+  for(var le in dialogProp) {
+    var field = document.getElementById(le);
+    //if(!field) this should not happen
+    var p = dialogProp[le];
+    var typ = (typeof p.value);
+    console.log("Element:"+le+" of type:"+typ+" has field:"+field.value);
+    console.log(field);
+    switch(typ) {
+      case 'number':
+        rtnval[le] = parseFloat(field.value);
+        break;
+      case 'string':
+        rtnval[le] = field.value;
+        break;
+      default:
+        rtnval[le] = null;
+        break;
+    }
+  }
+  return rtnval;
+}
+
+function openImgPropDialog(force_flash) {
   var obj = paperGlue.getCurrentContextObject();
+  //console.log("ObjKeys:"+Object.keys(obj));
   paperGlue.showImageCursors(obj,false);
   var p = openDialogPropCommon(obj.id);
   if(obj.type === 'symbol') {
-    p += '<tr><td>Name</td><td>';
+    //p += '<tr><td>Name</td><td>';
     var nm = obj.src.id + "#" + obj.id;
     if(obj.inst.hasOwnProperty('name')) {
       nm = obj.inst.name;
     }
-    p += '<input id="name" type="text" value="'+nm+'"/></td></tr>';
+    //p += '<input id="name" type="text" value="'+nm+'"/></td></tr>';
+    p += propertyRow(obj.inst,'name',nm,'Name','name');
   } // otherwise symbol
-  p += '<tr><td>X</td><td>';
-  p += '<input id="xpos" type="number" value="'+obj.raster.position.x+'"/></td></tr>';
-  p += '<tr><td>Y</td><td>';
-  p += '<input id="ypos" type="number" value="'+obj.raster.position.y+'"/></td></tr>';
-  p += '<tr><td>Rot</td><td>';
-  p += '<input id="rot" type="number" value="'+obj.raster.rotation+'"/></td></tr>';
+  p += propertyRow(obj.raster.position,'_x',0,'X','xpos');
+  p += propertyRow(obj.raster.position,'_y',0,'Y','ypos');
+  p += propertyRow(obj.raster,'_rotation',{defaultValue:0,type:'number',max:360,min:0},'Rot','rot');
   if(obj.type !== 'symbol') {
-    p += '<tr><td>Scale</td><td>';
-    p += '<input id="scale" type="text" value="'+obj.src.scale+'"/></td></tr>';
+    p += propertyRow(obj.src,'scale',{defaultValue:1.0,step:0.1},'Scale','scale');
+  }
+  p += '<tr><td>Flash Image</td><td>';
+  var flashFlag = "";
+  var click_cmd = "myScriptCmd('openImgPropDialog',true)";
+  var flashing = false;
+  if(typeof force_flash !== 'undefined' || (obj.inst.hasOwnProperty('flashUp') && obj.inst.flashUp)) {
+    flashFlag = 'checked="true"';
+    click_cmd = "myScriptCmd('openImgPropDialog')";
+    flashing = true;
+  }
+  p += '<input id="flashflag" type="checkbox"'+flashFlag+' onclick="'+click_cmd+'"/></td></tr>';
+  var op_para = {step:0.1,max:1.0,min:0.0};
+  if(flashing) {
+    op_para.defaultValue = 0.1;
+    p += propertyRow(obj.inst,'flashUp',op_para,'UpRate');
+    p += propertyRow(obj.inst,'flashDown',op_para,'DownRate');
+    op_para.defaultValue = 1.0;
+    p += propertyRow(obj.inst,'flashHigh',op_para,'MaxOpacity');
+    op_para.defaultValue = 0.0;
+    p += propertyRow(obj.inst,'flashLow',op_para,'MinOpacity');
+  } else {
+    op_para.defaultValue = 1.0;
+    p += propertyRow(obj.raster,'opacity',op_para,'Opacity');
   }
   //}
   // var ks = Object.keys(obj);
@@ -465,30 +546,56 @@ function propDialogReturn(reply) {
     areaDialogReturn(reply);
     return;
   }
+  var rtnval = getDialogPropValues();
+  console.log("RtnVals for:"+Object.keys(rtnval));
+
   // otherwise hope this is an image or symbol
-  var nmfield = null;
-  if(obj.type === 'symbol')
-    nmfield = document.getElementById('name');
-  var xfield = document.getElementById('xpos');
-  var yfield = document.getElementById('ypos');
-  var rfield = document.getElementById('rot');
-  if(obj.type !== 'symbol') {
-    var sfield = document.getElementById('scale');
-    var s = parseFloat(sfield.value);
-    if(obj.src.scale != s) {
-      paperGlue.scaleCurrentImage(s);
+  //var nmfield = null;
+  //if(obj.type === 'symbol')
+  //  nmfield = document.getElementById('name');
+  //var xfield = document.getElementById('xpos');
+  //var yfield = document.getElementById('ypos');
+  //var rfield = document.getElementById('rot');
+  //if(obj.type !== 'symbol') {
+    //var sfield = document.getElementById('scale');
+    //var s = parseFloat(sfield.value);
+  if(rtnval.hasOwnProperty('scale'))
+    console.log(obj.src.scale,rtnval.scale);
+    if(obj.src.scale != rtnval.scale) {
+      paperGlue.scaleCurrentImage(rtnval.scale);
     }
-  }
-  var x = parseFloat(xfield.value);
-  var y = parseFloat(yfield.value);
-  var r = parseFloat(rfield.value);
+  //}
+  //var x = parseFloat(xfield.value);
+  //var y = parseFloat(yfield.value);
+  //var r = parseFloat(rfield.value);
   //console.log("X:"+x);
-  if(!!nmfield) {
+  //if(!!nmfield) {
+  if(rtnval.hasOwnProperty('name')) {
     var name = nmfield.value;
     console.log("New name:"+name);
     paperGlue.nameCurrentImage(name);
   }
-  paperGlue.moveCurrentImage(x,y,r);
+  //console.log("rtnval.rot"+rtnval.rot);
+  paperGlue.moveCurrentImage(rtnval.xpos,rtnval.ypos,rtnval.rot);
+  var ffield = document.getElementById('flashflag');
+  if(ffield.isChecked) {
+    if(obj.inst.flashup !== rtnval.flashup ||
+      obj.inst.flashdown !== rtnval.flashdown ||
+      obj.inst.flashhigh !== rtnval.flashhigh ||
+      obj.inst.flashlow !== rtnval.flashlow) {
+      obj.inst.flashup = rtnval.flashup;
+      obj.inst.flashdown = rtnval.flashdown;
+      obj.inst.flashhigh = rtnval.flashhigh;
+      obj.inst.flashlow = rtnval.flashlow;
+      paperGlue.recordFlash(obj.id,rtnval);
+    }
+  } else {
+    if(obj.inst.opacity !== rtnval.opacity) {
+      paperGlue.recordOpacity(obj.id,rtnval.opacity);
+      obj.inst.opacity = rtnval.opacity;
+      obj.raster.opacity = rtnval.opacity;
+    }
+  }
   if(reply === 'Apply') {
     paperGlue.showImageCursors(obj,false);
     return;
@@ -960,6 +1067,7 @@ var exports = {
   selectFile : selectFile,
   setNameField : setNameField,
   stateSelected : stateSelected,
+  openImgPropDialog:openImgPropDialog
 };
 globals.myScript = exports;
 
