@@ -440,20 +440,23 @@ function getDialogPropValues() {
     var typ = (typeof p.value);
     console.log("Element:"+le+" of type:"+typ+" has field:"+field.value);
     console.log(field);
+    rtnval[le] = null;
     switch(typ) {
       case 'number':
-        rtnval[le] = parseFloat(field.value);
+        var num = parseFloat(field.value);
+        //if(p.value !== num)
+        rtnval[le] = num;
         break;
       case 'string':
+        //if(p.value !== field.value)
         rtnval[le] = field.value;
-        break;
-      default:
-        rtnval[le] = null;
         break;
     }
   }
   return rtnval;
 }
+
+var flashChanged = false;  // used to determine if flash parameters need saving
 
 function openImgPropDialog(force_flash) {
   var obj = paperGlue.getCurrentContextObject();
@@ -479,17 +482,18 @@ function openImgPropDialog(force_flash) {
   var flashFlag = "";
   var click_cmd = "myScriptCmd('openImgPropDialog',true)";
   var flashing = false;
-  if(typeof force_flash !== 'undefined' || (obj.inst.hasOwnProperty('flashUp') && obj.inst.flashUp)) {
+  flashChanged = (typeof force_flash);
+  if((typeof force_flash !== 'undefined' && force_flash) || (obj.inst.hasOwnProperty('flashUp') && obj.inst.flashUp)) {
     flashFlag = 'checked="true"';
-    click_cmd = "myScriptCmd('openImgPropDialog')";
+    click_cmd = "myScriptCmd('openImgPropDialog',false)";
     flashing = true;
   }
   p += '<input id="flashflag" type="checkbox"'+flashFlag+' onclick="'+click_cmd+'"/></td></tr>';
   var op_para = {step:0.1,max:1.0,min:0.0};
   if(flashing) {
     op_para.defaultValue = 0.1;
-    p += propertyRow(obj.inst,'flashUp',op_para,'UpRate');
-    p += propertyRow(obj.inst,'flashDown',op_para,'DownRate');
+    p += propertyRow(obj.inst,'flashUpRate',op_para,'UpRate');
+    p += propertyRow(obj.inst,'flashDownRate',op_para,'DownRate');
     op_para.defaultValue = 1.0;
     p += propertyRow(obj.inst,'flashHigh',op_para,'MaxOpacity');
     op_para.defaultValue = 0.0;
@@ -575,23 +579,25 @@ function propDialogReturn(reply) {
     console.log("New name:"+name);
     paperGlue.nameCurrentImage(name);
   }
-  //console.log("rtnval.rot"+rtnval.rot);
+  //console.log("rtnval"+rtnval.flashup);
   paperGlue.moveCurrentImage(rtnval.xpos,rtnval.ypos,rtnval.rot);
   var ffield = document.getElementById('flashflag');
-  if(ffield.isChecked) {
-    if(obj.inst.flashup !== rtnval.flashup ||
-      obj.inst.flashdown !== rtnval.flashdown ||
-      obj.inst.flashhigh !== rtnval.flashhigh ||
-      obj.inst.flashlow !== rtnval.flashlow) {
-      obj.inst.flashup = rtnval.flashup;
-      obj.inst.flashdown = rtnval.flashdown;
-      obj.inst.flashhigh = rtnval.flashhigh;
-      obj.inst.flashlow = rtnval.flashlow;
+  if(ffield.checked) {
+    if(flashChanged ||
+      obj.inst.flashUpRate !== rtnval.flashUpRate ||
+      obj.inst.flashDownRate !== rtnval.flashDownRate ||
+      obj.inst.flashHigh !== rtnval.flashHigh ||
+      obj.inst.flashLow !== rtnval.flashLow) {
+      obj.inst.flashUpRate = rtnval.flashUpRate;
+      obj.inst.flashDownRate = rtnval.flashDownRate;
+      obj.inst.flashHigh = rtnval.flashHigh;
+      obj.inst.flashLow = rtnval.flashLow;
       paperGlue.recordFlash(obj.id,rtnval);
     }
   } else {
-    if(obj.inst.opacity !== rtnval.opacity) {
-      paperGlue.recordOpacity(obj.id,rtnval.opacity);
+    console.log("Ops:"+obj.inst.opacity+" "+rtnval.opacity);
+    if(paperGlue.recordOpacity(obj.id,rtnval.opacity)) {
+      // only returns true if there has been a change
       obj.inst.opacity = rtnval.opacity;
       obj.raster.opacity = rtnval.opacity;
     }

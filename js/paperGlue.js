@@ -68,7 +68,7 @@ var selectedItems = {};
 var selectedPos = {};  // for prev pos following are move
 var selectedMove = false;
 var imagesLoaded = {};
-var imageInstances = {};  //images that have been cloned from sybols in imagesLoaded.
+var symbolInstances = {};  //images that have been cloned from sybols in imagesLoaded.
 var flashingImages = [];
 var fileContextMenu = [
   {label:'open from',callback:loadRecordAs},
@@ -403,14 +403,14 @@ function onImageMouseDown(event) {
       imageSelected.opacity = 0.5;
       imageSelectedPosition = this.position.clone();  // need to dereference
       imageSelectedRotation = null; // indicating it rotation is a seperate issue
-      return false;  // master image found, so no need to look at clones in imageInstances
+      return false;  // master image found, so no need to look at clones in symbolInstances
     }
   }
   // no master image found, so maybe this is a clone
-  id = findInstance(imageInstances,"raster",true,this);
+  id = findInstance(symbolInstances,"raster",true,this);
   if(!!id) {
     console.log("Clone image found ID=" + id);
-    imgobj = imageInstances[id];
+    imgobj = symbolInstances[id];
     if(!editMode) {
       if(imgobj.hasOwnProperty('hitCallback'))
         imgobj.hitCallback(mouseDownPosition,event,hit_id,imgobj);
@@ -445,7 +445,7 @@ function onImageMouseDown(event) {
 // only use force_id for redo so that it uses old id
 function symbolPlace(imgid, force_id) {
   if(typeof force_id !== 'undefined') {
-    if(imageInstances.hasOwnProperty(force_id)) {
+    if(symbolInstances.hasOwnProperty(force_id)) {
       console.log("This image symbol still exists");
       return;
     }
@@ -469,16 +469,16 @@ function symbolPlace(imgid, force_id) {
     img_id = force_id;
     console.log("Forces instance is:"+inst);
   }
-  imageInstances[img_id] = inst;
+  symbolInstances[img_id] = inst;
   imgobj.instances += 1;
   return inst;
 }
 
-// find img_id for imgobj in imageInstances
+// find img_id for imgobj in symbolInstances
 function symbolRemove(id) {
-  var inst = imageInstances[id];
+  var inst = symbolInstances[id];
   inst.raster.remove();
-  delete imageInstances[id];
+  delete symbolInstances[id];
   if(selectedItems.hasOwnProperty(id))
     delete selectedItems[id];
 }
@@ -574,7 +574,7 @@ function loadImage(path,subpath)  {
         var ip = full_list[i].src;
         if(typeof path !== 'undefined' && path.length > 0) {
           console.log("path:"+path.length);
-          id = "img" + imageInstances.length; // default id
+          id = "img" + symbolInstances.length; // default id
           if(ip === path) {
             if(full_list[i].hasOwnProperty('id'))
               id = full_list[i].id;
@@ -644,7 +644,7 @@ function nameCurrentImage(name) {
 }
 
 function nameImage(name,id) {
-  var imgobj = imageInstances[id];
+  var imgobj = symbolInstances[id];
   console.log("ID:"+id);
   if(name === id) {  // no need for name if it is the same as id
     if(imgobj.hasOwnProperty('name'))
@@ -1165,8 +1165,8 @@ function onMouseDrag(event) {
         //console.log("Move id:",sid);
         if(lineInstances.hasOwnProperty(sid))
           lineInstances[sid].path.position += event.delta;
-        else if(imageInstances.hasOwnProperty(sid))
-          imageInstances[sid].raster.position += event.delta;
+        else if(symbolInstances.hasOwnProperty(sid))
+          symbolInstances[sid].raster.position += event.delta;
         else if(areaInstances.hasOwnProperty(sid)) {
           var sa =areaInstances[sid];
           if(sa.hasOwnProperty("path"))
@@ -1285,7 +1285,7 @@ function onMouseUp(event) {
             lineSelected = item;
             lineSelectedPosition = prev_pos;
             validatePath(item);
-          } else if(imageInstances.hasOwnProperty(sid)) {
+          } else if(symbolInstances.hasOwnProperty(sid)) {
             imageMoved(item,prev_pos,false,null);
           } else if(areaInstances.hasOwnProperty(sid)) {
             areaMoved(item,prev_pos);
@@ -1364,7 +1364,7 @@ function onMouseUp(event) {
 
 function imageMoved(img,prev_pos,spot_rotate,src_prev_rot) {
   // note that src_prev_rot is only no null for first symbol creation
-  var img_id = findInstance(imageInstances,'raster',true,img);
+  var img_id = findInstance(symbolInstances,'raster',true,img);
   if(!!img_id) {  // shouldn't be any trouble here
     console.log("instance found with id:"+img_id);  // need to keep id as well - might be null for master objects in layout mode
     //console.log(Object.keys(img));
@@ -1372,10 +1372,10 @@ function imageMoved(img,prev_pos,spot_rotate,src_prev_rot) {
     //console.log(Object.keys(img.parent));
     //console.log(Object.keys(img.parent.children[0]));
     var round_only = !snapDefault;
-    var inst = imageInstances[img_id];
+    var inst = symbolInstances[img_id];
     if(inst.hasOwnProperty('snap'))
       round_only = !inst.snap;
-    var src = imageInstances[img_id].src;
+    var src = symbolInstances[img_id].src;
     if(!src_prev_rot && spot_rotate) { // no movement or no prior position it being null
       rotateImage(img_id,'symbol',img,src,90);
       correctPosition(img,src,round_only);
@@ -1798,15 +1798,15 @@ function swapItems(id1,id2,record) {
   if(lineInstances.hasOwnProperty(id1)) {
     obj1 = lineInstances[id1].path;
     type1 = 'line';
-  } else if(imageInstances.hasOwnProperty(id1)) {
-    obj1 = imageInstances[id1].raster;
+  } else if(symbolInstances.hasOwnProperty(id1)) {
+    obj1 = symbolInstances[id1].raster;
     type1 = 'symbol';
   }
   if(lineInstances.hasOwnProperty(id2)) {
     obj2 = lineInstances[id2].path;
     type2 = 'line';
-  } else if(imageInstances.hasOwnProperty(id2)) {
-    obj2 = imageInstances[id2].raster;
+  } else if(symbolInstances.hasOwnProperty(id2)) {
+    obj2 = symbolInstances[id2].raster;
     type2 = 'symbol';
   }
   if(!obj1 || !obj2)
@@ -1834,8 +1834,8 @@ function raiseItem(id,raise_by,record) {
   if(lineInstances.hasOwnProperty(id)) {
     obj = lineInstances[id].path;
     type = 'line';
-  } else if(imageInstances.hasOwnProperty(id)) {
-    obj = imageInstances[id].raster;
+  } else if(symbolInstances.hasOwnProperty(id)) {
+    obj = symbolInstances[id].raster;
     type = 'symbol';
   }
   // raise is not applicable to raise
@@ -1869,7 +1869,7 @@ function deleteSelected() {
       console.log("Delete "+id);
       if(lineInstances.hasOwnProperty(id))
         removeLine(id,true);
-      else if(imageInstances.hasOwnProperty(id))
+      else if(symbolInstances.hasOwnProperty(id))
         removeImage(id,true);
       else if(areaInstances.hasOwnProperty(id))
         removeAreaInstance(id,true);
@@ -1879,15 +1879,15 @@ function deleteSelected() {
 
 function incMoveSymbol(obj,direction,snap) {
   objPosition = obj.raster.position;
-  var img_id = findInstance(imageInstances,'raster',true,obj.raster);
+  var img_id = findInstance(symbolInstances,'raster',true,obj.raster);
   if(snap) {
     obj.raster.position += [direction[0]*snapRect[2],direction[1]*snapRect[3]];
     if(!!img_id) {
       //console.log("instance found with id:"+img_id);  // need to keep id as well - might be null for master objects in layout mode
-      //var src = imageInstances[img_id].src;  // could have used obj.src
+      //var src = symbolInstances[img_id].src;  // could have used obj.src
       var round_only = !snapDefault;
       if(img_id !== null) {
-        var inst = imageInstances[img_id];
+        var inst = symbolInstances[img_id];
         if(inst.hasOwnProperty('snap'))
           round_only = !inst.snap;
       }
@@ -2181,7 +2181,8 @@ function parsePaperRecord(do_record) {
   var new_nextID = 0;  // nextID will be set to this after finding highest ID
   for(var di in do_record) {
     var to_do = do_record[di];
-    to_do.id = parseInt(to_do.id) + nextID;
+    if(to_do.hasOwnProperty('type') && to_do.type != 'image')  // only images use string ids
+      to_do.id = parseInt(to_do.id) + nextID;
     if(to_do.id >= new_nextID)
       new_nextID = to_do.id + 1;
     if(to_do.hasOwnProperty('pos')) {
@@ -2264,8 +2265,8 @@ function removeLines() {
 }
 
 function removeSymbols() {
-  console.log("Removing images:"+Object.keys(imageInstances).length);
-  for(var id in imageInstances) {
+  console.log("Removing images:"+Object.keys(symbolInstances).length);
+  for(var id in symbolInstances) {
     symbolRemove(id);
   }
 }
@@ -2287,7 +2288,7 @@ function removeAll(){
 
 function removeImage(id,record) {
   if(record) {
-    var obj = imageInstances[id];
+    var obj = symbolInstances[id];
     doRecordAdd({action:'symbolDelete',id:id,src_id:obj.src.id,pos:obj.raster.position,rot:obj.raster.rotation});
   }
   symbolRemove(id);
@@ -2328,7 +2329,7 @@ function undo() {
         if(last_do.type === 'image')
           raster = imagesLoaded[last_do.id].raster;
         else
-          raster = imageInstances[last_do.id].raster;
+          raster = symbolInstances[last_do.id].raster;
         if(doRecordIndex > 0) {
           var prev_do = doRecord[doRecordIndex-1];
           if(prev_do.action == 'symbolPlace') {  // this was the first drag
@@ -2348,7 +2349,7 @@ function undo() {
         if(last_do.type === 'image')
           raster = imagesLoaded[last_do.id].raster;
         else
-          raster = imageInstances[last_do.id].raster;
+          raster = symbolInstances[last_do.id].raster;
         console.log("oldValue:"+last_do.oldValue);
         if(typeof last_do.oldValue != 'undefined'){  // check it has a pos
           raster.position = last_do.oldValue[0];  // required for non centered rotation
@@ -2367,7 +2368,7 @@ function undo() {
       case 'symbolDelete':
         console.log("replace image:" + last_do.id);
         symbolPlace(last_do.src_id,last_do.id);
-        raster = imageInstances[last_do.id].raster;
+        raster = symbolInstances[last_do.id].raster;
         raster.position = last_do.pos;
         raster.rotation = last_do.rot;
         break;
@@ -2458,7 +2459,7 @@ function redo() {
       if(to_do.type === 'image')
         imgobj = imagesLoaded[to_do.id];
       else
-        imgobj = imageInstances[to_do.id];
+        imgobj = symbolInstances[to_do.id];
       raster = imgobj.raster;
       raster.position = to_do.pos;
       console.log("Moving to "+ to_do.pos);
@@ -2467,7 +2468,7 @@ function redo() {
       if(to_do.type === 'image')
         imgobj = imagesLoaded[to_do.id];
       else
-        imgobj = imageInstances[to_do.id];
+        imgobj = symbolInstances[to_do.id];
       raster = imgobj.raster;
       raster.position = to_do.pos[0];  // required if rotation not about center
       raster.rotation = to_do.pos[1];
@@ -2481,7 +2482,7 @@ function redo() {
       if(to_do.action == 'imageMove') {
         doRecordIndex++;
         console.log("ID:"+to_do.id);
-        raster = imageInstances[to_do.id].raster;
+        raster = symbolInstances[to_do.id].raster;
         raster.position = to_do.pos;
       }
       break;
@@ -2575,7 +2576,7 @@ function pruneDo(remove_undo) {
           keep_all = true;
         break;
       case 'symbol':
-        if(!imageInstances.hasOwnProperty(to_do.id))
+        if(!symbolInstances.hasOwnProperty(to_do.id))
           continue;  // image nolonger exists
         break;
       case 'line':
@@ -2625,8 +2626,8 @@ function getNextID() {
   return nextID;
 }
 
-function getImageInstances() {
-  return imageInstances;
+function getSymbolInstances() {
+  return symbolInstances;
 }
 
 function getLineInstances() {
@@ -2697,7 +2698,7 @@ function delCurrentContextObject() {
     case 'image':
       currentContextObject.raster.remove();
       var instances = 0;
-      for(var symb in imageInstances) {
+      for(var symb in symbolInstances) {
         if(symb.src === currentContextObject.inst)
           instances++;
       }
@@ -2815,8 +2816,8 @@ function areaSelect() {
       l.path.selected = true;
     }
   }
-  for(var iid in imageInstances) {
-    var imgobj = imageInstances[iid];
+  for(var iid in symbolInstances) {
+    var imgobj = symbolInstances[iid];
     var bounds = imgobj.raster.bounds;
     console.log("Bounds"+bounds);
     if(rect.contains(bounds.topLeft) && rect.contains(bounds.bottomRight)) {
@@ -2852,8 +2853,8 @@ function addMeta(to_selected, meta_data) {
         else if(areaInstances.hasOwnProperty(sid)) {
           areaInstances[sid] += meta_data;
         }
-        else if(imageInstances.hasOwnProperty(sid)) {
-          imageInstances[sid] += meta_data;
+        else if(symbolInstances.hasOwnProperty(sid)) {
+          symbolInstances[sid] += meta_data;
         }
       }
     } else
@@ -3111,21 +3112,21 @@ function buildImgAvail(res) {
 
 function recordFlash(id,para) {
   doRecordAdd({action:'flash',id:id,type:getIdType(id),
-    flashUp:para.flashup,flashDown:para.flashdown,
-    flashHigh:para.flashhigh,flashLow:para.flashlow});
+    flashUpRate:para.flashUpRate,flashDownRate:para.flashDownRate,
+    flashHigh:para.flashHigh,flashLow:para.flashLow});
 }
 
 function flashImage(dorec){
-  if(imageInstances.hasOwnProperty(dorec.id))
-    img = imageInstances[dorec.id];
+  if(symbolInstances.hasOwnProperty(dorec.id))
+    img = symbolInstances[dorec.id];
   else if(imagesLoaded.hasOwnProperty(dorec.id))
     img = imagesLoaded[dorec.id];
   else {
     console.error("Could not find image with id ="+dorec.id);
     return;
   }
-  img.flashUp = dorec.flashUp;
-  img.flashDown = dorec.flashDown;
+  img.flashUpRate = dorec.flashUpRate;
+  img.flashDownRate = dorec.flashDownRate;
   img.flashHigh = dorec.flashHigh;
   img.flashLow = dorec.flashLow;
   img.flashUp = true;
@@ -3134,21 +3135,27 @@ function flashImage(dorec){
 
 function recordOpacity(id,op) {
   var img, typ;
-  if(imageInstances.hasOwnProperty(id)) {
-    img = imageInstances[id];
-    typ = 'image';
+  if(symbolInstances.hasOwnProperty(id)) {
+    img = symbolInstances[id];
+    typ = 'symbol';
   } else if(imagesLoaded.hasOwnProperty(id)) {
     img = imagesLoaded[id];
-    typ = 'symbol';
+    typ = 'image';
   }
+  if(img.hasOwnProperty("opacity")) {
+    if(op === img.opacity)
+      return false;
+  } else if(op === 1.0)
+    return false;
   var dorec = {action:'opacity',id:id,type:typ,opacity:op};
   if(img.hasOwnProperty("opacity"))
     dorec.oldValue = img.opacity;
   doRecordAdd(dorec);
+  return true;
 }
 
 function getIdType(id) {
-  if(imageInstances.hasOwnProperty(id))
+  if(symbolInstances.hasOwnProperty(id))
     return 'symbol';
   else if(imagesLoaded.hasOwnProperty(id))
     return 'image';
@@ -3161,8 +3168,8 @@ function getIdType(id) {
 }
 
 function setImageOpacity(dorec) {
-  if(imageInstances.hasOwnProperty(dorec.id))
-    img = imageInstances[dorec.id];
+  if(symbolInstances.hasOwnProperty(dorec.id))
+    img = symbolInstances[dorec.id];
   else if(imagesLoaded.hasOwnProperty(dorec.id))
     img = imagesLoaded[dorec.id];
   else {
@@ -3181,22 +3188,25 @@ function setImageOpacity(dorec) {
 }
 
 function onFrame(event){
+  //console.log("Count:"+event.count+" Time:"+event.time);
   for(var id in flashingImages) {
-    var img = flashingImgs[id];
+    var img = flashingImages[id];
     var op;
-    if(img.flashUp) {
+    if(img.hasOwnProperty('flashUp') && img.flashUp) {  // shouldn't be here if this property missing
       op = img.raster.opacity + img.flashUpRate;
       if(op > img.flashHigh) {
         op = img.flashHigh;
-        img.flashup = false;
+        img.flashUp = false;
       }
     } else {
-      op = img.raster.opacity + img.flashDownRate;
+      op = img.raster.opacity - img.flashDownRate;
       if(op < img.flashLow) {
         op = img.flashLow;
-        img.flashup = true;
+        img.flashUp = true;
       }
     }
+    img.raster.opacity = op;
+    console.log("OP:"+op);
   }
 }
 
@@ -3209,7 +3219,7 @@ var exports = {
   loadImages:loadImages,
   loadImage:loadImage,
   getNextID:getNextID,
-  getImages:getImageInstances,
+  getImages:getSymbolInstances,
   getLines:getLineInstances,
   getAreas:getAreaInstances,
   getStates:getStates,
