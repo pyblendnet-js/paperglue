@@ -1443,6 +1443,7 @@ function scaleCurrentImage(scale) {
 }
 
 function moveCurrentImage(x,y,r) {
+  //console.log("currentContextObject:"+Object.keys(currentContextObject));
   var im = currentContextObject.raster;
   console.log("Move from pos:"+im.position+" to "+x+","+y+","+r);
   var p = new Point(x,y);
@@ -3187,27 +3188,48 @@ function setImageOpacity(dorec) {
   }
 }
 
-function onFrame(event){
+var commonFlashUp = true;
+
+function onFrame(event) {
   //console.log("Count:"+event.count+" Time:"+event.time);
-  for(var id in flashingImages) {
-    var img = flashingImages[id];
-    var op;
-    if(img.hasOwnProperty('flashUp') && img.flashUp) {  // shouldn't be here if this property missing
-      op = img.raster.opacity + img.flashUpRate;
-      if(op > img.flashHigh) {
-        op = img.flashHigh;
-        img.flashUp = false;
-      }
-    } else {
-      op = img.raster.opacity - img.flashDownRate;
-      if(op < img.flashLow) {
-        op = img.flashLow;
-        img.flashUp = true;
-      }
+  var img, id;
+  if(editMode) {
+    for(id in imagesLoaded) {
+      img = imagesLoaded[id];
+      var flash_prop = {flashUpRate:0.02,flashDownRate:0.02,flashHigh:0.8,flashLow:0.5};
+      commonFlashUp = flashImg(img,commonFlashUp,flash_prop);
     }
-    img.raster.opacity = op;
-    console.log("OP:"+op);
+  } else {
+    for(id in flashingImages) {
+      img = flashingImages[id];
+      var flash_up = true;
+      if(img.hasOwnProperty('flashUp'))
+        flash_up = img.flashUp;
+      img.flashUp = flashImg(img,flash_up);
+    }
   }
+}
+
+function flashImg(img,flash_up,flash_prop) {
+  if(typeof flash_prop === 'undefined')
+    flash_prop = img;
+  var op;
+  if(flash_up) {  // shouldn't be here if this property missing
+    op = img.raster.opacity + flash_prop.flashUpRate;
+    if(op > flash_prop.flashHigh) {
+      op = flash_prop.flashHigh;
+      flash_up = false;
+    }
+  } else {
+    op = img.raster.opacity - flash_prop.flashDownRate;
+    if(op < flash_prop.flashLow) {
+      op = flash_prop.flashLow;
+      flash_up = true;
+    }
+  }
+  img.raster.opacity = op;
+  //console.log("OP:"+op);
+  return flash_up;
 }
 
 // think this needs to be at the bottom so under scripts find things fully loaded

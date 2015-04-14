@@ -398,12 +398,12 @@ function setDialogMove(id) {
 
 var dialogProp = {};
 
-function propertyRow(obj,ele,def,nm,le) {
-  console.log(obj,ele,def,nm,le);
-  if(typeof nm === 'undefined')
-    nm = ele;
-  if(typeof le === 'undefined')
-    le = ele;
+function propertyRow(obj,def,nm,le) {
+  // obj is the item which has a numeric or string value
+  // def is the default value if obj is undefined
+  // nm is the text label for the field
+  // le is the id for the field
+  //console.log(obj,def,nm,le);
   var p = '<tr><td>'+nm+'</td><td>';
   var val = "";
   var para = "";
@@ -418,8 +418,8 @@ function propertyRow(obj,ele,def,nm,le) {
       val = def.defaultValue;
     // any type value will be overridden if object iis set
   }
-  if(obj.hasOwnProperty(ele)) {
-    val = obj[ele];
+  if(typeof obj !== 'undefined') {
+    val = obj;
   }
   if(val !== "")
     para += ' value="'+val+'"';
@@ -470,13 +470,14 @@ function openImgPropDialog(force_flash) {
       nm = obj.inst.name;
     }
     //p += '<input id="name" type="text" value="'+nm+'"/></td></tr>';
-    p += propertyRow(obj.inst,'name',nm,'Name','name');
+    p += propertyRow(obj.inst.name,nm,'Name','name');
   } // otherwise symbol
-  p += propertyRow(obj.raster.position,'_x',0,'X','xpos');
-  p += propertyRow(obj.raster.position,'_y',0,'Y','ypos');
-  p += propertyRow(obj.raster,'_rotation',{defaultValue:0,type:'number',max:360,min:0},'Rot','rot');
+  p += propertyRow(obj.raster.position.x,0,'X','xpos');
+  p += propertyRow(obj.raster.position.y,0,'Y','ypos');
+  console.log("Obj key:"+Object.keys(obj.raster));
+  p += propertyRow(obj.raster.rotation,{defaultValue:0,type:'number',max:360,min:0},'Rot','rot');
   if(obj.type !== 'symbol') {
-    p += propertyRow(obj.src,'scale',{defaultValue:1.0,step:0.1},'Scale','scale');
+    p += propertyRow(obj.src.scale,{defaultValue:1.0,step:0.1},'Scale','scale');
   }
   p += '<tr><td>Flash Image</td><td>';
   var flashFlag = "";
@@ -492,15 +493,15 @@ function openImgPropDialog(force_flash) {
   var op_para = {step:0.1,max:1.0,min:0.0};
   if(flashing) {
     op_para.defaultValue = 0.1;
-    p += propertyRow(obj.inst,'flashUpRate',op_para,'UpRate');
-    p += propertyRow(obj.inst,'flashDownRate',op_para,'DownRate');
+    p += propertyRow(obj.inst.flashUpRate,op_para,'UpRate','flashUpRate');
+    p += propertyRow(obj.inst.flashDownRate,op_para,'DownRate','flashDownRate');
     op_para.defaultValue = 1.0;
-    p += propertyRow(obj.inst,'flashHigh',op_para,'MaxOpacity');
+    p += propertyRow(obj.inst.flashHigh,op_para,'MaxOpacity','flashHigh');
     op_para.defaultValue = 0.0;
-    p += propertyRow(obj.inst,'flashLow',op_para,'MinOpacity');
+    p += propertyRow(obj.inst.flashLow,op_para,'MinOpacity','flashLow');
   } else {
     op_para.defaultValue = 1.0;
-    p += propertyRow(obj.raster,'opacity',op_para,'Opacity');
+    p += propertyRow(obj.raster.opacity,op_para,'Opacity','opacity');
   }
   //}
   // var ks = Object.keys(obj);
@@ -563,11 +564,11 @@ function propDialogReturn(reply) {
   //if(obj.type !== 'symbol') {
     //var sfield = document.getElementById('scale');
     //var s = parseFloat(sfield.value);
-  if(rtnval.hasOwnProperty('scale'))
+  if(rtnval.hasOwnProperty('scale')) {
     console.log(obj.src.scale,rtnval.scale);
-    if(obj.src.scale != rtnval.scale) {
+    if(obj.src.scale != rtnval.scale)
       paperGlue.scaleCurrentImage(rtnval.scale);
-    }
+  }
   //}
   //var x = parseFloat(xfield.value);
   //var y = parseFloat(yfield.value);
@@ -575,7 +576,7 @@ function propDialogReturn(reply) {
   //console.log("X:"+x);
   //if(!!nmfield) {
   if(rtnval.hasOwnProperty('name')) {
-    var name = nmfield.value;
+    var name = rtnval.name;
     console.log("New name:"+name);
     paperGlue.nameCurrentImage(name);
   }
