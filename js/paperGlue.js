@@ -1272,7 +1272,7 @@ function onMouseUp(event) {
   }
   if(editMode) {
     if(!!imageSelected) {
-      console.log("Opacity was:" + imageSelected.opacity);
+      //console.log("Opacity was:" + imageSelected.opacity);
       imageSelected.opacity = 1.0;
     }
     if(rightButton) {
@@ -1871,7 +1871,7 @@ function deleteSelected() {
       if(lineInstances.hasOwnProperty(id))
         removeLine(id,true);
       else if(symbolInstances.hasOwnProperty(id))
-        removeImage(id,true);
+        removeSymbol(id,true);
       else if(areaInstances.hasOwnProperty(id))
         removeAreaInstance(id,true);
     }
@@ -2287,7 +2287,7 @@ function removeAll(){
   nextID = 0;  // start again
 }
 
-function removeImage(id,record) {
+function removeSymbol(id,record) {
   if(record) {
     var obj = symbolInstances[id];
     doRecordAdd({action:'symbolDelete',id:id,src_id:obj.src.id,pos:obj.raster.position,rot:obj.raster.rotation});
@@ -2491,7 +2491,7 @@ function redo() {
       removeLine(to_do.id,false);
       break;
     case 'symbolDelete':
-      removeImage(to_do.id,false);   // delete is already in records
+      removeSymbol(to_do.id,false);   // delete is already in records
       break;
     case 'setArea':   // doesn't matter if area still exists
       if(!areaInstances.hasOwnProperty(to_do.id))
@@ -2671,7 +2671,7 @@ function getCurrentContextObject() {
   return currentContextObject;  // remeber this is not an instance - contains id into instance
 }
 
-function removeImageRecord(src) {
+function removeSymbolRecord(src) {
   // removes all instances of an image with src from doRecord
   var found = false;
   var symbols = [];
@@ -2698,6 +2698,7 @@ function delCurrentContextObject() {
   switch(currentContextObject.type) {
     case 'image':
       currentContextObject.raster.remove();
+      delete currentContextObject.inst.raster;
       var instances = 0;
       for(var symb in symbolInstances) {
         if(symb.src === currentContextObject.inst)
@@ -2715,7 +2716,7 @@ function delCurrentContextObject() {
         if(pot_instances === 0 ||
           confirm("Remove "+pot_instances + "instances from doRecord also?")) {
           if(pot_instances > 0) {
-            removeImageRecord(currentContextObject.id);
+            removeSymbolRecord(currentContextObject.id);
           }
           delete imagesLoaded[currentContextObject.id];
         }
@@ -2723,7 +2724,7 @@ function delCurrentContextObject() {
       hideCursor();
       break;
     case 'symbol':
-      removeImage(currentContextObject.id,true);
+      removeSymbol(currentContextObject.id,true);
       hideCursor();
       break;
     case 'line':
@@ -2782,6 +2783,13 @@ function setEditMode(state) {
   } else {
     mode = 'run';
     console.log("**RUN MODE**");
+    for(var id in imagesLoaded) {
+      var img = imagesLoaded[id];
+      if(img.hasOwnProperty('opacity'))
+        img.raster.opacity = img.opacity;
+      else
+        img.raster.opacity = 1.0;
+    }
   }
   if(typeof window.globals.setMode !== 'undefined')
     window.globals.setMode(mode);
@@ -3196,6 +3204,15 @@ function onFrame(event) {
   if(editMode) {
     for(id in imagesLoaded) {
       img = imagesLoaded[id];
+      if(!img.hasOwnProperty('raster'))
+        continue;
+      if(!img.dragClone && img.raster !== imageSelected) {
+        if(img.hasOwnProperty('opacity'))
+          img.raster.opacity = img.opacity;
+        else
+          img.raster.opacity = 1.0;
+        continue;
+      }
       var flash_prop = {flashUpRate:0.02,flashDownRate:0.02,flashHigh:0.8,flashLow:0.5};
       commonFlashUp = flashImg(img,commonFlashUp,flash_prop);
     }
