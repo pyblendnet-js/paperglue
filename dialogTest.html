@@ -1,0 +1,47 @@
+<!doctype html>
+<html>
+<head>
+  <meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+  <meta content="utf-8" http-equiv="encoding">
+  <script>  // this script for module loading
+  window.globals = { }; // for interscope comms
+  // must be defined before any modules that use it
+  function moduleCmd(mod,cmd,arg0,arg1,arg2,arg3,arg4) {
+    // assumes that window.global[mod][cmd] exists
+    //console.log(cmd,arg0,arg1,arg2);//.onload();  //no use since it may not be added to globals yet
+    window.globals[mod][cmd](arg0,arg1,arg2,arg3,arg4);
+  }
+  </script>
+  <script type="text/javascript" src="js/dialog.js"></script>
+  <script>
+    var dialog = window.globals.dialog;
+    var simpleProp = 20.0;
+    function simpleDialog() {
+      var fs = dialog.openDialogCommon(simpleDialogReturn, ['Okay', 'Cancel']);
+      var p = '<div id="imgLoadOptionsTitle">Default Image Load Options</div>';
+    	p += '<table>';
+      p += dialog.propertyRow(simpleProp, 10.0, 'X', 'simple_prop');
+      p += '</table>';
+    	var content = document.getElementById('DlgContent');
+    	content.innerHTML = p;
+    	dialog.setDialogMove("imgLoadOptionsTitle");
+    	return false;
+    }
+
+    function simpleDialogReturn(reply) {
+      console.log(reply);
+    }
+
+    function colorSelectDialog() {
+
+    }
+
+  </script>
+</head>
+<body>
+  <button type="button" onclick="simpleDialog();" class="button" width="300">Simple Dialog</button>
+  <script>
+
+  </script>
+</body>
+</html>
