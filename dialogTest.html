@@ -16,32 +16,80 @@
   <script>
     var dialog = window.globals.dialog;
     var simpleProp = 20.0;
+    var undefProp;
+    var simpleString = "hello";
     function simpleDialog() {
-      var fs = dialog.openDialogCommon(simpleDialogReturn, ['Okay', 'Cancel']);
+      var fs = dialog.openCommon(simpleDialogReturn, ['Okay', 'Cancel']);
       var p = '<div id="imgLoadOptionsTitle">Default Image Load Options</div>';
     	p += '<table>';
-      p += dialog.propertyRow(simpleProp, 10.0, 'X', 'simple_prop');
+      p += dialog.propertyRow(simpleProp, 10.0, 'number', 'simple_prop');
+      p += dialog.propertyRow(undefProp,
+        {defaultValue:10.0, max:30, min:5, step:5}, 'number', 'undef_prop');
+      p += dialog.propertyRow(simpleString, 10.0, 'string', 'simple_string');
       p += '</table>';
-    	var content = document.getElementById('DlgContent');
-    	content.innerHTML = p;
-    	dialog.setDialogMove("imgLoadOptionsTitle");
+      dialog.setContent(p);
+    	dialog.setMove("imgLoadOptionsTitle");
     	return false;
     }
 
-    function simpleDialogReturn(reply) {
+    function simpleDialogReturn(reply,prop_values) {
       console.log(reply);
+      if(reply != 'cancel') {
+        console.log("number = " + prop_values.simple_prop);
+        console.log("undef number = " + prop_values.undef_prop);
+        console.log("string = " + prop_values.simple_string);
+      }
     }
 
-    function colorSelectDialog() {
+    function colorDialog() {
+      dialog.colorSelector(setColor);
+    }
 
+    function setColor(c) {
+      console.log("Color selected = "+c);
+    }
+
+    var dummy_dir1_list =  [{name:"dummy_dir2",type:"dir"},{name:"dummy_file.xxx",type:"file"}];
+    var dummy_dir1_obj = {type:"dir",path:"dummy_dir1",dir:dummy_dir1_list};
+    var dummy_dir2_list = [{name:"dummy_file2.xxx",type:"file"},{name:"dummy_file3.xxx",type:"file"},{name:"dummy_file4.xxd",type:"file"}]
+    var dummy_dir2_obj = {type:"dir",path:"dummy_dir1/dummy_dir2",dir:dummy_dir2_list};
+    var dirCommands = { parent_rtn: "parentRtn()",list:"listDir()"};
+    var objective, xtns;
+
+    function fileSelectDialog() {
+      objective = "open";
+      xtns = "xxx,abc";
+      dialog.fileSelector(objective,xtns,dummy_dir1_obj,dirCommands,fileSelected);
+    }
+
+    function parentRtn() {
+      dialog.fileSelector(objective,xtns,dummy_dir1_obj,dirCommands,fileSelected);
+    }
+
+    function listDir() {
+      dialog.fileSelector(objective,xtns,dummy_dir2_obj,dirCommands,fileSelected);
+    }
+
+    function fileSelected(objective,path,subpath) {
+      console.log(objective+" from path:"+path+" file:"+subpath);
+    }
+
+    function fileSaveDialog() {
+      objective = "save";
+      xtns = "xxd";
+      dialog.fileSelector(objective,xtns,dummy_dir1_obj,dirCommands,fileSelected);
     }
 
   </script>
 </head>
 <body>
   <button type="button" onclick="simpleDialog();" class="button" width="300">Simple Dialog</button>
-  <script>
+  <button type="button" onclick="colorDialog();" class="button" width="300">Color Select Dialog</button>
+  <button type="button" onclick="fileSelectDialog();" class="button" width="300">File Select Dialog</button>
+  <button type="button" onclick="fileSaveDialog();" class="button" width="300">File Save Dialog</button>
+  <div id="clientArea">
 
-  </script>
+  </div>
+  <div id="Dialog"><div id="DlgContent"></div><div  id="DlgReplyButtons"></div></div>
 </body>
 </html>

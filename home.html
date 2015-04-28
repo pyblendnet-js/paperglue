@@ -3,33 +3,99 @@
 <head>
   <meta content="text/html;charset=utf-8" http-equiv="Content-Type">
   <meta content="utf-8" http-equiv="encoding">
+  <script>
+    window.globals = { }; // for interscope comms
+    // must be defined before any modules that use it
+    function moduleCmd(mod,cmd,arg0,arg1,arg2,arg3,arg4) {
+      // assumes that window.global[mod][cmd] exists
+      //console.log(cmd,arg0,arg1,arg2);//.onload();  //no use since it may not be added to globals yet
+      window.globals[mod][cmd](arg0,arg1,arg2,arg3,arg4);
+    }
+
+    var modulesLoaded = [];
+
+    function checkDependancies(nm) {
+      var mod = modulesLoaded[nm];
+      var mk = mod.dep.slice();  //shallow copy
+      for(var di in mk) {
+        var dm = mod.dep[di];
+        if(modulesLoaded.hasOwnProperty(dm)) {
+
+  //for(var nm2 in modulesLoaded) {
+    //if(nm === nm2)
+      //continue;  // dependant on self
+    //console.log("Is "+nm2+" in "+mod.dep);
+    //console.log("nm2 in mod.dep:"+(mod.dep.indexOf(nm2)));
+    //var i = mod.dep.indexOf(nm2)
+    //if(i >= 0) { // if so, remove from dependancies
+          //if(modulesLoaded[dm].dep.length > 0)
+            //console.log("Yes but has "+modulesLoaded[dm].dep.length+" dependancies of its own.");
+          //else
+            //console.log("Yes");
+          if(modulesLoaded[dm].dep.length === 0)  // but only if it's dependancies are met too
+            mod.dep.splice(di,1);
+        }
+      }
+      if(mod.dep.length > 0) {
+        //console.log(nm +" has "+ mod.dep.length + " remaining dependancies");
+      } else if(typeof mod.init === 'function') {
+        //window.globals[nm][mod.init];
+        console.log("Init for module " + nm);
+        mod.init();
+        delete mod.init;  // only fire once
+      }
+    }
+
+    function moduleLoaded(name,dependancies,init) {
+      console.log(name + " module loaded.");
+      if(typeof dependancies === 'undefined')
+        dependancies = [];
+      modulesLoaded[name] = {dep:dependancies,init:init};
+      //console.log("Modules loaded:"+Object.keys(modulesLoaded));
+      checkDependancies(name);  // if all dependancies met this init fires first
+      for(var i = 0; i < 10; i++) {  // need to scan modules many times
+        // once to check for modules dependant on name
+        // and then once for modules dependant on that last etc
+        for(var nm in modulesLoaded) {
+          checkDependancies(nm);
+        }
+      }
+    }
+    window.globals.moduleLoaded = moduleLoaded;
+  </script>
   <!-- Load the Paper.js library -->
-  <script type="text/javascript" src="js/paper.js"></script>
-  <script>  window.globals = { }; // for interscope comms </script>
+  <script type="text/javascript" src="js/paper.js" onload="moduleLoaded('paper')"></script>
   <script type="text/javascript" src="js/nodeComms.js"></script>
+  <script type="text/javascript" src="js/dialog.js"></script>
   <!-- Load external PaperScript and associate it with myCanvas -->
-  <script type="text/paperscript" src="js/paperglue.js" canvas="myCanvas"></script>
-  <script type="text/paperscript" src="js/myScript.js" canvas="myCanvas"></script>
+  <script type="text/javascript" src="js/paperglue.js"></script>
+  <script type="text/javascript" src="js/paperGlueDialogs.js"></script>
+  <script type="text/javascript" src="js/myScript.js"></script>
   <!-- should have the same scope as per https://github.com/paperjs/paper.js/issues/153 -->
   <script type="text/javascript" src="dorec.js"> </script>
   <script type="text/javascript" src="imgavail.js"> </script>
   <script>
+  function loaded(module) {
+
+  }
+
   function onload() {
-    console.log("body loaded");
+    //console.log("body loaded");
+    moduleLoaded("body");  //document body must be loaded before paperGlue init
     console.log(Object.keys(window.globals) ); //.onload();  //no use since it may not be added to globals yet
   }
 
-  function myScriptCmd(cmd, arg0,arg1,arg2,arg3,arg4) {
-    //console.log(Object.keys(window.globals.myScript) );
-    //console.log(cmd,arg0,arg1,arg2);//.onload();  //no use since it may not be added to globals yet
-    window.globals.myScript[cmd](arg0,arg1,arg2,arg3,arg4);
-  }
-
-  function paperGlueCmd(cmd,arg0,arg1,arg2,arg3,arg4) {
-    //console.log("PaperGlue commands:"+Object.keys(window.globals.paperGlue) );
-    //console.log(cmd,arg0,arg1,arg2);//.onload();  //no use since it may not be added to globals yet
-    window.globals.paperGlue[cmd](arg0,arg1,arg2,arg3,arg4);
-  }
+  // function myScriptCmd(cmd, arg0,arg1,arg2,arg3,arg4) {
+  //   //console.log(Object.keys(window.globals.myScript) );
+  //   //console.log(cmd,arg0,arg1,arg2);//.onload();  //no use since it may not be added to globals yet
+  //   window.globals.myScript[cmd](arg0,arg1,arg2,arg3,arg4);
+  // }
+  //
+  // function paperGlueCmd(cmd,arg0,arg1,arg2,arg3,arg4) {
+  //   //console.log("PaperGlue commands:"+Object.keys(window.globals.paperGlue) );
+  //   //console.log(cmd,arg0,arg1,arg2);//.onload();  //no use since it may not be added to globals yet
+  //   window.globals.paperGlue[cmd](arg0,arg1,arg2,arg3,arg4);
+  // }
 
   function DlgShow(Message)
   {
@@ -123,11 +189,6 @@
     </table>
 </div>
 </div>
-<div id="Dialog" >
-  <div>
-    <div id="DlgContent">Content Goes Here</div>
-    <div id="DlgReplyButtons"></div>
-  </div>
-</div>
+<div id="Dialog"><div id="DlgContent"></div><div  id="DlgReplyButtons"></div></div>
 </body>
 </html>
