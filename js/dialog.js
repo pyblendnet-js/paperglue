@@ -56,10 +56,10 @@
     }
     keyFocus = true;
     isModal = true;
-    //paperGlue.enableKeyFocus(false);
+    paperGlue.enableKeyFocus(false);
     dialogDiv.style.visibility = 'visible';
     dialogDiv.style.fontSize = fontsize + 'px';
-    //paperGlue.setModalOpen(true); //make dialog modalish
+    paperGlue.setModalOpen(true); //make dialog modalish
     //dialog.style.fontSize = fontsize;
     //dialog.style = "font-size:"+fontsize+"px;visibility:visible;";
     dialogProp = {};
@@ -73,12 +73,14 @@
 
   function mouseDown(e) {
     e.stopPropagation();
+    if(typeof this.setCapture === 'function')  // no work on chrome
+      this.setCapture();
     //dragFlag = true;
     tempMouseMove = clientArea.onmousemove;
     this.onmousemove = mouseMove;
-    clientArea.onmousemove = mouseMove;
+    //clientArea.onmousemove = mouseMove;
     tempMouseUp = clientArea.onmouseup;
-    clientArea.onmouseup = mouseUp;
+    //clientArea.onmouseup = mouseUp;
     this.onmouseup = mouseUp;
     var rect = this.getBoundingClientRect();
     mouseX = e.clientX - rect.left;
@@ -87,15 +89,25 @@
 
   function mouseUp(e) {
     e.stopPropagation();
-    clientArea.onmousemove = tempMouseMove;
-    clientArea.onmouseup = tempMouseUp;
+    //clientArea.onmousemove = tempMouseMove;
+    //clientArea.onmouseup = tempMouseUp;
     this.onmousemove = null;
     this.onmouseup = null;
+    if(typeof this.setCapture === 'function')  // no work on chrome
+      this.releaseCapture();
+    console.log("MouseMoveUp");
   }
 
   function mouseMove(e) {
+    var rect = this.getBoundingClientRect();
+    var inside = true;  // alternative for chrome
+    if(typeof this.setCapture !== 'function')  // no work on chrome
+      inside = e.clientX > rect.left && e.clientX < rect.right && e.clientY > rect.top && e.clientY < rect.bottom;
+    if(inside) {
     dialogDiv.style.left = (e.clientX - mouseX) + 'px';
     dialogDiv.style.top = (e.clientY - mouseY) + 'px';
+  } else
+    mouseUp(e);
     //console.log('Move');
   }
 
@@ -179,9 +191,9 @@
 
   function closeDialog() {
     dialogDiv.style.visibility = 'hidden';
-    //paperGlue.setModalOpen(false);
+    paperGlue.setModalOpen(false);
     isModal = false;
-    //paperGlue.enableKeyFocus(true);
+    paperGlue.enableKeyFocus(true);
     hasFocus = false;
   }
 
@@ -229,10 +241,6 @@
     if (typeof setColorCallback === 'function')
       setColorCallback(c);
     closeDialog();
-    //var Dlg = document.getElementById('Dialog');
-    //Dlg.style.visibility = 'hidden';
-    //window.globals.paperGlue.setModalOpen(false);
-    //window.globals.paperGlue.enableKeyFocus(true);
   }
 
 

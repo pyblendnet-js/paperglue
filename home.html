@@ -70,15 +70,12 @@
   <!-- Load external PaperScript and associate it with myCanvas -->
   <script type="text/javascript" src="js/paperglue.js"></script>
   <script type="text/javascript" src="js/paperGlueDialogs.js"></script>
+  <script type="text/javascript" src="js/paperGlueMenus.js"></script>
   <script type="text/javascript" src="js/myScript.js"></script>
   <!-- should have the same scope as per https://github.com/paperjs/paper.js/issues/153 -->
   <script type="text/javascript" src="dorec.js"> </script>
   <script type="text/javascript" src="imgavail.js"> </script>
   <script>
-  function loaded(module) {
-
-  }
-
   function onload() {
     //console.log("body loaded");
     moduleLoaded("body");  //document body must be loaded before paperGlue init
@@ -146,9 +143,10 @@
 </head>
 <body id="body" onload="onload();" >
   <div id="clientArea">
-  <div id="statusInfo" style="display:none">STATUS LINE</div>
-  <div id="canvasDiv" style="height:100%;background-color:blue">
-    <canvas id="myCanvas" resize></canvas>
+    <div id="statusInfo" style="display:none">STATUS LINE</div>
+    <div id="canvasDiv" style="height:100%;background-color:blue">
+      <canvas id="myCanvas" resize></canvas>
+    </div>
   </div>
   <div id="actionTableDiv" style="display:none">
     <style>
@@ -187,8 +185,7 @@
     style="border: thin solid #808080; cursor: default; white-space: nowrap"
     bgcolor="White">
     </table>
-</div>
-</div>
-<div id="Dialog"><div id="DlgContent"></div><div  id="DlgReplyButtons"></div></div>
+  </div>
+  <div id="Dialog"><div id="DlgContent"></div><div  id="DlgReplyButtons"></div></div>
 </body>
 </html>
