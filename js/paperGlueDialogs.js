@@ -257,16 +257,16 @@ function areaDialogReturn(reply) {
 function fileSelectorDialog(objective, xtns, dir_obj) {
   var parent_rtn_cmd, list_dir_cmd;
   if (xtns === 'localImages') {
-    parent_rtn = "paperGlueCmd('loadImage','" + dir_obj.path +
+    parent_rtn = "moduleCmd('paperGlue','loadImage','" + dir_obj.path +
       "','parent_directory')";
-    list_dir_cmd = "paperGlueCmd('loadImage','" + dir_obj.path +
+    list_dir_cmd = "moduleCmd('paperGlue','loadImage','" + dir_obj.path +
       "','" + fd.name +
       "')";
   } else {
-    parent_rtn = "paperGlueCmd('listFiles','" + objective + "','" +
+    parent_rtn = "moduleCmd('paperGlue','listFiles','" + objective + "','" +
       xtns + "','" +
       dir_obj.path + "','parent_directory')";
-    list_dir_cmd = "paperGlueCmd('listFiles','" + objective + "','" +
+    list_dir_cmd = "moduleCmd('paperGlue','listFiles','" + objective + "','" +
       xtns + "','" +
       dir_obj.path + "','" + fd.name + "')";
   }
@@ -296,10 +296,6 @@ function lineGetColor(obj) {
 function setCurrentLineColor(c) {
   window.globals.paperGlue.setCurrentLineColor(c);
   dialog.closeDialog();
-  //var Dlg = document.getElementById('Dialog');
-  //Dlg.style.visibility = 'hidden';
-  //window.globals.paperGlue.setModalOpen(false);
-  //window.globals.paperGlue.enableKeyFocus(true);
 }
 
 function setStateDialog(state) {
@@ -356,8 +352,6 @@ function setStateDialogReturn(reply) {
   if (reply === 'Apply') {
     return;
   }
-  //paperGlue.setModalOpen(false);
-  //paperGlue.enableKeyFocus(true);
   dialog.closeDialog();
 }
 

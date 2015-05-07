@@ -6,20 +6,24 @@
   var dialogDiv;
   var content;
   var replyButtons;
-  var hasFocus = false;
-  var isModal = false;
   var dialogProp = {}; // set in
   var dialogRtn; // function to return results to
   var tempMouseUp;
   var fontStyle;
 
-  // other modules using the keyboard should check here to see if dialog has focus
-  function onKey() {
-    return !keyFocus;
+  window.globals.modalKey = null;
+
+  function onKey(event) {  //set to global.modalKey in openCommon
+    if (event.key === 'escape') {
+      closeDialog();
+      return false;
+    }
+    return true;
   }
 
   function openCommon(dialog_rtn, reply_buttons) {
     // paper.js note: do not mess with the body unless in same scope or maybe use createElement
+    globals.modalKey = onKey; //make dialog modalish
     if (typeof clientArea === 'undefined') { // prepare page for dialog
       clientArea = document.getElementById('clientArea');
       dialogDiv = document.getElementById('Dialog');
@@ -56,10 +60,8 @@
     }
     keyFocus = true;
     isModal = true;
-    paperGlue.enableKeyFocus(false);
     dialogDiv.style.visibility = 'visible';
     dialogDiv.style.fontSize = fontsize + 'px';
-    paperGlue.setModalOpen(true); //make dialog modalish
     //dialog.style.fontSize = fontsize;
     //dialog.style = "font-size:"+fontsize+"px;visibility:visible;";
     dialogProp = {};
@@ -189,14 +191,11 @@
       closeDialog();
   }
 
+
   function closeDialog() {
     dialogDiv.style.visibility = 'hidden';
-    paperGlue.setModalOpen(false);
-    isModal = false;
-    paperGlue.enableKeyFocus(true);
-    hasFocus = false;
+    globals.modalKey = null;
   }
-
   // special dialogs
 
   var ega = {
@@ -336,21 +335,10 @@
       setMove("fileSelectTitle");
       return false;
     }
-    // in initApp() you will find paperGlue.fileSelector = fileSelectorDialog;
 
   function selectFile(objective, path, subpath) {
-    selectFileCallback(objective, path, subpath);
-    // switch (objective) {
-    // 	case 'loadRecord':
-    // 		paperGlue.loadRecord(path, subpath);
-    // 		break;
-    // 		// case 'saveRecord':
-    // 		//   paperGlue.saveRecord(path,subpath);
-    // 		//   break;
-    // 	case 'loadImage':
-    // 		paperGlue.loadImage(path, subpath);
-    // 		break;
-    // }
+    if(typeof selectFileCallback === 'function')
+      selectFileCallback(objective, path, subpath);
     closeDialog();
   }
 
@@ -378,12 +366,6 @@
 
   var globals = window.globals;
   var exports = {
-    hasFocus: function() {
-      return hasfocus;
-    },
-    isModal: function() {
-      return isModal;
-    },
     openCommon: openCommon,
     closeDialog: closeDialog,
     propertyRow: propertyRow,

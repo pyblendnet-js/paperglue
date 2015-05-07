@@ -38,7 +38,6 @@
   var cursorLayer;
   var layerFlip = [1, 1];
   var editMode = true;
-  var modalOpen = false;
   var mouseDownHandled = false; // prevent propogation to onMouseDown
   var selectDist = 10; // how close to a line for right click select closest
   var keyFocus = true;
@@ -700,13 +699,13 @@
             } else
               continue;
           }
-          var parts = ip.split("/");
-          console.log("parts:" + parts + " length=" + parts.length);
+          var parts = ip.split("/");  // seperate the fid into directories and file name
+          //console.log("parts:" + parts + " length=" + parts.length);
           var f = {
             name: parts[0]
           };
           if (parts.length > 1)
-            f.type = "dir";
+            f.type = "dir";  // first part is a directory name
           else {
             f.type = "file";
             var xp = parts[0].split('.');
@@ -717,12 +716,19 @@
           }
           ilist.push(f);
         }
-        console.log("ilist:" + ilist);
+        //console.log("ilist:" + ilist);
         dialog.fileSelector("loadImage", "localImages", {
           type: "dir",
           path: path,
-          dir: ilist
-        });
+          dir: ilist},
+          {parent_rtn: "moduleCmd('paperGlue','listFiles','loadImage','" +
+          xtns + "','" +
+            dir_obj.path + "','parent_directory');",
+            list:"moduleCmd('paperGlue','listFiles','loadImage','" +
+            xtns + "','" +
+              dir_obj.path + "','parent_directory');"},
+            null
+        );
       } else
         console.log("No images available object loaded");
     } else if (typeof path === 'undefined') {
@@ -822,7 +828,7 @@
     stopEvent(event);
     if (!editMode)
       return false;
-    if (modalOpen || !currentContextMenu) {
+    if (typeof globals.modalKey === 'function' || !currentContextMenu) {
       console.log("Modal or no currentContextMenu");
       return false;
     }
@@ -916,7 +922,7 @@
       return false;
     }
     console.log("Basic Mouse down");
-    if (modalOpen)
+    if (typeof globals.modalKey === 'function')
       return false;
     mouseDownPosition = event.point;
     hideArea();
@@ -1290,7 +1296,7 @@
     stopEvent(event);
     mouseDownHandled = true;
     console.log("Line mouse down");
-    if (modalOpen)
+    if (typeof globals.modalKey === 'function')
       return;
     hideContextMenu('contextMenu');
     mouseDownPosition = event.point;
@@ -1341,7 +1347,7 @@
   // universal mouse drag function can drag lines or images or create rubber band new line
   function onMouseDrag(event) {
     // only fires when the mouse button is pressed
-    if (modalOpen || !editMode)
+    if (typeof globals.modalKey === 'function' || !editMode)
       return;
     if (rightButton) {
       var v = event.point.subtract(mouseDownPosition);
@@ -1466,7 +1472,7 @@
   function onMouseUp(event) {
     console.log("Mouse up");
     stopEvent(event);
-    if (modalOpen) {
+    if (typeof globals.modalKey === 'function') {
       return false;
     }
     if (editMode) {
@@ -1815,19 +1821,6 @@
   var modPressDelay = 800; //delay in ms since mod key pressed for modified action
 
   function onKeyDown(event) { //note: this is the paper.js handler - do not confuse with html
-    console.log("Key pressed");
-    if (modalOpen) {
-      console.log("Modal key:" + event.key);
-      if (event.key === 'escape' && dialog.closeDialog !== 'undefined') {
-        dialog.closeDialog();
-        return false;
-      }
-      return true; //this allows dialogs to receive key strokes
-    }
-    if (!keyFocus) {
-      console.log("Paper  glue ignoring keys");
-      return false;
-    }
     stopEvent(event);
     var d = new Date();
     var nowMs = d.getTime();
@@ -1859,6 +1852,20 @@
     //console.log("Now:"+(nowMs - controlPressMs));
     //console.log("Paperglue received:" + event.key);
     //console.log("Window keys:" + Object.keys(window));
+    console.log("Key pressed:"+event.key);
+    // some module such as dialog have modal behaviour
+    // if set, off key to these
+    if (typeof globals.modalKey === 'function') {
+      console.log("Modal key:" + event.key);
+      return modalKey(event.key);
+    }
+    // other modules may just want to accept a hot key
+    if (typeof globals.chainKeyCall === 'function') {
+      if (!global.chainKeyCall(event)) {
+        console.log("Paper glue ignoring keys");
+        return false;   // module stole key so no further process.
+      }
+    }
     var propagate = true;
     var delta = null; // for arrow keys
     if (event.controlPressed) {
@@ -2403,7 +2410,7 @@
     listXtns = xtns;
     if (window.location.protocol === 'file:') {
       console.log("Local storage  listing");
-      if (typeof dialog.fileSelector === 'function') {
+      if (typeof paperDialogs.fileSelector === 'function') {
         var local_storage_objects = Object.keys(localStorage);
         console.log("Local storage objects:" + local_storage_objects);
         // xtns don't really apply to local storage
@@ -2450,6 +2457,7 @@
           relativePath = reply_obj.path;
           if (typeof dialog.fileSelector === 'function')
             dialog.fileSelector(listObjective, listXtns, reply_obj);
+          // listObject is also the name for the function to call on rtn
           break;
       }
       //} catch(e1) {
@@ -3135,12 +3143,6 @@
     hideCursor();
   }
 
-  function enableKeyFocus(state) {
-    // disable to allow dialog field input
-    keyFocus = state;
-    //console.log("PaperGlue keyfocus:"+  keyFocus);
-  }
-
   function setEditMode(state) {
     editMode = state;
     var mode;
@@ -3164,10 +3166,6 @@
 
     if (typeof window.globals.setMode !== 'undefined')
       window.globals.setMode(mode);
-  }
-
-  function setModalOpen(state) {
-    modalOpen = state;
   }
 
   function areaSelect() {
@@ -3743,8 +3741,6 @@
     getLineColor: getLineColor,
     setLineColor: setLineColor,
     setCurrentLineColor: setCurrentLineColor,
-    keyHandler: null,
-    enableKeyFocus: enableKeyFocus,
     //removeAll:removeAll,
     getCurrentContextObject: getCurrentContextObject,
     delCurrentContextObject: delCurrentContextObject,
@@ -3767,7 +3763,6 @@
     changeAreaName: nameCurrentArea,
     moveCurrentArea: moveCurrentArea,
     setEditMode: setEditMode, // change this to false for application
-    setModalOpen: setModalOpen,
     areaSelect: areaSelect,
     getAreaNameCall: getAreaNameCall,
     getAreaRectCall: getAreaRectCall,
@@ -3790,7 +3785,6 @@
   globals.paperGlue = exports;
   paperGlue = globals.paperGlue; // for dependant modules to add:
   // - fileSelector(objective,dir_obj) = a gui to display directories returned by list()
-  // - closeDialog() = so pressing escape will close any modal dialogs
 
   if (typeof globals.moduleLoaded === 'function')
     globals.moduleLoaded('paperGlue', dependancies, init);

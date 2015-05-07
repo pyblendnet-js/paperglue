@@ -5,7 +5,10 @@
   <meta content="utf-8" http-equiv="encoding">
   <script>
     window.globals = { }; // for interscope comms
-    // must be defined before any modules that use it
+    // paperGlue uses
+    // window.globals.modalKey = null; set in dialog.js for modal dialogs
+    // window.globals.chainKey = null; which could be set in module
+    // moduleCmd below must be defined before any modules that use it
     function moduleCmd(mod,cmd,arg0,arg1,arg2,arg3,arg4) {
       // assumes that window.global[mod][cmd] exists
       //console.log(cmd,arg0,arg1,arg2);//.onload();  //no use since it may not be added to globals yet

@@ -42,7 +42,7 @@
     //paperGlue = window.globals.paperGlue; //to access paperGlue commands
     paperGlue.init(); // sets up extra layers
     drawStripBoard(10, 100, 34);
-    paperGlue.loadImages([], pgMenus.default_image_menus); //first_image
+    paperGlue.loadImages([first_image], pgMenus.default_image_menus);
     paperGlue.setSnap([5, 5, 10, 10]);
     paperGlue.showAreas();
     //paperGlue.closeDialog = dialog.closeDialog;
