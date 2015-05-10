@@ -8,8 +8,11 @@
   // must be defined before any modules that use it
   function moduleCmd(mod,cmd,arg0,arg1,arg2,arg3,arg4) {
     // assumes that window.global[mod][cmd] exists
-    //console.log(cmd,arg0,arg1,arg2);//.onload();  //no use since it may not be added to globals yet
-    window.globals[mod][cmd](arg0,arg1,arg2,arg3,arg4);
+    console.log(mod,cmd,arg0,arg1,arg2);
+    if(mod === "" && cmd === 'listDir')  // only used for test pages
+      listDir(arg0,arg1,arg2,arg3,arg4);
+    else
+      window.globals[mod][cmd](arg0,arg1,arg2,arg3,arg4);
   }
   </script>
   <script type="text/javascript" src="js/dialog.js"></script>
@@ -49,11 +52,14 @@
       console.log("Color selected = "+c);
     }
 
+    // dummy directories for test
     var dummy_dir1_list =  [{name:"dummy_dir2",type:"dir"},{name:"dummy_file.xxx",type:"file"}];
-    var dummy_dir1_obj = {type:"dir",path:"dummy_dir1",dir:dummy_dir1_list};
+    var dummy_dir1_obj = {type:"dir",path:"",dir:dummy_dir1_list};
     var dummy_dir2_list = [{name:"dummy_file2.xxx",type:"file"},{name:"dummy_file3.xxx",type:"file"},{name:"dummy_file4.xxd",type:"file"}]
-    var dummy_dir2_obj = {type:"dir",path:"dummy_dir1/dummy_dir2",dir:dummy_dir2_list};
-    var dirCommands = { parent_rtn: "parentRtn()",list:"listDir()"};
+    var dummy_dir2_obj = {type:"dir",path:"dummy_dir2",dir:dummy_dir2_list};
+    // the dirCommands tells the dialog what to do for directories
+    // module would normally be either nodeComms or, for loadImage it would be pgdialogs
+    var dirCommands = { module: "",funct:"listDir"};
     var objective, xtns;
 
     function fileSelectDialog() {
@@ -62,12 +68,17 @@
       dialog.fileSelector(objective,xtns,dummy_dir1_obj,dirCommands,fileSelected);
     }
 
-    function parentRtn() {
-      dialog.fileSelector(objective,xtns,dummy_dir1_obj,dirCommands,fileSelected);
-    }
-
-    function listDir() {
-      dialog.fileSelector(objective,xtns,dummy_dir2_obj,dirCommands,fileSelected);
+    // dummy directory listing function
+    function listDir(objective,xtns,path,subpath) {
+      console.log("listDir("+objective+','+xtns+','+path+")");
+      var save_mode = (objective.substr(0, 4) === 'save');
+      var fs = fileSelected;
+      if(save_mode)  // save mode uses buttons to return instead on single clicks
+        fs = saveFileReturn;
+      if(typeof subpath !== undefined && subpath == 'parent_directory')
+        dialog.fileSelector(objective,xtns,dummy_dir1_obj,dirCommands,fs);
+      else // only other options is the one dummy directory
+        dialog.fileSelector(objective,xtns,dummy_dir2_obj,dirCommands,fs);
     }
 
     function fileSelected(objective,path,subpath) {
@@ -77,7 +88,11 @@
     function fileSaveDialog() {
       objective = "save";
       xtns = "xxd";
-      dialog.fileSelector(objective,xtns,dummy_dir1_obj,dirCommands,fileSelected);
+      listDir(objective,xtns,"");
+    }
+
+    function saveFileReturn(path, subpath) {
+      console.log("Save to Path:"+path+" Subpath:"+subpath);
     }
 
   </script>

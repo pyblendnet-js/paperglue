@@ -27,7 +27,7 @@
   console.log("Loading paperGlue");
   // includes
   var globals = window.globals;
-  dependancies = ['body', 'paper', 'nodeComms'];
+  dependancies = ['body', 'paper'];
   // see exports at bottom for public functions
   //note:objects here are all somewhere within the paper scope
   // To make visibile to window, declare as window.object
@@ -70,49 +70,13 @@
   var imagesLoaded = {};
   var symbolInstances = {}; //images that have been cloned from sybols in imagesLoaded.
   var flashingImages = [];
-  var fileContextMenu = [{
-    label: 'open from',
-    callback: loadRecordAs
-  }, {
-    label: 'save as',
-    callback: saveRecordAs
-  }]; // must appear before use in default menu
-  if (window.location.protocol === 'file:') {
-    fileContextMenu.push({
-      label: 'open doRecord',
-      callback: loadRecord
-    });
-    fileContextMenu.push({
-      label: 'save doRecord',
-      callback: saveRecord
-    });
-  } else {
-    fileContextMenu.push({
-      label: 'open doRecord.pgl',
-      callback: loadRecord
-    });
-    fileContextMenu.push({
-      label: 'save doRecord.pgl',
-      callback: saveRecord
-    });
-    fileContextMenu.push({
-      label: 'save imgAvail.js',
-      callback: buildImgAvail
-    });
-  }
+  var fileContextMenu = []; // must appear before use in default menu
+
   fileContextMenu.push({
     label: 'new',
     callback: removeAll
   });
 
-  var exportMenu = [{
-    label: '  js as doRec.js',
-    callback: saveDoRec
-  }, ];
-  var importMenu = [{
-    label: 'import dorec.js',
-    callback: loadDoRec
-  }, ];
   var stateMenu = [{
     label: 'clear',
     callback: clearAll
@@ -126,17 +90,8 @@
     callback: toggleAreas
   }];
   var defaultContextMenu = [{
-    label: 'image',
-    callback: loadImage
-  }, {
     label: 'file',
     submenu: fileContextMenu
-  }, {
-    label: 'export',
-    submenu: exportMenu
-  }, {
-    label: 'import',
-    submenu: importMenu
   }, {
     label: 'state',
     submenu: stateMenu
@@ -341,12 +296,7 @@
   }
 
   function init() {
-    var myScript = globals.myScript;
-    var nodeComms = globals.nodeComms;
-    var dialog = globals.dialog;
-
     body = document.getElementById("body");
-
     paper.install(window);
     paper.setup('myCanvas');
     importDefaults.pos = view.center;
@@ -654,91 +604,6 @@
     }
   }
 
-  function loadImage(path, subpath) {
-    // load images from directory or locals
-    if (window.location.protocol === 'file:') { //local storage
-      console.log("No server so need to use prelisting");
-      // need to building a image load object for loadImages
-      if (typeof window.globals.imagesAvailable !== 'undefined') {
-        var full_list = window.globals.imagesAvailable;
-        console.log(full_list);
-        console.log("path:" + path + " subpath:" + subpath);
-        if (typeof path === 'undefined')
-          path = "";
-        if (typeof subpath !== 'undefined') {
-          if (subpath === 'parent_directory') {
-            var lp = path.lastIndexOf("/");
-            if (lp >= 0)
-              path = path.substring(0, lp);
-            else
-              path = "";
-          } else {
-            if (path.length > 0)
-              path += "/";
-            path += subpath;
-          }
-        }
-        ilist = [];
-        for (var i in full_list) {
-          console.log("i:" + i + " = " + full_list[i].src);
-          var ip = full_list[i].src;
-          if (typeof path !== 'undefined' && path.length > 0) {
-            console.log("path:" + path.length);
-            id = "img" + symbolInstances.length; // default id
-            if (ip === path) {
-              if (full_list[i].hasOwnProperty('id'))
-                id = full_list[i].id;
-              else if (typeof subpath !== 'undefined') // should be
-                id = subpath;
-              loadSingleImage(path, id);
-              return;
-            }
-            if (ip.indexOf(path) === 0) {
-              ip = ip.substring(path.length + 1);
-              console.log("Entering subpath:" + ip);
-            } else
-              continue;
-          }
-          var parts = ip.split("/");  // seperate the fid into directories and file name
-          //console.log("parts:" + parts + " length=" + parts.length);
-          var f = {
-            name: parts[0]
-          };
-          if (parts.length > 1)
-            f.type = "dir";  // first part is a directory name
-          else {
-            f.type = "file";
-            var xp = parts[0].split('.');
-            console.log("xp:" + xp);
-            if (xp.length < 2 || imageExtensions.indexOf(xp[xp.length - 1]) <
-              0)
-              continue;
-          }
-          ilist.push(f);
-        }
-        //console.log("ilist:" + ilist);
-        dialog.fileSelector("loadImage", "localImages", {
-          type: "dir",
-          path: path,
-          dir: ilist},
-          {parent_rtn: "moduleCmd('paperGlue','listFiles','loadImage','" +
-          xtns + "','" +
-            dir_obj.path + "','parent_directory');",
-            list:"moduleCmd('paperGlue','listFiles','loadImage','" +
-            xtns + "','" +
-              dir_obj.path + "','parent_directory');"},
-            null
-        );
-      } else
-        console.log("No images available object loaded");
-    } else if (typeof path === 'undefined') {
-      listFiles("loadImage", imageExtensions); // defaults to listfile from here
-    } else { // assume we have a path to an image provided by listFile via myscript fileSelectDialog
-      var full_path = path + "/" + subpath;
-      loadSingleImage(full_path, subpath);
-    }
-  }
-
   function loadSingleImage(full_path, subpath) {
     //e.g var first_image = {src:"img/con_Block_5.08mm_12.png", scale:0.6, id:"conBlock1", isSymbol:true, dragClone:true, pos:view.center };
     var img = importDefaults;
@@ -804,15 +669,6 @@
     }
     hideContextMenu('contextMenu');
   };
-
-  function viewCall() {
-    console.log('view called');
-  }
-
-  function openCall() {
-    console.log('open called');
-    loadRecord();
-  }
 
   function stopEvent(event) {
     if (typeof event.preventDefault !== 'undefined')
@@ -1857,7 +1713,7 @@
     // if set, off key to these
     if (typeof globals.modalKey === 'function') {
       console.log("Modal key:" + event.key);
-      return modalKey(event.key);
+      return globals.modalKey(event);
     }
     // other modules may just want to accept a hot key
     if (typeof globals.chainKeyCall === 'function') {
@@ -1928,26 +1784,6 @@
           } else { // undo and remove that particular redo
             undo();
             doRecord.splice(doRecordIndex, 1);
-          }
-          propagate = false;
-          break;
-        case 's':
-          console.log("cntrlS");
-          if (event.shiftPressed) { // save as
-            saveRecordAs();
-          } else {
-            saveRecord();
-          }
-          propagate = false;
-          break;
-        case 'o':
-          console.log("cntrlO");
-          if (confirm("Do you want to load from storage?")) {
-            if (event.shiftPressed) { // load from
-              listFiles("loadRecord", "pgl");
-            } else {
-              loadRecord();
-            }
           }
           propagate = false;
           break;
@@ -2310,160 +2146,6 @@
       console.error("JSON Stringify error:" + err);
     }
     return jdata;
-  }
-
-  function saveDoRec() {
-    if (window.location.protocol == 'file:') {
-      alert("Can only save dorec.js with server active.");
-    }
-    if (typeof nodeComms.sendData !== 'function')
-      return;
-    var jtxt = buildRedoTxt(true, true);
-    var save_data = {
-      command: 'save',
-      path: "dorec.js",
-      data: jtxt
-    };
-    nodeComms.sendData(JSON.stringify(save_data));
-  }
-
-  function saveRecordAs() {
-    listFiles("saveRecord", "pgl");
-  }
-
-  function saveRecord(path, subpath) {
-    var dolist = doRecord; //pruneDo();
-    console.log("Try to save");
-    console.log("Globals:" + Object.keys(window.globals));
-    if(typeof nodeComms !== 'undefined')
-      console.log("SendData:", typeof nodeComms.sendData);
-    var jdata = buildRedoData();
-    console.log("jdata:" + jdata);
-    if (window.location.protocol == 'file:') {
-      // might try to impletement local storage some day
-      console.log("Storage type:" + typeof(Storage));
-      if (typeof(Storage) === "undefined") {
-        console.log("Local storage not implemented");
-      } else {
-        console.log("Data:" + jdata);
-        if (typeof path === 'undefined')
-          subpath = "data";
-        localStorage[subpath] = jdata;
-        console.log("Local storage:" + localStorage);
-      }
-    } else if (typeof nodeComms.sendData === 'function') {
-      var save_data = {
-        command: 'save',
-        path: recordPath,
-        data: jdata
-      };
-      if (typeof path !== 'undefined')
-        save_data.path = path;
-      if (typeof subpath !== 'undefined')
-        save_data.subpath = subpath;
-      nodeComms.sendData(JSON.stringify(save_data));
-    }
-  }
-
-  function loadRecordAs() {
-    listFiles("loadRecord", "pgl");
-  }
-
-  function loadRecord(path, subpath) {
-    console.log("Load");
-    console.log(window.location.protocol);
-    if (window.location.protocol === 'file:') {
-      console.log("Using local storage");
-      if (typeof(Storage) === "undefined") {
-        console.log("Local storage not implemented");
-      } else {
-        if (typeof path === 'undefined')
-          subpath = "data";
-        if (localStorage.hasOwnProperty(subpath)) {
-          console.log("Parsing length = " + localStorage[subpath].length);
-          parseRecord(localStorage[subpath]);
-        } else {
-          alert("Local storage has no item of name:" + subpath);
-        }
-      }
-    } else if (typeof nodeComms.sendData === 'function') {
-      console.log("Loading from node js server storage");
-      nodeComms.onReply = onLoadReply;
-      console.log("Attempting to load:" + recordPath);
-      postObject = {
-        command: 'load',
-        path: recordPath
-      }; //xtns not required
-      if (typeof path !== 'undefined')
-        postObject.path = path;
-      if (typeof subpath !== 'undefined')
-        postObject.subpath = subpath;
-      nodeComms.sendData(JSON.stringify(postObject));
-    }
-  }
-
-  function listFiles(objective, xtns, path, subpath) {
-    console.log("List " + xtns + " from " + path + " / " + subpath +
-      "for " +
-      objective);
-    listObjective = objective;
-    listXtns = xtns;
-    if (window.location.protocol === 'file:') {
-      console.log("Local storage  listing");
-      if (typeof paperDialogs.fileSelector === 'function') {
-        var local_storage_objects = Object.keys(localStorage);
-        console.log("Local storage objects:" + local_storage_objects);
-        // xtns don't really apply to local storage
-        dialog.fileSelector(listObjective, listXtns, {
-          type: "dir",
-          path: "localStorage",
-          dir: local_storage_objects
-        });
-      }
-    } else if (typeof nodeComms.sendData === 'function') {
-      // node js storage
-      nodeComms.onReply = onLoadReply;
-      if (typeof path !== 'undefined')
-        relativePath += path;
-      console.log("Attempting to list from:" + relativePath);
-      postObject = {
-        command: 'list',
-        xtns: listXtns,
-        path: relativePath
-      };
-      if (typeof subpath !== 'undefined')
-        postObject.subpath = subpath;
-      // note: a special subpath can be "parent_directory"
-      //       This is required as ".." is not allowed
-      // note: relativePath will be corrected by onLoadReply
-      nodeComms.sendData(JSON.stringify(postObject));
-    }
-  }
-
-  function onLoadReply(res) {
-    console.log("Onreply:" + res);
-    if (res.indexOf('500') === 0) { //starts with error code
-      console.log("Report error:" + res);
-    } else {
-      console.log("attempting to parse json object");
-      //try {
-      var reply_obj = JSON.parse(res);
-      console.log(reply_obj);
-      switch (reply_obj.type) {
-        case 'file':
-          parseRecord(reply_obj.data);
-          break;
-        case 'dir':
-          relativePath = reply_obj.path;
-          if (typeof dialog.fileSelector === 'function')
-            dialog.fileSelector(listObjective, listXtns, reply_obj);
-          // listObject is also the name for the function to call on rtn
-          break;
-      }
-      //} catch(e1) {
-      //  console.log("Error parsing reply"+e1);
-      //}
-    }
   }
 
   function parseRecord(jdata) {
@@ -2978,6 +2660,14 @@
     return symbolInstances;
   }
 
+  function getNumSymbols() {
+    return symbolInstances.length;
+  }
+
+  function getImageInstances() {
+    return imageInstances;
+  }
+
   function getLineInstances() {
     console.log("Returning line instances:", Object.keys(lineInstances)
       .length);
@@ -3408,114 +3098,6 @@
 
   // the following is used for adding a loader to a doRec.js include
   var doRecLoader = "';\nwindow.globals.importRecord = jdata;\n";
-  var imgAvailLoader = "';\nwindow.globals.imagesAvailable = idata;\n";
-
-  var walkerTree = [];
-  var imgFileList;
-
-  function buildImgAvail(res) {
-    var path, subpath;
-    if (typeof res === 'undefined') {
-      if (window.location.protocol === 'file:') {
-        alert("ABORT - Can only generate file list from server");
-        return;
-      }
-      if (typeof nodeComms.sendData !== 'function') // very odd if this happens
-        return;
-      // node js storage
-      nodeComms.onReply = buildImgAvail; // recursive call
-      path = "";
-      imgFileList = [];
-    } else {
-      console.log("Onreply:" + res);
-      if (res.indexOf('500') === 0) { //starts with error code
-        console.log("Report error:" + res);
-      } else {
-        console.log("attempting to parse json object");
-        //try {
-        var reply_obj = JSON.parse(res);
-        console.log(reply_obj);
-        if (reply_obj.type !== 'dir') {
-          console.log("Failed to return dir from image list");
-          return;
-        }
-        // always arrives here with a new directory listing
-        path = reply_obj.path;
-        dir = reply_obj.dir;
-        // first record all the files in this directory
-        for (var i in dir) {
-          if (dir[i].type === 'file') {
-            var fo = {
-              src: (path + '/' + dir[i].name)
-            };
-            for (var j in importDefaults) {
-              if (importDefaults[j] != baseImportDefaults[j])
-                fo[j] = importDefaults[j];
-            }
-            imgFileList.push(fo); // will use baseImportDefaults unless specified
-          }
-        }
-        // now look for subdirectories
-        index = 0;
-        walkerTree.push({
-          path: path,
-          dir: dir,
-          index: 0
-        });
-        while (index >= 0) {
-          subpath = null;
-          for (i = index; i < dir.length; i++) {
-            var fd = dir[i];
-            if (fd.type === 'dir') {
-              subpath = fd.name;
-              walkerTree[walkerTree.length - 1].index = i + 1;
-              break;
-            }
-          }
-          if (!!subpath)
-            break;
-          if (walkerTree.length === 0) {
-            console.log("walker mission complete - " + imgFileList.length +
-              " image found");
-            // buildingimgAvail.js
-            jdata = "var idata=\n'";
-            var json_txt = JSON.stringify(imgFileList);
-            for (var c in json_txt) {
-              jdata += json_txt[c];
-              if (json_txt[c] === '}')
-                jdata += '\n';
-            }
-            jdata += imgAvailLoader;
-            var save_data = {
-              command: 'save',
-              path: "imgavail.js",
-              data: jdata
-            };
-            if (typeof path !== 'undefined')
-              postObject.path = path;
-            if (typeof subpath !== 'undefined')
-              postObject.subpath = subpath;
-            nodeComms.sendData(JSON.stringify(save_data));
-            return;
-          }
-          var wp = walkerTree.pop();
-          path = wp.path;
-          dir = wp.dir;
-          index = wp.index;
-        }
-      }
-      // catch(excpetion e) {}
-    }
-    console.log("Attempting to list from:" + path + " / " + subpath);
-    postObject = {
-      command: 'list',
-      xtns: imageExtensions,
-      path: path,
-      subpath: subpath
-    };
-    //if(typeof subpath !== 'undefined')
-    nodeComms.sendData(JSON.stringify(postObject));
-  }
 
   function recordFlash(id, para) {
     doRecordAdd({
@@ -3727,9 +3309,11 @@
     rasterize: rasterize,
     appendMenus: appendMenus,
     loadImages: loadImages,
-    loadImage: loadImage,
+    loadSingleImage: loadSingleImage,
     getNextID: getNextID,
-    getImages: getSymbolInstances,
+    getsymbols: getSymbolInstances,
+    getNumSymbols: getNumSymbols,
+    getImages: getImageInstances,
     getLines: getLineInstances,
     getAreas: getAreaInstances,
     getStates: getStates,
@@ -3767,10 +3351,8 @@
     getAreaNameCall: getAreaNameCall,
     getAreaRectCall: getAreaRectCall,
     loadDoRec: loadDoRec,
+    buildRedoData: buildRedoData,
     buildRedoTxt: buildRedoTxt,
-    saveRecord: saveRecord,
-    loadRecord: loadRecord,
-    listFiles: listFiles,
     parseRecord: parseRecord,
     addMeta: addMeta,
     setState: setState,

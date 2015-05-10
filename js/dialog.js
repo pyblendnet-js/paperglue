@@ -38,7 +38,8 @@
       dialogDiv.style['background-color'] = 'lightgray';
       content = document.getElementById('DlgContent');
     }
-    dialogRtn = dialog_rtn;
+    if(typeof dialog_rtn !== 'undefined')
+      dialogRtn = dialog_rtn;
     var fontsize = window.innerWidth / 80;
     fontStyle = 'style="font-size:' + fontsize + 'px;"';
     replyButtons = document.getElementById('DlgReplyButtons');
@@ -165,7 +166,7 @@
       //if(!field) this should not happen
       var p = dialogProp[le];
       var typ = (typeof p.value);
-      //console.log("Element:" + le + " of type:" + typ + " has field:" + field.value);
+      console.log("Element:" + le + " of type:" + typ + " has field:" + field.value);
       //console.log(field);
       rtnval[le] = null;
       switch (typ) {
@@ -183,6 +184,7 @@
     return rtnval;
   }
 
+  // receive replies from dialog buttons
   function dialogReturn(reply) {
     if (typeof dialogRtn === 'function') {
       dialogRtn(reply, getPropValues());
@@ -244,19 +246,19 @@
 
 
   var savePath = ""; // kept from listing to give base path for save
-  var existingFileName = null; //used to determine is saving over
+  var existingFileNames = []; //used to determine is saving over
   var selectFileCallback;
 
   function fileSelector(objective, xtns, dir_obj, dir_cmd, select_callback) {
       var save_mode = (objective.substr(0, 4) === 'save');
       if (save_mode) {
         openCommon(fileSelectReturn, ['Okay', 'Cancel']);
-        dialogRtn = select_callback;
       } else {
-        openCommon(fileSelectReturn);
-        if (typeof select_callback === 'function')
-          selectFileCallback = select_callback; // for immediate file selection - only used for file load
+        openCommon();  // no buttons, so no need for rtn
       }
+      selectFileCallback = select_callback;
+      // for save mode this is called from fileSelectReturn
+      // for other modes this is called from file item clicks
       console.log("Opening file selector dialog");
       var fontsize = window.innerWidth / 80;
       var fs = 'style="font-size:' + fontsize + 'px;"';
@@ -264,14 +266,14 @@
       if (dir_obj.path === ".")
         dir_obj.path = "";
       var xtn_list = xtns.split(",");
-      existingFileName = null; // nothing chosen yet
+      existingFileName = []; // nothing found yet
       if (dir_obj.path !== "")
         p += " from " + dir_obj.path;
       p += "</div>";
       if (save_mode) {
         dialogType = 'file_select';
-        p +=
-          '<div>Save to:<input id="nameField" type="text" value=" "/></div>';
+        // do not use propertyRow here as fileSelectReturn does not get values in that way
+        p += '<div>Save to:<input id="nameField" type="text" value=""/></div>';
         savePath = dir_obj.path;
       }
       p += '<table ' + fs + '>';
@@ -285,12 +287,13 @@
         '" onclick="';
       console.log("Listing for path:" + dir_obj.path);
       if (dir_obj.path !== "" && dir_obj.path !== 'localStorage') {
-        p += '<tr><td><button style="color:red' + btnstyle + dir_cmd.parent_rtn +
+        var parent_rtn = "moduleCmd('"+dir_cmd.module+"','"+dir_cmd.funct+"','" + objective + "','" +	xtns + "','" + dir_obj.path + "','parent_directory')";
+        p += '<tr><td><button style="color:red' + btnstyle + parent_rtn +
           '">..</button></td></tr>';
       }
       for (var i in dir_obj.dir) {
         var fd = dir_obj.dir[i];
-        var type, name;
+        var type, name, list_dir;
         if (dir_obj.path === 'localStorage') {
           type = 'object';
           name = fd;
@@ -311,10 +314,14 @@
           }
         }
         //console.log("fd:"+Object.keys(fd));
+        console.log("Type:"+type);
         if (type === 'dir') {
           col = 'blue';
-          cf = dir_cmd.list;
+          console.log("path:"+dir_obj.path);
+          cf = "moduleCmd('"+dir_cmd.module+"','"+dir_cmd.funct+"','" +          objective + "','" + xtns + "','" +
+              dir_obj.path + "','" + fd.name + "')";
         } else {
+          existingFileNames.push(name);
           if (save_mode)
             cf = "moduleCmd('dialog','setNameField','" + name + "')";
           else // includes loadRecord and loadImage
@@ -337,8 +344,9 @@
     }
 
   function selectFile(objective, path, subpath) {
+    console.log(objective + " for file " + path + " / " + subpath);
     if(typeof selectFileCallback === 'function')
-      selectFileCallback(objective, path, subpath);
+      selectFileCallback(path, subpath);
     closeDialog();
   }
 
@@ -347,12 +355,11 @@
     var nm = nfield.value;
     if (reply !== 'Cancel') {
       //console.log("Save path:" + nm);
-      //console.log("existing:" + existingFileName);
-      if (existingFileName === nm) {
+    if (existingFileNames.indexOf(nm) >= 0) {
         if (!confirm("Save over existing?"))
           return;
       }
-      dialogRtn("save", savePath, nm);
+      selectFileCallback(savePath, nm);
     }
     closeDialog();
   }
@@ -361,7 +368,6 @@
   function setNameField(nm) {
     var nmElement = document.getElementById('nameField');
     nmElement.value = nm;
-    existingFileName = nm;
   }
 
   var globals = window.globals;

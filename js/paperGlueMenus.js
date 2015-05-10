@@ -117,8 +117,6 @@
 		state: stateMenu
 	};
 
-	var defaultMenuAddendum = [];
-
 	var default_image_menus = {
 		contextMenu: "symbolMenu",
 		instanceContextMenu: "symbolInstanceMenu"
