@@ -65,24 +65,24 @@
     function fileSelectDialog() {
       objective = "open";
       xtns = "xxx,abc";
-      dialog.fileSelector(objective,xtns,dummy_dir1_obj,dirCommands,fileSelected);
+      // the long way to call the dialog file selector is: //dialog.fileSelector(objective,xtns,dummy_dir1_obj,dirCommands,fileSelected);
+      // but the same can be achieved by
+      listDir(objective,xtns,"");
     }
 
-    // dummy directory listing function
+    // dummy directory listing function - recursive for directory entries
     function listDir(objective,xtns,path,subpath) {
       console.log("listDir("+objective+','+xtns+','+path+")");
-      var save_mode = (objective.substr(0, 4) === 'save');
-      var fs = fileSelected;
-      if(save_mode)  // save mode uses buttons to return instead on single clicks
-        fs = saveFileReturn;
+      var dir_obj;  // since we are not looking at real directories
       if(typeof subpath !== undefined && subpath == 'parent_directory')
-        dialog.fileSelector(objective,xtns,dummy_dir1_obj,dirCommands,fs);
+        dir_obj = dummy_dir1_obj;  // the dummy root directory
       else // only other options is the one dummy directory
-        dialog.fileSelector(objective,xtns,dummy_dir2_obj,dirCommands,fs);
+        dir_obj  = dummy_dir2_obj; // the dummy sub directory
+      dialog.fileSelector(objective,xtns,dir_obj,dirCommands,fileSelected);
     }
 
     function fileSelected(objective,path,subpath) {
-      console.log(objective+" from path:"+path+" file:"+subpath);
+      console.log(objective + " from:"+path+" file:"+subpath);
     }
 
     function fileSaveDialog() {
@@ -90,11 +90,6 @@
       xtns = "xxd";
       listDir(objective,xtns,"");
     }
-
-    function saveFileReturn(path, subpath) {
-      console.log("Save to Path:"+path+" Subpath:"+subpath);
-    }
-
   </script>
 </head>
 <body>

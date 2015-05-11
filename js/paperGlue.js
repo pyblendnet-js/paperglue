@@ -107,7 +107,6 @@
   var doRecord = []; // record of all clonings and moves  {action:string,src_id:src.id,raster:image or line:path,pos:point}
   var doRecordIndex = 0; // points to next do location
   var recordPath = "recordSave.pgl"; //default save path for node server
-  var relativePath = "";
   var postObject;
   var listObjective;
   var listXtns;

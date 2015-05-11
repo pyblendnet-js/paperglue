@@ -248,17 +248,24 @@
   var savePath = ""; // kept from listing to give base path for save
   var existingFileNames = []; //used to determine is saving over
   var selectFileCallback;
+  var fileObjective;
+
+  function setSelectFileCallback(funct) {
+    selectFileCallback = funct;
+  }
 
   function fileSelector(objective, xtns, dir_obj, dir_cmd, select_callback) {
+      fileObjective = objective;
       var save_mode = (objective.substr(0, 4) === 'save');
       if (save_mode) {
         openCommon(fileSelectReturn, ['Okay', 'Cancel']);
       } else {
         openCommon();  // no buttons, so no need for rtn
       }
-      selectFileCallback = select_callback;
-      // for save mode this is called from fileSelectReturn
-      // for other modes this is called from file item clicks
+      if(typeof selectFileCallback === 'undefined')
+        selectFileCallback = select_callback;
+      // for save mode this is called from fileSelectReturn with path,subpath
+      // for other modes this is called from selectFile with objective,path,file
       console.log("Opening file selector dialog");
       var fontsize = window.innerWidth / 80;
       var fs = 'style="font-size:' + fontsize + 'px;"';
@@ -346,7 +353,7 @@
   function selectFile(objective, path, subpath) {
     console.log(objective + " for file " + path + " / " + subpath);
     if(typeof selectFileCallback === 'function')
-      selectFileCallback(path, subpath);
+      selectFileCallback(objective, path, subpath);
     closeDialog();
   }
 
@@ -359,7 +366,7 @@
         if (!confirm("Save over existing?"))
           return;
       }
-      selectFileCallback(savePath, nm);
+      selectFileCallback(fileObjective, savePath, nm);
     }
     closeDialog();
   }
@@ -381,6 +388,7 @@
     dialogReturn: dialogReturn,
     colorSelector: colorSelector,
     setColor: setColor,
+    setSelectFileCallback: setSelectFileCallback,
     fileSelector: fileSelector,
     setNameField: setNameField,
     selectFile: selectFile

@@ -61,7 +61,7 @@ function loadData(res,load_path,xtns) {
   pth = buildSafePath(res,load_path);
   if(!pth)
     return;
-  //try {
+  try {
     var xtn_list;
     if(typeof xtns !== 'undefined')
       xtn_list = xtns.split(',');
@@ -108,9 +108,9 @@ function loadData(res,load_path,xtns) {
         }
       );
     }
-  //} catch(err) {
-  //  respondPost(res,'500 - Internal Error:' + err.message);
-  //}
+  } catch(err) {
+    respondPost(res,'500 - Internal Error:' + err.message);
+  }
 }
 
 var pathExt = "";
@@ -221,7 +221,8 @@ http.createServer(function(req,res){
           // this is special for returning to parent
           pth = path.dirname(pth);
         } else {
-          pth = path.join(pth, decodeURI(post_obj.subpath));
+          pth = path.join(pth, decodeURI(post_obj.subpath)).replace("\\","/");
+          // the \\ character is misinterpreted when past back listing files
         }
       }
       console.log("Combined path:"+pth);

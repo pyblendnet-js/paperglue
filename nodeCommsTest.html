@@ -1,0 +1,69 @@
+<!doctype html>
+<html>
+<head>
+  <meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+  <meta content="utf-8" http-equiv="encoding">
+  <script>  // this script for module loading
+  window.globals = { }; // for interscope comms
+  // must be defined before any modules that use it
+  function moduleCmd(mod,cmd,arg0,arg1,arg2,arg3,arg4) {
+    // assumes that window.global[mod][cmd] exists
+    console.log(mod,cmd,arg0,arg1,arg2);
+    if(mod === "" && cmd === 'listDir')  // only used for test pages
+      listDir(arg0,arg1,arg2,arg3,arg4);
+    else
+      window.globals[mod][cmd](arg0,arg1,arg2,arg3,arg4);
+  }
+  </script>
+  <!-- neither of these modules have any dependancies -->
+  <script type="text/javascript" src="js/dialog.js"></script>
+  <script type="text/javascript" src="js/nodeComms.js"></script>
+  <script>
+    var dialog = window.globals.dialog;
+    var nodeComms = window.globals.nodeComms;
+
+    // var dummy_dir1_obj = {type:"dir",path:"",dir:dummy_dir1_list};
+    // var dummy_dir2_obj = {type:"dir",path:"dummy_dir2",dir:dummy_dir2_list};
+    // // the dirCommands tells the dialog what to do for directories
+    // module would normally be either nodeComms or, for loadImage it would be pgdialogs
+    var dirCommands = { module: "nodeComms",funct:"listFiles"};
+    var objective, xtns;
+
+    function fileSelectDialog() {
+      nodeComms.setFileSelector(dialog.fileSelector);
+      dialog.setSelectFileCallback(fileSelected);
+      console.log("Load as");
+    	nodeComms.listFiles("load", "");
+    }
+
+    function loadRecordDialog() {
+      nodeComms.setFileSelector(dialog.fileSelector);
+      dialog.setSelectFileCallback(fileSelected);
+      console.log("Load Record (*.pgl) as");
+    	nodeComms.listFiles("loadRecord", "pgl");
+    }
+
+    function fileSelected(objective,path,subpath) {
+      console.log(objective+" from:"+path+" file:"+subpath);
+    }
+
+    function fileSaveDialog() {
+      nodeComms.setFileSelector(dialog.fileSelector);
+      dialog.setSelectFileCallback(fileSelected);
+      // note above argument does not need to be the same as for load
+      console.log("Save as");
+    	nodeComms.listFiles("saveRecord", "pgl"); // paper glue list
+    }
+
+  </script>
+</head>
+<body>
+  <button type="button" onclick="fileSelectDialog();" class="button" width="300">File Select Dialog</button>
+  <button type="button" onclick="loadRecordDialog();" class="button" width="300">Load Record (*.pgl) Dialog</button>
+  <button type="button" onclick="fileSaveDialog();" class="button" width="300">Save Record (*.pgl) Dialog</button>
+  <div id="clientArea">
+
+  </div>
+  <div id="Dialog"><div id="DlgContent"></div><div  id="DlgReplyButtons"></div></div>
+</body>
+</html>

@@ -2,6 +2,8 @@
 	// see http://www.adequatelygood.com/JavaScript-Module-Pattern-In-Depth.html
 	// but exporting public methods via window.globals - no public variables
 
+	var relativePath = "";
+
 	function SendData(data) {
 		console.log('Sending' + data.length + 'bytes to ' + window.location.href);
 		var xhr = new XMLHttpRequest();
@@ -74,14 +76,16 @@
 	    } else if (typeof nodeComms.sendData === 'function') {
 	      // node js storage
 	      nodeComms.onReply = onLoadReply;
-	      if (typeof path !== 'undefined')
-	        relativePath += path;
-	      console.log("Attempting to list from:" + relativePath);
+	      if (typeof path === 'undefined')
+	        path = "";  //relativePath += path;
+	      console.log("Attempting to list from:" + path);  //relativePath);
 	      postObject = {
 	        command: 'list',
 	        xtns: listXtns,
-	        path: relativePath
+	        path: path  // relativePath
 	      };
+				if(listXtns.length > 0)  // so "" is wildcard
+				  postObject[xtns] = listXtns;
 	      if (typeof subpath !== 'undefined')
 	        postObject.subpath = subpath;
 	      // note: a special subpath can be "parent_directory"
@@ -177,7 +181,9 @@
 	        case 'dir':
 	          relativePath = reply_obj.path;
 	          if (typeof fileSelector === 'function')
-	            fileSelector(listObjective, listXtns, reply_obj);
+	            fileSelector(listObjective, listXtns, reply_obj,{module:"nodeComms",funct:"listFiles"});
+							// assumes fileSelect return callback has been set in module
+							// e.g for dialog.js, use setSelectFileCallback(function)
 	          // listObject is also the name for the function to call on rtn
 	          break;
 	      }
@@ -198,5 +204,6 @@
 	};
 	//nodeComms = window.globals.nodeComms;  // for dependant function
 	// to attach: onReply(res)
-	globals.moduleLoaded('nodeComms');
+	if (typeof globals.moduleLoaded === 'function')
+	  globals.moduleLoaded('nodeComms');
 }());
