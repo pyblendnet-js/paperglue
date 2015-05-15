@@ -18,6 +18,7 @@
       closeDialog();
       return false;
     }
+    console.log("Pass it on2");
     return true;
   }
 

@@ -3,6 +3,7 @@
 	// but exporting public methods via window.globals - no public variables
 
 	var relativePath = "";
+	//var recordPath = "recordSave.pgl"; //default save path for node server
 
 	function SendData(data) {
 		console.log('Sending' + data.length + 'bytes to ' + window.location.href);
@@ -95,7 +96,7 @@
 	    }
 	  }
 
-		function saveFile(jdata) {
+		function saveFile(jdata, path, subpath) {
 			console.log("jdata:" + jdata);
 			if (window.location.protocol == 'file:') {
 				// might try to impletement local storage some day
@@ -112,9 +113,9 @@
 			} else if (typeof nodeComms.sendData === 'function') {
 				var save_data = {
 					command: 'save',
-					path: recordPath,
 					data: jdata
 				};
+				// obsolete was default: path: recordPath,
 				if (typeof path !== 'undefined')
 					save_data.path = path;
 				if (typeof subpath !== 'undefined')
@@ -129,7 +130,7 @@
 			fileParser = file_parser;
 		}
 
-		function loadFile(path, subpath,file_parser) {
+		function loadFile(path, subpath, file_parser) {
 	    console.log("Load");
 			if(typeof file_parser === 'function')
 			  fileParser = file_parser;
@@ -152,10 +153,10 @@
 	    } else if (typeof nodeComms.sendData === 'function') {
 	      console.log("Loading from node js server storage");
 	      nodeComms.onReply = onLoadReply;
-	      console.log("Attempting to load:" + recordPath);
+	      //console.log("Attempting to load:" + recordPath);
+				// obsolete path: recordPath
 	      postObject = {
 	        command: 'load',
-	        path: recordPath
 	      }; //xtns not required
 	      if (typeof path !== 'undefined')
 	        postObject.path = path;

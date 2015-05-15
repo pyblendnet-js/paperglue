@@ -1,0 +1,48 @@
+<!doctype html>
+<html>
+<head>
+  <script>
+    window.globals = { }; // for interscope comms
+  </script>
+  <meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+  <meta content="utf-8" http-equiv="encoding">
+  <script type="text/javascript" src="js/contextMenu.js"></script>
+</head>
+<body>
+  <div style="display:none;" id="contextMenu">
+    <table  border="0" cellpadding="0" cellspacing="0"
+    style="border: thin solid #808080; cursor: default; white-space: nowrap"
+    bgcolor="White">
+    </table>
+  </div>
+  <script>
+  var value1 = false;
+  function getValue1() {
+    return value1;
+  }
+  function test1() {
+    value1 = !value1;
+    console.log("Toggle value1 =" + value1);
+  }
+  function test2() {
+    console.log("Test2");
+  }
+  var subMenu = [{
+    label: 'toggle value1',
+    propCall: getValue1,
+    callback: test1
+  },{
+    label: 'test2',
+    callback: test1
+  }];
+  var defaultContextMenu = [{
+    label: 'parentMenu',
+    submenu: subMenu
+  }, {
+    label: 'toggle value1',
+    callback: test1
+  }];
+  globals.contextMenu.setDefault(defaultContextMenu);
+  </script>
+</body>
+</html>
