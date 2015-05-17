@@ -358,7 +358,7 @@
   function selectFile(objective, path, subpath) {
     console.log(objective + " for file " + path + " / " + subpath);
     if(typeof selectFileCallback === 'function')
-      selectFileCallback(objective, "", path, subpath);
+      selectFileCallback(objective, path, subpath);
     closeDialog();
   }
 

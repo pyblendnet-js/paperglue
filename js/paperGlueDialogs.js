@@ -673,6 +673,7 @@
         console.log("ilist:" + ilist);
         //if (path === "")
         //  path = "";
+				fileSelectObjective = "loadImage";
         dialog.fileSelector("loadImage", imageExtensions, {
           type: "dir",
           path: path,
@@ -680,7 +681,7 @@
         }, {
           module: "pgdialogs",
           funct: "loadImage"
-        }, loadImage); // returns to self
+        }, fileSelected); // returns to self
         //*************** wrong args for loadImage as fileSelector!
         //   {parent_rtn: "moduleCmd('paperGlue','listFiles','loadImage','" +
         //   xtns + "','" +
