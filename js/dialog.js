@@ -294,7 +294,7 @@
         'text-align:left;' +
         '" onclick="';
       console.log("Listing for path:" + dir_obj.path);
-      if (dir_obj.path !== "" && dir_obj.path !== 'localStorage') {
+      if (dir_obj.path !== "") { // && dir_obj.path !== 'localStorage' && dir_obj.path !== 'localImages') {
         var parent_rtn = "moduleCmd('"+dir_cmd.module+"','"+dir_cmd.funct+"','" + objective + "','" +	xtns + "','" + dir_obj.path + "','parent_directory')";
         p += '<tr><td><button style="color:red' + btnstyle + parent_rtn +
           '">..</button></td></tr>';
@@ -338,6 +338,10 @@
             "','" + name + "')";
           col = 'black';
         }
+        console.log("col:"+col);
+        console.log("Btnstyle:"+btnstyle);
+        console.log("cf:"+cf);
+        console.log("name:"+name);
         p += '<tr><td><button style="color:' + col + btnstyle + cf + '">' +
           name +
           '</button></td></tr>';
@@ -354,7 +358,7 @@
   function selectFile(objective, path, subpath) {
     console.log(objective + " for file " + path + " / " + subpath);
     if(typeof selectFileCallback === 'function')
-      selectFileCallback(objective, path, subpath);
+      selectFileCallback(objective, "", path, subpath);
     closeDialog();
   }
 

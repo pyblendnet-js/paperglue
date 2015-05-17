@@ -499,8 +499,14 @@
 			var imgobj = images_to_load.pop();
 			imgobj.initialProp = Object.keys(imgobj);
 			if (imagesLoaded.hasOwnProperty(imgobj.id)) {
-				if (confirm("Already loaded. Add 'C' to id?")) {
+				if (confirm("Image name "+imgobj.id+ " is already loaded. Add 'C' to id string or cancel to reload?")) {
 					imgobj.id += 'C';
+					// note: images are loaded from three different events:
+					// initApp in myScript.js calls with array of required images
+					// initApp then calls loadDoRec which will look for a dorec.js
+					//   which is holds a paperGlue undo record.
+					// Finally in edit mode the user my load an image seperately or
+					//   as part of a paperGlue undo record.
 				} else {
 					var previous = imagesLoaded[imgobj.id];
 					previous.raster.remove(); // assume this is a reload
@@ -1552,8 +1558,9 @@
 			return globals.modalKey(event);
 		}
 		// other modules may just want to accept a hot key
-		if (typeof globals.chainKeyCall === 'function') {
-			if (!global.chainKeyCall(event)) {
+		if (typeof globals.chainKey === 'function') {
+			console.log("Starting key chain");
+			if (!globals.chainKey(event)) {
 				console.log("Paper glue ignoring keys");
 				return false; // module stole key so no further process.
 			}
@@ -1875,7 +1882,7 @@
 	}
 
 	function incMoveArea(obj, direction, snap) {
-		objRect = obj.inst.rect;
+		objRect = obj.inst.rect.clone();
 		var inst = obj.inst;
 		var area_id = findInstance(areaInstances, 'path', true, inst.path);
 		var delta = direction;
@@ -1883,8 +1890,7 @@
 			delta[0] *= snapRect[2];
 			delta[1] *= snapRect[3];
 		}
-		inst.rect = new Rectangle(objRect.topLeft + delta, objRect.bottomRight +
-			delta);
+		inst.rect = new Rectangle(objRect.topLeft.add(delta), objRect.bottomRight.add(delta));
 		showArea(area_id);
 		doRecordAdd({
 			action: 'areaMove',
@@ -3171,7 +3177,7 @@
 		getLineColor: getLineColor,
 		setLineColor: setLineColor,
 		setCurrentLineColor: setCurrentLineColor,
-		//removeAll:removeAll,
+		removeAll:removeAll,
 		getCurrentContextObject: getCurrentContextObject,
 		delCurrentContextObject: delCurrentContextObject,
 		nameCurrentImage: nameCurrentImage,

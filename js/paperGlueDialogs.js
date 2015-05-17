@@ -49,10 +49,12 @@
     }, ];
 
 		function toggleAreas() {  // function is only used for menus
+			console.log("Option:"+optionsContextMenu[0].label);
 			if(paperGlue.toggleAreas())
-			  optionsContextMenu[0].label = 'show areas';
-			else
 			  optionsContextMenu[0].label = 'hide areas';
+			else
+			  optionsContextMenu[0].label = 'show areas';
+			console.log("Option:"+optionsContextMenu[0].label);
 		}
 
     var optionsContextMenu = [{
@@ -102,12 +104,11 @@
     nodeComms = globals.nodeComms;
     contextMenu = globals.contextMenu;
     initMenus();
-    onKeyChain = globals.chainKey;
     globals.chainKey = onKey;
     paperGlue.setContextMenu(); // contextMenu is an optional module for paperGlue but not when used with pgDialogs.
   }
 
-  var onKeyChain = null;
+  var onKeyChain = null;  //link to next key handler
 
   function onKey(event) {
     console.log('pgdialogs key handler');
@@ -310,7 +311,8 @@
   }
 
   function openImgLoadDefaultDialog() {
-    openDialogCommon(imgLoadDefaultDialogReturn, ['Okay', 'Cancel']);
+		console.log("openImgLoadDefaultDialog");
+    dialog.openCommon(imgLoadDefaultDialogReturn, ['Okay', 'Cancel']);
     console.log("Opening image load default dialog");
     var fontsize = window.innerWidth / 80;
     var fs = 'style="font-size:' + fontsize + 'px;"';
@@ -318,8 +320,7 @@
       '<div id="imgLoadOptionsTitle">Default Image Load Options</div>';
     p += '<table ' + fs + '>';
     p += '<tr><td>Scale</td><td>';
-    p += '<input id="imgscale" type="text" value="' + paperGlue.importDefaults
-      .scale +
+    p += '<input id="imgscale" type="text" value="' + paperGlue.importDefaults.scale +
       '"/></td></tr>';
     p += '</table>';
     var content = document.getElementById('DlgContent');
@@ -384,7 +385,10 @@
     var w = parseFloat(wfield.value);
     var h = parseFloat(hfield.value);
     //console.log("X:"+x);
-    paperGlue.changeAreaName(name); // beware name is volitile
+		var obj = paperGlue.getCurrentContextObject();
+		var nm = "area#" + obj.id;
+    if (nm != name)  // only change name if different to area#...
+      paperGlue.changeAreaName(name); // beware name is volitile
     paperGlue.moveCurrentArea(new Rectangle(x, y, w, h));
     if (reply === 'Apply')
       return;
@@ -411,7 +415,7 @@
   }
 
   function setStateDialog(state) {
-    openDialogCommon(setStateDialogReturn, ['Okay', 'Cancel']);
+    dialog.openCommon(setStateDialogReturn, ['Okay', 'Cancel']);
     console.log("Opening set state dialog");
     var fontsize = window.innerWidth / 80;
     var fs = 'style="font-size:' + fontsize + 'px;"';
@@ -484,7 +488,7 @@
     var states_count = Object.keys(states).length;
     console.log("Currently " + states_count + " states");
     dialogType = 'select_state';
-    openDialogCommon(selectStateDialogReturn);
+    dialog.openCommon(selectStateDialogReturn);
     console.log("Opening select state dialog");
     // var state = def_state;
     // if(!state) {
@@ -590,7 +594,7 @@
         saveRecord(path, subpath);
         break;
       case 'loadImage':
-        loadImage(path, subpath);
+        loadImage("","",path, subpath);
         break;
       default:
         console.log("Unknown objective:" + objective);
@@ -598,8 +602,11 @@
     }
   }
 
-  function loadImage(path, subpath) {
+  function loadImage(objective, xtns, path, subpath) {
     // load images from directory or locals
+		// this function must conform to dialog.fileSelector fileselect function type
+		// objective should always be "loadImages"
+		// xtns should always be the contents of imageExtensions
     if (window.location.protocol === 'file:') { //local storage
       console.log("No server so need to use prelisting");
       // need to building a image load object for loadImages
@@ -629,13 +636,14 @@
           var ip = full_list[i].src;
           // if path has been defined then maybe we have found target
           if (typeof path !== 'undefined' && path.length > 0) {
-            console.log("file path:" + path.length);
+            console.log("file path:" + path);
             id = "img" + paperGlue.getNumSymbols(); // default id
             if (ip === path) {
               if (full_list[i].hasOwnProperty('id')) // image has defined id name
                 id = full_list[i].id;
               else if (typeof subpath !== 'undefined') // should be
                 id = subpath; // use image file name as id
+							console.log("Load image file:"+path);
               paperGlue.loadSingleImage(path, id, contextMenu.eventPos);
               return;
             }
@@ -663,15 +671,15 @@
           ilist.push(f);
         }
         console.log("ilist:" + ilist);
-        if (path === "")
-          path = "localImages";
-        dialog.fileSelector("loadImage", "localImages", {
+        //if (path === "")
+        //  path = "";
+        dialog.fileSelector("loadImage", imageExtensions, {
           type: "dir",
           path: path,
           dir: ilist
         }, {
           module: "pgdialogs",
-          funct: loadImage
+          funct: "loadImage"
         }, loadImage); // returns to self
         //*************** wrong args for loadImage as fileSelector!
         //   {parent_rtn: "moduleCmd('paperGlue','listFiles','loadImage','" +
@@ -858,6 +866,7 @@
     saveRecord: saveRecord,
     loadRecord: loadRecord,
     loadImage: loadImage,
+		openImgLoadDefaultDialog:openImgLoadDefaultDialog
   };
   globals.pgdialogs = exports;
   globals.moduleLoaded('pgdialogs', ['paperGlue', 'dialog', 'nodeComms',

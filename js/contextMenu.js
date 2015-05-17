@@ -131,8 +131,10 @@
 		//console.log(currentContextMenu);
 		if (currentContextMenu !== null) {
 			var menu_item = currentContextMenu[menu_index];
+			//console.log(Object.keys(menu_item));
 			if (menu_item.hasOwnProperty('callback')) {
 				var callback = menu_item.callback;
+				//console.log("Type of:"+typeof callback);
 				if (typeof callback == 'function') {
 					//console.log("Calling callback:" + callback);
 					callback();
@@ -187,7 +189,7 @@
 		}
 		return null;
 	}
-	
+
 	var globals = window.globals;
 	var exports = {
     setDefault: setDefault,
