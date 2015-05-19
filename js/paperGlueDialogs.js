@@ -48,14 +48,14 @@
       callback: paperGlue.deleteState
     }, ];
 
-		function toggleAreas() {  // function is only used for menus
-			console.log("Option:"+optionsContextMenu[0].label);
-			if(paperGlue.toggleAreas())
-			  optionsContextMenu[0].label = 'hide areas';
-			else
-			  optionsContextMenu[0].label = 'show areas';
-			console.log("Option:"+optionsContextMenu[0].label);
-		}
+    function toggleAreas() { // function is only used for menus
+      console.log("Option:" + optionsContextMenu[0].label);
+      if (paperGlue.toggleAreas())
+        optionsContextMenu[0].label = 'hide areas';
+      else
+        optionsContextMenu[0].label = 'show areas';
+      console.log("Option:" + optionsContextMenu[0].label);
+    }
 
     var optionsContextMenu = [{
       label: 'hide areas',
@@ -108,7 +108,7 @@
     paperGlue.setContextMenu(); // contextMenu is an optional module for paperGlue but not when used with pgDialogs.
   }
 
-  var onKeyChain = null;  //link to next key handler
+  var onKeyChain = null; //link to next key handler
 
   function onKey(event) {
     console.log('pgdialogs key handler');
@@ -311,7 +311,7 @@
   }
 
   function openImgLoadDefaultDialog() {
-		console.log("openImgLoadDefaultDialog");
+    console.log("openImgLoadDefaultDialog");
     dialog.openCommon(imgLoadDefaultDialogReturn, ['Okay', 'Cancel']);
     console.log("Opening image load default dialog");
     var fontsize = window.innerWidth / 80;
@@ -320,7 +320,8 @@
       '<div id="imgLoadOptionsTitle">Default Image Load Options</div>';
     p += '<table ' + fs + '>';
     p += '<tr><td>Scale</td><td>';
-    p += '<input id="imgscale" type="text" value="' + paperGlue.importDefaults.scale +
+    p += '<input id="imgscale" type="text" value="' + paperGlue.importDefaults
+      .scale +
       '"/></td></tr>';
     p += '</table>';
     var content = document.getElementById('DlgContent');
@@ -385,9 +386,9 @@
     var w = parseFloat(wfield.value);
     var h = parseFloat(hfield.value);
     //console.log("X:"+x);
-		var obj = paperGlue.getCurrentContextObject();
-		var nm = "area#" + obj.id;
-    if (nm != name)  // only change name if different to area#...
+    var obj = paperGlue.getCurrentContextObject();
+    var nm = "area#" + obj.id;
+    if (nm != name) // only change name if different to area#...
       paperGlue.changeAreaName(name); // beware name is volitile
     paperGlue.moveCurrentArea(new Rectangle(x, y, w, h));
     if (reply === 'Apply')
@@ -413,6 +414,27 @@
     globals.paperGlue.setCurrentLineColor(c);
     dialog.closeDialog();
   }
+
+	var nextStateID = 0;
+
+	function setNewState() {
+		console.log("Setting new state");
+		var state = paperGlue.getCurrentState();
+		if (!state) {
+			state = {
+				id: paperGlue.getNextID(),
+				name: "state#" + nextStateID
+			};
+			console.log("Create new state of name:" + state.name);
+			nextStateID++;
+		} else {
+			if (state.hasOwnProperty("name"))
+				console.log("Found state of name:" + state.name);
+			if (state.hasOwnProperty("clearFlag"))
+				console.log("ClearFlag:" + state.clearFlag);
+		}
+		setStateDialog(state);
+	}
 
   function setStateDialog(state) {
     dialog.openCommon(setStateDialogReturn, ['Okay', 'Cancel']);
@@ -488,7 +510,7 @@
     var states_count = Object.keys(states).length;
     console.log("Currently " + states_count + " states");
     dialogType = 'select_state';
-    dialog.openCommon(selectStateDialogReturn);
+    dialog.openCommon(selectStateDialogReturn,['Cancel']);
     console.log("Opening select state dialog");
     // var state = def_state;
     // if(!state) {
@@ -549,13 +571,18 @@
     return false;
   }
 
+	function selectStateDialogReturn(reply) {
+		paperGlue.hideCursor();
+		dialog.closeDialog();
+	}
+
   function stateSelected(value) {
     var index = parseInt(value);
     console.log("Going to index:" + index);
     if (stateSkipMode)
       paperGlue.skipToIndex(index);
     else
-      paperGlue.forardToIndex(index);
+      paperGlue.forwardToIndex(index);
     dialog.closeDialog();
   }
 
@@ -594,7 +621,7 @@
         saveRecord(path, subpath);
         break;
       case 'loadImage':
-        loadImage("","",path, subpath);
+        loadImage("", "", path, subpath);
         break;
       default:
         console.log("Unknown objective:" + objective);
@@ -604,9 +631,9 @@
 
   function loadImage(objective, xtns, path, subpath) {
     // load images from directory or locals
-		// this function must conform to dialog.fileSelector fileselect function type
-		// objective should always be "loadImages"
-		// xtns should always be the contents of imageExtensions
+    // this function must conform to dialog.fileSelector fileselect function type
+    // objective should always be "loadImages"
+    // xtns should always be the contents of imageExtensions
     if (window.location.protocol === 'file:') { //local storage
       console.log("No server so need to use prelisting");
       // need to building a image load object for loadImages
@@ -643,7 +670,7 @@
                 id = full_list[i].id;
               else if (typeof subpath !== 'undefined') // should be
                 id = subpath; // use image file name as id
-							console.log("Load image file:"+path);
+              console.log("Load image file:" + path);
               paperGlue.loadSingleImage(path, id, contextMenu.eventPos);
               return;
             }
@@ -673,7 +700,7 @@
         console.log("ilist:" + ilist);
         //if (path === "")
         //  path = "";
-				fileSelectObjective = "loadImage";
+        fileSelectObjective = "loadImage";
         dialog.fileSelector("loadImage", imageExtensions, {
           type: "dir",
           path: path,
@@ -859,7 +886,10 @@
     setMode: setMode,
     //setCurrentLineColor: setCurrentLineColor,
     // setNameField: setNameField,
-    stateSelected: stateSelected,
+		setNewState:setNewState,
+		stateSelected: stateSelected,
+		forwardToState: forwardToState,
+		skipToState: skipToState,
     openImgPropDialog: openImgPropDialog,
     lineGetColor: lineGetColor,
     selectLineColor: selectLineColor,
@@ -867,7 +897,7 @@
     saveRecord: saveRecord,
     loadRecord: loadRecord,
     loadImage: loadImage,
-		openImgLoadDefaultDialog:openImgLoadDefaultDialog
+    openImgLoadDefaultDialog: openImgLoadDefaultDialog
   };
   globals.pgdialogs = exports;
   globals.moduleLoaded('pgdialogs', ['paperGlue', 'dialog', 'nodeComms',

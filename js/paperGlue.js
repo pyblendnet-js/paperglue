@@ -2529,26 +2529,6 @@
 		return areaInstances;
 	}
 
-	var nextStateID = 0;
-
-	function setNewState() {
-		var state = paperGlue.getCurrentState();
-		if (!state) {
-			state = {
-				id: paperGlue.getNextID(),
-				name: "state#" + nextStateID
-			};
-			console.log("Create new state of name:" + state.name);
-			nextStateID++;
-		} else {
-			if (state.hasOwnProperty("name"))
-				console.log("Found state of name:" + state.name);
-			if (state.hasOwnProperty("clearFlag"))
-				console.log("ClearFlag:" + state.clearFlag);
-		}
-		setStateDialog(state);
-	}
-
 	function getStates() {
 		console.log("Returning do record state instances");
 		var states = [];

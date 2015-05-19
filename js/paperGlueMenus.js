@@ -101,7 +101,7 @@
     }, ];
     var stateMenu = [{
       label: 'set state',
-      callback: paperGlue.setNewState
+      callback: pgdialogs.setNewState
     }, {
       label: 'forward to state',
       callback: pgdialogs.forwardToState
