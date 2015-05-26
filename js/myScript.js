@@ -118,18 +118,32 @@
 
   function animationExample() {
     var src_id = "running_man";
-    var src_img = paperGlue.loadSingleImage("img/running_man.png",src_id,{isSymbol:false});
+    var src_img = paperGlue.loadSingleImage("img/running_man.png",src_id,{isSymbol:false,onLoad:animationLoaded});
+  }
+
+  // callback when animation image has been loaded
+  function animationLoaded(src_id,src_img) {
     console.log("src_img.raster:"+src_img.raster);
     console.log("src_img.src:"+src_img.src);
     console.log("src_img.pos:"+src_img.raster.position);
     src_img.raster.position = new Point(-1000,0);
-    //,new Point(100,100));
+
+    //src_img.raster.position = new Point(100,100);
     //console.log(Object.keys(paper.Raster));
     //src_img.raster.scale(1.0);
     //console.log("Src_img:"+Object.keys(src_img.raster));
     var img = {src:src_img}; // = paperGlue.symbolPlace(src_id,src_id);  // force_id prevents record creation
+
+    // test
+    clip = new Rectangle(20,20,30,30);
+    var nr = src_img.raster.getSubRaster(clip);
+    nr.position = new Point(200,100);
+    img.raster = nr;
+    // return;
+    // end test
+
     img.pos = new Point(600,100);
-    img.speed = 32;
+    img.speed = 64;
     img.vel = new Point(img.speed,0);
     img.scale = new Point(2.0,2.0);
     img.update = runningManUpdate;
@@ -140,9 +154,10 @@
       }
     }
     //console.log("Src_img:"+Object.keys(src_img.raster));
-    var clip_size = new Size(src_img.width/6,src_img.height/5);
+    var img_size = src_img.raster.size;
+    var clip_size = new Size(img_size.width/6,img_size.height/5);
     console.log("Clip:"+clip_size);
-    img.sprite = {action:0,nextAction:0,dclip:[dclip],clipSize:clip_size,period:0.05};
+    img.sprite = {action:0,nextAction:0,dclip:[dclip],clipSize:clip_size,period:0.025};
     console.log("images:"+Object.keys(paperGlue.getImages()));
     manTarget = paperGlue.getImages().conBlock1;
     src_img.raster.insertBelow(manTarget.raster);

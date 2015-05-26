@@ -516,11 +516,13 @@
 			imagesLoaded[imgobj.id] = imgobj; // record master images
 			var img = addImage(imgobj.src, imgobj.id); // add image to document
 			imgobj.element = img;
-			//img.onload = function() {
-        imgobj.width = img.naturalWidth;
-				imgobj.height = img.naturalHeight;
-			//};
+			// the following is not reliable on chrome until image loaded
+      //  imgobj.width = img.naturalWidth;
+			//	imgobj.height = img.naturalHeight;
+			// use raster size instead after load
 			imgobj.raster = new Raster(imgobj.id); // make this a paper image
+			imgobj.raster.onLoad = imageOnLoad;
+
 			if (imgobj.hasOwnProperty('scale')) {
 				imgobj.raster.scale(imgobj.scale);
 			}
@@ -556,6 +558,20 @@
 					imgobj[dk] = custom_default_props[dk];
 			}
 			imgobj.loadedProp = Object.keys(imgobj);
+		}
+	}
+
+	function imageOnLoad() {
+		//console.log("Loaded:"+this);
+		for(var id in imagesLoaded) {
+			//console.log("Check:"+id);
+			var img = imagesLoaded[id];
+			if(img.raster === this) {
+			  console.log("Found id:"+id);
+				if(img.hasOwnProperty('onLoad'))  // callback for animation init
+				  img.onLoad(id,img);
+				break;
+			}
 		}
 	}
 
@@ -3124,7 +3140,8 @@
 			//console.log("dindex:"+Object.keys(dindex));
 			//console.log(dindex.y,dindex.y);
 			var clip = new Rectangle(img.sprite.clipSize.width*dindex.x,img.sprite.clipSize.height*dindex.y,img.sprite.clipSize.width,img.sprite.clipSize.height);
-			//console.log(img.sprite.clipSize);
+			//console.log(img.sprite.clipSize);  // returns zero fro chrome
+			//console.log(img.raster.size);
 			//console.log(clip);
 			//clip = new Rectangle(20,20,30,30);
 			var sr = img.src.raster;
