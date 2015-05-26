@@ -725,7 +725,7 @@
       nodeComms.listFiles("loadImage", imageExtensions); // defaults to listfile from here
     } else { // assume we have a path to an image provided by listFile via myscript fileSelectDialog
       var full_path = path + "/" + subpath;
-      paperGlue.loadSingleImage(full_path, subpath, contextMenu.eventPos);
+      paperGlue.loadSingleImage(full_path, subpath, {pos:contextMenu.eventPos});
     }
   }
 

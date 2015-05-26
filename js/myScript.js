@@ -50,6 +50,7 @@
     paperGlue.loadDoRec();
     paperGlue.setEditMode(false); // begin in run mode
     console.log("Press ESC to exit run mode");
+    animationExample();
   }
 
   function drawGrid(spacing) {
@@ -111,6 +112,97 @@
       }
     }
     return true;
+  }
+
+  var manTarget;
+
+  function animationExample() {
+    var src_id = "running_man";
+    var src_img = paperGlue.loadSingleImage("img/running_man.png",src_id,{isSymbol:false});
+    console.log("src_img.raster:"+src_img.raster);
+    console.log("src_img.src:"+src_img.src);
+    console.log("src_img.pos:"+src_img.raster.position);
+    src_img.raster.position = new Point(-1000,0);
+    //,new Point(100,100));
+    //console.log(Object.keys(paper.Raster));
+    //src_img.raster.scale(1.0);
+    //console.log("Src_img:"+Object.keys(src_img.raster));
+    var img = {src:src_img}; // = paperGlue.symbolPlace(src_id,src_id);  // force_id prevents record creation
+    img.pos = new Point(600,100);
+    img.speed = 32;
+    img.vel = new Point(img.speed,0);
+    img.scale = new Point(2.0,2.0);
+    img.update = runningManUpdate;
+    var dclip = [];
+    for(var yi = 0; yi < 5; yi++) {
+      for(var xi = 0; xi < 6; xi++) {
+        dclip.push({x:xi,y:yi});
+      }
+    }
+    //console.log("Src_img:"+Object.keys(src_img.raster));
+    var clip_size = new Size(src_img.width/6,src_img.height/5);
+    console.log("Clip:"+clip_size);
+    img.sprite = {action:0,nextAction:0,dclip:[dclip],clipSize:clip_size,period:0.05};
+    console.log("images:"+Object.keys(paperGlue.getImages()));
+    manTarget = paperGlue.getImages().conBlock1;
+    src_img.raster.insertBelow(manTarget.raster);
+    var sprites = paperGlue.getSprites();
+    console.log("Sprites:"+sprites.length);
+    sprites[src_id] = img;
+    //console.log("Sprites:"+sprites.length);
+    //console.log("Sprites:"+paperGlue.getSprites().length);
+  }
+
+  var manTargetDirection = 0;
+  var manDirection = 0;
+
+  function runningManUpdate(img, dt) {
+    //console.log("imgX:"+img.pos.x);
+    //console.log("Stop:"+window.innerWidth*3/4);
+    if(img.vel.x > 0) {
+      if(img.pos.x > (window.innerWidth*3/4)) {
+        manTargetDirection = 180;
+        img.src.raster.insertAbove(manTarget.raster);
+        //img.raster.insertBelow(manTarget);
+      }
+    } else {
+      if(img.pos.x < (window.innerWidth/4)) {
+        manTargetDirection = 0;
+        img.src.raster.insertBelow(manTarget.raster);
+        //img.raster.insertAbove(manTarget);
+      }
+    }
+    //console.log("dir:"+manTargetDirection);
+    //console.log("mandir:"+manDirection);
+    if(manDirection != manTargetDirection) {
+      // check if manDirection goes past manTargetDirection (xor)
+      manDirection = rotateTo(manDirection,20*dt,manTargetDirection);
+    }
+    var cos = Math.cos(manDirection*Math.PI/180.0);
+    //console.log("cos:"+cos);
+    img.scale = new Point(2.0*cos,2.0);
+    img.vel = new Point(img.speed*cos,0);
+  }
+
+  function rotateTo(a_old,delta,target) {
+    // delta must be positive
+    // returns true if angle has gone past target
+    var a_new = a_old + delta;
+    var t2;
+    if(delta > 0) {
+      if((target > a_old) && (target <= a_new))
+        return target;
+      t2 = target + 360;
+      if((t2 > a_old) && (t2 <= a_new))
+        return target;
+    } else {
+      if((target < a_old) && (target >= a_new))
+        return target;
+      t2 = target - 360;
+      if((t2 < a_old) && (t2 >= a_new))
+        return target;
+    }
+    return a_new % 360;
   }
 
     //window.globals.keyhandler = keyDown;  // requests paperglue to pass event here

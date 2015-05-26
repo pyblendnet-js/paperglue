@@ -70,6 +70,7 @@
 	var imagesLoaded = {};
 	var symbolInstances = {}; //images that have been cloned from sybols in imagesLoaded.
 	var flashingImages = [];
+	var sprites = [];
 
 	var holdContext = false; // don't reset contextMenu till after mouseUp
 	var doRecord = []; // record of all clonings and moves  {action:string,src_id:src.id,raster:image or line:path,pos:point}
@@ -513,14 +514,20 @@
 				}
 			}
 			imagesLoaded[imgobj.id] = imgobj; // record master images
-			imgobj.element = addImage(imgobj.src, imgobj.id); // add image to document
+			var img = addImage(imgobj.src, imgobj.id); // add image to document
+			imgobj.element = img;
+			//img.onload = function() {
+        imgobj.width = img.naturalWidth;
+				imgobj.height = img.naturalHeight;
+			//};
 			imgobj.raster = new Raster(imgobj.id); // make this a paper image
 			if (imgobj.hasOwnProperty('scale')) {
 				imgobj.raster.scale(imgobj.scale);
 			}
-			//console.log(img.isSymbol);
+			console.log(imgobj.isSymbol);
 			if (imgobj.hasOwnProperty('isSymbol')) { // this image can appear many times as instances
 				if (imgobj.isSymbol === true) { // needs true comparison
+					console.log("Image "+imgobj.id+" is symbol");
 					imgobj.symbol = new Symbol(imgobj.raster);
 					imgobj.raster.remove(); //dont need this cluttering the document
 					imgobj.raster = imgobj.symbol.place();
@@ -552,16 +559,20 @@
 		}
 	}
 
-	function loadSingleImage(full_path, subpath, pos) {
+	function loadSingleImage(full_path, subpath, props) {
 		//e.g var first_image = {src:"img/con_Block_5.08mm_12.png", scale:0.6, id:"conBlock1", isSymbol:true, dragClone:true, pos:view.center };
 		var img = importDefaults;
-		if (typeof pos != 'undefined') {
-			img.pos = pos;
+		if (typeof props != 'undefined') {
+			for(var p in props) {
+			  img[p] = props[p];
+				console.log("Img prop:"+p+"="+props[p]);
+			}
 		}
 		img.src = full_path;
 		img.id = subpath;
 		var images_to_load = [img];
 		loadImages(images_to_load);
+		return imagesLoaded[subpath];
 	}
 
 	function nameCurrentImage(name) {
@@ -3065,8 +3076,85 @@
 					flash_up = img.flashUp;
 				img.flashUp = flashImg(img, flash_up);
 			}
+			//console.log("Sprites:"+sprites);
+			try {
+			for (id in sprites) {
+				// sprites are rasters with motion and or animation
+        img = sprites[id];
+				if(img.hasOwnProperty('sprite'))
+					spriteAnimate(img,dt);
+				if(img.hasOwnProperty('pos')) {
+					img.raster.position = img.pos;
+				  if(img.hasOwnProperty('vel')) {
+						img.pos = img.pos.add(img.vel.multiply(dt));
+						//console.log("Pos:"+img.pos+" dt:"+dt+" vel:"+img.vel+" = "+img.vel.multiply(dt));
+  				  if(img.hasOwnProperty('acc')) {
+	  				  img.vel = img.vel.add(img.acc.multiply(dt));
+						}
+					}
+				}
+				if(img.hasOwnProperty('update')) {
+						img.update(img,dt);
+				}
+				if(img.hasOwnProperty('rot')) {
+					img.raster.rotation += img.rot*dt;
+				}
+			}
+		} catch(e) {
+			console.log("Exception in sprite loop:"+e);
+		}
 		}
 		onFrameBusy = false; // allow new event
+	}
+
+	function spriteAnimate(img, dt) {
+		if(!img.sprite.hasOwnProperty('tm')) {
+		  img.sprite.tm = 0;
+			img.sprite.index = 0;
+		}
+		if(img.sprite.tm <= 0) {
+			img.sprite.tm += img.sprite.period;
+			//console.log("Period:"+img.sprite.period);
+			// sprite = { tm:0,action:index_into_dclip ,nextAction:action: ,index:0,dclip:see_below }
+			var dclip = img.sprite.dclip[img.sprite.action];
+			//console.log("dclip[0]:"+dclip[4].x);
+			//console.log("dclip[0]:"+dclip[5].x);
+			//console.log("dindex:"+img.sprite.index);
+			var dindex = dclip[img.sprite.index];
+			//console.log("dindex:"+Object.keys(dindex));
+			//console.log(dindex.y,dindex.y);
+			var clip = new Rectangle(img.sprite.clipSize.width*dindex.x,img.sprite.clipSize.height*dindex.y,img.sprite.clipSize.width,img.sprite.clipSize.height);
+			//console.log(img.sprite.clipSize);
+			//console.log(clip);
+			//clip = new Rectangle(20,20,30,30);
+			var sr = img.src.raster;
+			//console.log("sr:"+sr);
+			var nr = sr.getSubRaster(clip);
+			if(typeof img.raster !== 'undefined' && !!img.raster)
+			  img.raster.remove();  // remove previous animation
+			img.raster = nr;
+			if(img.hasOwnProperty('scale')) {
+				img.raster.scale(img.scale);
+			}
+			//console.log("dclip:"+Object.keys(dclip));
+			// dclip is an array of [{x:y:}]
+		  img.sprite.index++; // move to next frame
+			//console.log("img.sprite.index:"+img.sprite.index);
+			if(img.sprite.index >= dclip.length) {
+			  img.sprite.index = 0;
+				img.sprite.action = img.sprite.nextAction;
+				dclip = img.sprite.dclip[img.sprite.action];
+  			//console.log("dclip:"+Object.keys(dclip));
+	  		//console.log("index:"+img.sprite.index);
+			}
+		} else {
+		  img.sprite.tm -= dt;
+		  //console.log("Sprite time:"+img.sprite.tm);
+		}
+	}
+
+	function getSprites() {
+		return sprites;
 	}
 
 	function flashImg(img, flash_up, flash_prop) {
@@ -3145,6 +3233,7 @@
 		getNextID: getNextID,
 		getsymbols: getSymbolInstances,
 		getNumSymbols: getNumSymbols,
+		symbolPlace:symbolPlace,
 		getImages: getImageInstances,
 		getLines: getLineInstances,
 		getAreas: getAreaInstances,
@@ -3197,6 +3286,7 @@
 		importDefaults: importDefaults,
 		recordOpacity: recordOpacity,
 		recordFlash: recordFlash,
+		getSprites: getSprites,
     setContextMenu: setContextMenu   //optional module set
 	};
 	globals.paperGlue = exports;
