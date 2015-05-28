@@ -493,8 +493,10 @@
 	function loadImages(images_to_load, custom_default_props) {
 		if (typeof custom_default_props === 'undefined')
 			custom_default_props = customDefaultProps;
-		else
+		else {
 			customDefaultProps = custom_default_props;
+			console.log("Custom default properties being set");
+		}
 		console.log("Loading " + images_to_load.length + " images");
 		while (images_to_load.length > 0) { // continue till empty - not sure if this is valid
 			var imgobj = images_to_load.pop();

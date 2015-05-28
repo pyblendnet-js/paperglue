@@ -59,6 +59,7 @@
 	// called by onContextMenu above
 	function showContextMenu(e) {
 		eventPos = new Point(e.clientX, e.clientY);
+		console.log("EventPOS:"+eventPos);
 		var posx = e.clientX + window.pageXOffset + 'px'; //Left Position of Mouse Pointer
 		var posy = e.clientY + window.pageYOffset + 'px'; //Top Position of Mouse Pointer
 		var el = document.getElementById('contextMenu');
@@ -190,6 +191,10 @@
 		return null;
 	}
 
+	function getEventPos() {
+		return eventPos;
+	}
+
 	var globals = window.globals;
 	var exports = {
     setDefault: setDefault,
@@ -197,6 +202,7 @@
 		append: append,
 		hide: hide,
 		setEnable: setEnable,
+		getEventPos: getEventPos
 	};
 
 	globals.contextMenu = exports;

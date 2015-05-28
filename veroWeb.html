@@ -1,0 +1,195 @@
+<!doctype html>
+<html>
+<head>
+  <meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+  <meta content="utf-8" http-equiv="encoding">
+  <script>
+    window.globals = { }; // for interscope comms
+    // paperGlue uses
+    // window.globals.modalKey = null; set in dialog.js for modal dialogs
+    // window.globals.chainKey = null; which could be set in module
+    // moduleCmd below must be defined before any modules that use it
+    function moduleCmd(mod,cmd,arg0,arg1,arg2,arg3,arg4) {
+      // assumes that window.global[mod][cmd] exists
+      //console.log(cmd,arg0,arg1,arg2);//.onload();  //no use since it may not be added to globals yet
+      window.globals[mod][cmd](arg0,arg1,arg2,arg3,arg4);
+    }
+
+    var modulesLoaded = [];
+
+    function checkDependancies(nm) {
+      var mod = modulesLoaded[nm];
+      var mk = mod.dep.slice();  //shallow copy
+      for(var di in mk) {
+        var dm = mod.dep[di];
+        if(modulesLoaded.hasOwnProperty(dm)) {
+
+  //for(var nm2 in modulesLoaded) {
+    //if(nm === nm2)
+      //continue;  // dependant on self
+    //console.log("Is "+nm2+" in "+mod.dep);
+    //console.log("nm2 in mod.dep:"+(mod.dep.indexOf(nm2)));
+    //var i = mod.dep.indexOf(nm2)
+    //if(i >= 0) { // if so, remove from dependancies
+          //if(modulesLoaded[dm].dep.length > 0)
+            //console.log("Yes but has "+modulesLoaded[dm].dep.length+" dependancies of its own.");
+          //else
+            //console.log("Yes");
+          if(modulesLoaded[dm].dep.length === 0)  // but only if it's dependancies are met too
+            mod.dep.splice(di,1);
+        }
+      }
+      if(mod.dep.length > 0) {
+        //console.log(nm +" has "+ mod.dep.length + " remaining dependancies");
+      } else if(typeof mod.init === 'function') {
+        //window.globals[nm][mod.init];
+        console.log("Init for module " + nm);
+        mod.init();
+        delete mod.init;  // only fire once
+      }
+    }
+
+    function moduleLoaded(name,dependancies,init) {
+      console.log(name + " module loaded.");
+      if(typeof dependancies === 'undefined')
+        dependancies = [];
+      modulesLoaded[name] = {dep:dependancies,init:init};
+      //console.log("Modules loaded:"+Object.keys(modulesLoaded));
+      checkDependancies(name);  // if all dependancies met this init fires first
+      for(var i = 0; i < 10; i++) {  // need to scan modules many times
+        // once to check for modules dependant on name
+        // and then once for modules dependant on that last etc
+        for(var nm in modulesLoaded) {
+          checkDependancies(nm);
+        }
+      }
+    }
+    window.globals.moduleLoaded = moduleLoaded;
+  </script>
+  <!-- Load the Paper.js library -->
+  <script type="text/javascript" src="js/paper.js" onload="moduleLoaded('paper')"></script>
+  <script type="text/javascript" src="js/nodeComms.js"></script>
+  <script type="text/javascript" src="js/dialog.js"></script>
+  <script type="text/javascript" src="js/contextMenu.js"></script>
+  <!-- Load external PaperScript and associate it with myCanvas -->
+  <script type="text/javascript" src="js/paperglue.js"></script>
+  <script type="text/javascript" src="js/paperGlueDialogs.js"></script>
+  <script type="text/javascript" src="js/paperGlueMenus.js"></script>
+  <script type="text/javascript" src="js/veroWeb.js"></script>
+  <!-- should have the same scope as per https://github.com/paperjs/paper.js/issues/153 -->
+  <script type="text/javascript" src="dorec.js"> </script>
+  <script type="text/javascript" src="imgavail.js"> </script>
+  <script>
+  function onload() {
+    //console.log("body loaded");
+    moduleLoaded("body");  //document body must be loaded before paperGlue init
+    //console.log(Object.keys(window.globals) ); //.onload();  //no use since it may not be added to globals yet
+  }
+
+  // function myScriptCmd(cmd, arg0,arg1,arg2,arg3,arg4) {
+  //   //console.log(Object.keys(window.globals.myScript) );
+  //   //console.log(cmd,arg0,arg1,arg2);//.onload();  //no use since it may not be added to globals yet
+  //   window.globals.myScript[cmd](arg0,arg1,arg2,arg3,arg4);
+  // }
+  //
+  // function paperGlueCmd(cmd,arg0,arg1,arg2,arg3,arg4) {
+  //   //console.log("PaperGlue commands:"+Object.keys(window.globals.paperGlue) );
+  //   //console.log(cmd,arg0,arg1,arg2);//.onload();  //no use since it may not be added to globals yet
+  //   window.globals.paperGlue[cmd](arg0,arg1,arg2,arg3,arg4);
+  // }
+
+  function DlgShow(Message)
+  {
+    // Change the message.
+    var Msg = document.getElementById('DlgContent');
+    Msg.innerHTML = Message;
+    // Display the dialog box.
+    var Dlg = document.getElementById('Dialog');
+    Dlg.style.visibility = 'visible';
+  }
+
+  </script>
+  <style>
+      .button {
+        color: white;
+        background-color: black;
+      }
+
+      #Dialog {
+        visibility: hidden;
+
+      position: absolute;
+        left: 20px;
+        top: 60px;
+        padding: 2px;
+        text-align:center;
+        border: solid;
+        background-color: lightgray;
+      }
+      #Dialog td {
+        padding:2px;
+      }
+      #contextMenu {
+        padding: 0;
+        font-size:100px;
+      }
+
+      #Dialog {
+        font-size:100px;
+      }
+
+      table, th, td {
+        border: 1px solid black;
+        border-collapse:collapse;
+      }
+    </style>
+
+</head>
+<body id="body" onload="onload();" >
+  <div id="clientArea">
+    <div id="statusInfo" style="display:none">STATUS LINE</div>
+    <div id="canvasDiv" style="height:100%;background-color:blue">
+      <canvas id="myCanvas" resize></canvas>
+    </div>
+  </div>
+  <div id="actionTableDiv" style="display:none">
+    <style>
+      table {border-collapse:collapse;}
+      .table{ /*height: 4em; */                   /* define the height */
+        border:4px solid black;
+      }
+      th{margin: 0;padding: 10px;border:1px solid grey;background-color: lightblue;font-size:14px;text-overflow:ellipsis}
+      td{margin: 0;padding: 10px;border:1px solid black;font-size:14px;text-overflow:ellipsis}
+      tr:nth-child(odd){background-color:#F0F0E0;}  /*  no work for some reason */
+    </style>
+    <table id="actionTable" class="table">
+      <thead>
+        <tr>
+          <th style="width:100px">Action </th>
+          <th style="width:30px">Obj ID</th>
+          <th>Parameters</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td colspan="3"  style="padding:0">
+            <div id="actionTableBodyDiv" style="overflow:scroll;height:200px;width:100%;overflow:auto;margin:0;border:0">
+              <table>
+                <tbody id="actionTableBody">
+                </tbody>
+              </table>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div style="display:none;" id="contextMenu">
+    <table  border="0" cellpadding="0" cellspacing="0"
+    style="border: thin solid #808080; cursor: default; white-space: nowrap"
+    bgcolor="White">
+    </table>
+  </div>
+  <div id="Dialog"><div id="DlgContent"></div><div  id="DlgReplyButtons"></div></div>
+</body>
+</html>
