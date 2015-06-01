@@ -326,7 +326,6 @@
 		for (var id in imagesLoaded) {
 			console.log("Check id:" + id);
 			imgobj = imagesLoaded[id];
-
 			if (this === imgobj.raster) { //master image found
 				console.log("Master image found");
 				if (!editMode) {
@@ -496,6 +495,7 @@
 		console.log("Loading " + imageLoadsPending + " images");
 		while (images_to_load.length > 0) { // continue till empty - not sure if this is valid
 			var imgobj = images_to_load.pop();
+			//console.log("imgobj:"+imgobj);
 			imgobj.initialProp = Object.keys(imgobj);
       if (imagesLoaded.hasOwnProperty(imgobj.id)) {
 				if (confirm("Image name "+imgobj.id+ " is already loaded. Add 'C' to id string or cancel to reload?")) {
@@ -587,21 +587,12 @@
 		}
 	}
 
-	// function imageOnLoad() {
-	// 	//console.log("Loaded:"+this);
-	// 	for(var id in imagesLoaded) {
-	// 		//console.log("Check:"+id);
-	// 		var img = imagesLoaded[id];
-	// 		if(img.raster === this) {
-	// 		  console.log("Found id:"+id);
-	// 			break;
-	// 		}
-	// 	}
-	// }
-
 	function loadSingleImage(full_path, subpath, props) {
 		//e.g var first_image = {src:"img/con_Block_5.08mm_12.png", scale:0.6, id:"conBlock1", isSymbol:true, dragClone:true, pos:view.center };
-		var img = importDefaults;
+		var img = {};
+		for(var i in importDefaults) {
+		  img[i] = importDefaults[i];
+		}
 		if (typeof props != 'undefined') {
 			for(var p in props) {
 			  img[p] = props[p];
@@ -613,7 +604,7 @@
 		}
 		img.src = full_path;
 		img.id = subpath;
-		var images_to_load = [img];
+		var images_to_load = [img];  // a set of one
 		loadImages(images_to_load);  //uses individual onload
 		//return imagesLoaded[subpath];
 	}
