@@ -90,6 +90,9 @@
 	var cursorColors = ['#f00', '#ff0', '#88f', '#8f8'];
 	var currentStateRate = 0.0; // immediate jumps to state
 
+  var imageLoadsPending = 0;  // try to keep track of pending loads
+	var onImagesLoaded;  // callback when image loading has completed
+
 	function cloneShallow(obj) {
 		var ro = {};
 		for (var i in obj)
@@ -177,16 +180,6 @@
 			lineInstances[id].color = c;
 		}
 		lineColor = c;
-	}
-
-	// helper to add hidden image to document before reference as paper image
-	function addImage(source, id) {
-		var img = document.createElement("img");
-		img.src = source; // this will cause a GET call from the browser
-		img.id = id;
-		img.hidden = true;
-		body.appendChild(img);
-		return img;
 	}
 
 	// finds an instance of an object based on element key and value
@@ -490,18 +483,21 @@
 	 * Called from external script via window.globals to add images to the document with behaviour parameters
 	 * @param {array} images_to_load is array of image objects having parameters src, id, [isSymbol:bool, dragClone:bool, contextMenu:object, instanceContextMenu:object, pos:point, scale:float]
 	 */
-	function loadImages(images_to_load, custom_default_props) {
-		if (typeof custom_default_props === 'undefined')
-			custom_default_props = customDefaultProps;
-		else {
+	function loadImages(images_to_load, custom_default_props, images_loaded_callback) {
+		if (typeof custom_default_props !== 'undefined' && !!custom_default_props) {
 			customDefaultProps = custom_default_props;
 			console.log("Custom default properties being set");
 		}
-		console.log("Loading " + images_to_load.length + " images");
+		if(typeof images_loaded_callback === 'function')
+		  onImagesLoaded = images_loaded_callback;
+		else
+		  onImagesLoaded = null;  // don't want it repeating next time
+		imageLoadsPending = images_to_load.length;   // onImagesLoaded callback fired when this returns to zero
+		console.log("Loading " + imageLoadsPending + " images");
 		while (images_to_load.length > 0) { // continue till empty - not sure if this is valid
 			var imgobj = images_to_load.pop();
 			imgobj.initialProp = Object.keys(imgobj);
-			if (imagesLoaded.hasOwnProperty(imgobj.id)) {
+      if (imagesLoaded.hasOwnProperty(imgobj.id)) {
 				if (confirm("Image name "+imgobj.id+ " is already loaded. Add 'C' to id string or cancel to reload?")) {
 					imgobj.id += 'C';
 					// note: images are loaded from three different events:
@@ -517,65 +513,91 @@
 			}
 			imagesLoaded[imgobj.id] = imgobj; // record master images
 			var img = addImage(imgobj.src, imgobj.id); // add image to document
-			imgobj.element = img;
-			// the following is not reliable on chrome until image loaded
-      //  imgobj.width = img.naturalWidth;
-			//	imgobj.height = img.naturalHeight;
-			// use raster size instead after load
-			imgobj.raster = new Raster(imgobj.id); // make this a paper image
-			imgobj.raster.onLoad = imageOnLoad;
-
-			if (imgobj.hasOwnProperty('scale')) {
-				imgobj.raster.scale(imgobj.scale);
-			}
-			console.log(imgobj.isSymbol);
-			if (imgobj.hasOwnProperty('isSymbol')) { // this image can appear many times as instances
-				if (imgobj.isSymbol === true) { // needs true comparison
-					console.log("Image "+imgobj.id+" is symbol");
-					imgobj.symbol = new Symbol(imgobj.raster);
-					imgobj.raster.remove(); //dont need this cluttering the document
-					imgobj.raster = imgobj.symbol.place();
-					imgobj.instances = 0;
-				}
-			}
-			if (imgobj.hasOwnProperty('pos')) { // a position given so it will be visible
-				console.log("Pos:" + imgobj.pos);
-				imgobj.raster.position = imgobj.pos;
-			} else { // no position so dont show yet
-				imgobj.raster.remove();
-				console.log("don't need this cluttering the document");
-			}
-			var listen_to_mouse = imgobj.hasOwnProperty('contextMenu');
-			if (imgobj.hasOwnProperty('dragClone')) { // if not defined then assume false
-				if (imgobj.dragClone === true)
-					listen_to_mouse = true;
-			}
-			if (listen_to_mouse)
-				imgobj.raster.onMouseDown = onImageMouseDown; // needed for drag or context
-			var default_keys = Object.keys(custom_default_props);
+			var default_keys = Object.keys(customDefaultProps);
 			console.log("Image default props:" + default_keys);
 			for (var di in default_keys) {
 				dk = default_keys[di];
 				if (!imgobj.hasOwnProperty(dk))
-					imgobj[dk] = custom_default_props[dk];
+					imgobj[dk] = customDefaultProps[dk];
 			}
 			imgobj.loadedProp = Object.keys(imgobj);
 		}
 	}
 
-	function imageOnLoad() {
-		//console.log("Loaded:"+this);
-		for(var id in imagesLoaded) {
-			//console.log("Check:"+id);
-			var img = imagesLoaded[id];
-			if(img.raster === this) {
-			  console.log("Found id:"+id);
-				if(img.hasOwnProperty('onLoad'))  // callback for animation init
-				  img.onLoad(id,img);
-				break;
+	// helper to add hidden image to document before reference as paper image
+	function addImage(source, id) {
+		var img = document.createElement("img");
+		img.id = id;
+		img.hidden = true;
+		img.onload = imageLoaded;
+		console.log("Commence loading image:"+source);
+		img.src = source; // this will cause a GET call from the browser
+		return img;
+	}
+
+	// see http://stackoverflow.com/questions/17049176/ns-error-not-available-component-is-not-available
+	function imageLoaded(e) {
+		img = e.target;
+		console.log("Image loaded:"+img.id);
+		body.appendChild(img);
+		imgobj = imagesLoaded[img.id]; // record master images
+		imgobj.element = img;
+		// the following is not reliable on chrome until image loaded
+    //  imgobj.width = img.naturalWidth;
+		//	imgobj.height = img.naturalHeight;
+		// use raster size instead after load
+		imgobj.raster = new Raster(imgobj.id); // make this a paper image
+		//imgobj.raster.onLoad = imageOnLoad;
+
+		if (imgobj.hasOwnProperty('scale')) {
+			imgobj.raster.scale(imgobj.scale);
+		}
+		console.log("Is image a symbol:"+imgobj.isSymbol);
+		if (imgobj.hasOwnProperty('isSymbol')) { // this image can appear many times as instances
+			if (imgobj.isSymbol === true) { // needs true comparison
+				console.log("Image "+imgobj.id+" is symbol");
+				imgobj.symbol = new Symbol(imgobj.raster);
+				imgobj.raster.remove(); //dont need this cluttering the document
+				imgobj.raster = imgobj.symbol.place();
+				imgobj.instances = 0;
 			}
 		}
+		if (imgobj.hasOwnProperty('pos') && !!imgobj.pos) { // a position given so it will be visible
+			console.log("Pos:" + imgobj.pos);
+			imgobj.raster.position = imgobj.pos;
+		} else { // no position so dont show yet
+			imgobj.raster.remove();
+			console.log("don't need this cluttering the document");
+		}
+		var listen_to_mouse = imgobj.hasOwnProperty('contextMenu');
+		if (imgobj.hasOwnProperty('dragClone')) { // if not defined then assume false
+			if (imgobj.dragClone === true)
+				listen_to_mouse = true;
+		}
+		if (listen_to_mouse)
+			imgobj.raster.onMouseDown = onImageMouseDown; // needed for drag or context
+		if(imgobj.hasOwnProperty('onLoad')) { // callback for individual image // used mainly for animation init
+			console.log("Calling on load for :" + imgobj.id);
+			imgobj.onLoad(imgobj.id,imgobj);
+		}
+		imageLoadsPending--;
+    if(imageLoadsPending === 0 && typeof onImagesLoaded === 'function') {
+			console.log("All images loaded");
+			onImagesLoaded();
+		}
 	}
+
+	// function imageOnLoad() {
+	// 	//console.log("Loaded:"+this);
+	// 	for(var id in imagesLoaded) {
+	// 		//console.log("Check:"+id);
+	// 		var img = imagesLoaded[id];
+	// 		if(img.raster === this) {
+	// 		  console.log("Found id:"+id);
+	// 			break;
+	// 		}
+	// 	}
+	// }
 
 	function loadSingleImage(full_path, subpath, props) {
 		//e.g var first_image = {src:"img/con_Block_5.08mm_12.png", scale:0.6, id:"conBlock1", isSymbol:true, dragClone:true, pos:view.center };
@@ -583,14 +605,17 @@
 		if (typeof props != 'undefined') {
 			for(var p in props) {
 			  img[p] = props[p];
-				console.log("Img prop:"+p+"="+props[p]);
+				if(typeof props[p] === 'object')
+				  console.log("Img prop:"+p+"="+props[p]);
+				else
+				  console.log("Img prop:"+p+"="+(typeof props[p]));
 			}
 		}
 		img.src = full_path;
 		img.id = subpath;
 		var images_to_load = [img];
-		loadImages(images_to_load);
-		return imagesLoaded[subpath];
+		loadImages(images_to_load);  //uses individual onload
+		//return imagesLoaded[subpath];
 	}
 
 	function nameCurrentImage(name) {
@@ -2026,13 +2051,16 @@
 		return jdata;
 	}
 
+  var projectData;  // persistent store of doRec data
+  var postParseRecord;  // callback of loadDoRec
+
 	function parseRecord(jdata) {
 		//try {
 		console.log("Data=" + jdata);
-		var project_data = JSON.parse(jdata);
-		if (doRecord.length > 0)
+		projectData = JSON.parse(jdata);
+		if (doRecord.length > 0)  // have events already been recorded
 			removeAll();
-		imglist = project_data.imglist;
+		imglist = projectData.imglist;
 		console.log("Images to load:" + imglist.length); //Array.isArray(imglist));
 		// add any images not already loaded - does not check date
 		var overload_images = true;
@@ -2050,9 +2078,19 @@
 			var imgobj = parseImageObj(imglist[ik]);
 			imgs_to_load.push(imgobj);
 		}
-		console.log("Images to load:" + imgs_to_load);
-		loadImages(imgs_to_load); //will add to previously set defaults
-		var do_record = project_data.dolist;
+		if(imgs_to_load.length > 0) {
+		  console.log("Images to load:" + imgs_to_load);
+		  loadImages(imgs_to_load, null, parseRecordPostImageLoad); //will add to previously set defaults
+			delete projectData.imgList;  // nolonger needed I think
+		} else {
+			parseRecordPostImageLoad();
+		}
+  }
+
+  // complete parse record once all images are loaded
+	function parseRecordPostImageLoad() {
+		console.log("All images loaded so now process do record");
+		var do_record = projectData.dolist;
 		//for(var di in do_record) {
 		//  console.log("ID:"+do_record[di].id);
 		//}
@@ -2066,6 +2104,8 @@
 		//} catch(e2) {
 		//   console.log("Error parsing file data"+e2);
 		//}
+		if(typeof postParseRecord === 'function')
+		  postParseRecord(true);
 	}
 
 	function parsePaperRecord(do_record) {
@@ -2107,8 +2147,8 @@
 	function parseLine(arr) {
 		if (!arr)
 			return null;
-		console.log("Type;" + (typeof arr));
-		console.log(arr.length);
+		//console.log("Type:" + (typeof arr));
+		//console.log(arr.length);
 		if (arr.length === 2) {
 			return [parsePoint(arr[0]), parsePoint(arr[1])];
 		} else if (arr[0] === 'Point') {
@@ -2118,7 +2158,7 @@
 	}
 
 	function parseRect(ord) {
-		console.log(ord[0]); // will be undefined for a real point
+		//console.log(ord[0]); // will be undefined for a real point
 		if (ord[0] === 'Rectangle')
 			return new Rectangle(ord[1], ord[2], ord[3], ord[4]);
 		else
@@ -2761,11 +2801,15 @@
 	}
 
 	// for loading a static js doRecord
-	function loadDoRec(fname) {
+	function loadDoRec(callback, fname) {
+		postParseRecord = callback;
 		if (typeof fname === 'undefined')
 			fname = "importRecord";
 		console.log("Run global function " + fname);
-		parseRecord(window.globals[fname]);
+		if(globals.hasOwnProperty(fname))
+		  parseRecord(globals[fname]);
+		else if(typeof postParseRecord === 'function')
+		  postParseRecord(false);
 	}
 
 	/* Add meta data to do record from external

@@ -637,6 +637,7 @@
     if (window.location.protocol === 'file:') { //local storage
       console.log("No server so need to use prelisting");
       // need to building a image load object for loadImages
+      // only object in imagesAvailable can be accessed
       // imagesAvailable was a listing loaded from imgavail.js
       if (typeof globals.imagesAvailable !== 'undefined') {
         var full_list = globals.imagesAvailable;
@@ -721,10 +722,12 @@
       } else
         console.log("No images available object loaded");
     } else if (typeof path === 'undefined') {
+      // can only access images under 'project' directory
       nodeComms.setFileSelector(fileSelectorDialog);
       nodeComms.listFiles("loadImage", imageExtensions); // defaults to listfile from here
     } else { // assume we have a path to an image provided by listFile via myscript fileSelectDialog
-      var full_path = path + "/" + subpath;
+      // see workspace = 'project' in server.js
+      var full_path = "project/" + path + "/" + subpath;
       paperGlue.loadSingleImage(full_path, subpath, {pos:contextMenu.getEventPos()});
     }
   }

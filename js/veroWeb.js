@@ -42,12 +42,19 @@
     //paperGlue = window.globals.paperGlue; //to access paperGlue commands
     paperGlue.init(); // sets up extra layers
     drawStripBoard(10, 100, 34);
-    paperGlue.loadImages([first_image], pgMenus.default_image_menus);
+    paperGlue.loadImages([first_image], pgMenus.default_image_menus,postImageLoadInit);
+    // init is completed after images have been loaded
+  }
+
+  function postImageLoadInit() {
     paperGlue.setSnap([5, 5, 10, 10]);
     paperGlue.showAreas();
     //paperGlue.closeDialog = dialog.closeDialog;
     //paperGlue.fileSelector = dialog.fileSelectorDialog;
-    paperGlue.loadDoRec();
+    paperGlue.loadDoRec(postDoRec);  //wait for image loads
+  }
+
+  function postDoRec() {
     paperGlue.setEditMode(false); // begin in run mode
     console.log("Press ESC to exit run mode");
   }

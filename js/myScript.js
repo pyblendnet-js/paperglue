@@ -42,12 +42,20 @@
     //paperGlue = window.globals.paperGlue; //to access paperGlue commands
     paperGlue.init(); // sets up extra layers
     drawStripBoard(10, 100, 34);
-    paperGlue.loadImages([first_image], pgMenus.default_image_menus);
+    paperGlue.loadImages([first_image], pgMenus.default_image_menus,postImageLoadInit);
+    // init is completed after images have been loaded
+  }
+
+  function postImageLoadInit() {
+    console.log("posImageLoadInit");
     paperGlue.setSnap([5, 5, 10, 10]);
     paperGlue.showAreas();
     //paperGlue.closeDialog = dialog.closeDialog;
     //paperGlue.fileSelector = dialog.fileSelectorDialog;
-    paperGlue.loadDoRec();
+    paperGlue.loadDoRec(postDoRec);  //wait for image loads etc.
+  }
+
+  function postDoRec() {
     paperGlue.setEditMode(false); // begin in run mode
     console.log("Press ESC to exit run mode");
     animationExample();
@@ -117,6 +125,7 @@
   var manTarget;
 
   function animationExample() {
+    console.log("Start animation example");
     var src_id = "running_man";
     var src_img = paperGlue.loadSingleImage("img/running_man.png",src_id,{isSymbol:false,onLoad:animationLoaded});
   }
