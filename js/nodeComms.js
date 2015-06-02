@@ -55,7 +55,7 @@
 		}
 
 		function listFiles(objective, xtns, path, subpath, file_selector) {
-	    console.log("List " + xtns + " from " + path + " / " + subpath +
+	    console.log("List " + xtns + " from " + path + "/" + subpath +
 	      " for " +
 	      objective);
 			if(typeof file_selector === 'function')	  // may have been already set

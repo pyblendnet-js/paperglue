@@ -612,7 +612,7 @@
   }
 
   function fileSelected(objective, path, subpath) {
-    console.log(objective + " from:" + path + " / " + subpath);
+    console.log(objective + " from:" + path + "/" + subpath);
     switch (fileSelectObjective) { // saveRecord returns save so use fileSelectObjective instead
       case 'loadRecord':
         loadRecord(path, subpath);
@@ -630,6 +630,8 @@
   }
 
   function loadImage(objective, xtns, path, subpath) {
+
+    console.log("Load Image:"+path);
     // load images from directory or locals
     // this function must conform to dialog.fileSelector fileselect function type
     // objective should always be "loadImages"

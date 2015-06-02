@@ -338,10 +338,10 @@
             "','" + name + "')";
           col = 'black';
         }
-        console.log("col:"+col);
-        console.log("Btnstyle:"+btnstyle);
-        console.log("cf:"+cf);
-        console.log("name:"+name);
+        //console.log("col:"+col);
+        //console.log("Btnstyle:"+btnstyle);
+        //console.log("cf:"+cf);
+        //console.log("name:"+name);
         p += '<tr><td><button style="color:' + col + btnstyle + cf + '">' +
           name +
           '</button></td></tr>';
@@ -356,7 +356,7 @@
     }
 
   function selectFile(objective, path, subpath) {
-    console.log(objective + " for file " + path + " / " + subpath);
+    console.log(objective + " for file " + path + "/" + subpath);
     if(typeof selectFileCallback === 'function')
       selectFileCallback(objective, path, subpath);
     closeDialog();

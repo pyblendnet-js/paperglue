@@ -42,7 +42,7 @@
     //paperGlue = window.globals.paperGlue; //to access paperGlue commands
     paperGlue.init(); // sets up extra layers
     drawStripBoard(10, 100, 34);
-    paperGlue.loadImages([first_image], pgMenus.default_image_menus,postImageLoadInit);
+    //paperGlue.loadImages([first_image], pgMenus.default_image_menus,postImageLoadInit);
     // init is completed after images have been loaded
   }
 
@@ -51,12 +51,12 @@
     paperGlue.showAreas();
     //paperGlue.closeDialog = dialog.closeDialog;
     //paperGlue.fileSelector = dialog.fileSelectorDialog;
-    paperGlue.loadDoRec(postDoRec);  //wait for image loads
+    //paperGlue.loadDoRec(postDoRec);  //wait for image loads
   }
 
   function postDoRec() {
-    paperGlue.setEditMode(false); // begin in run mode
-    console.log("Press ESC to exit run mode");
+    //paperGlue.setEditMode(false); // begin in run mode
+    //console.log("Press ESC to exit run mode");
   }
 
   function drawGrid(spacing) {

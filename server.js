@@ -41,7 +41,8 @@ if(!workspace)
 
 function serveStaticFile(res, path, contentType, responseCode) {
   if(!responseCode) responseCode = 200;
-  var read_path = __dirname + '/' + path;
+  var read_path = __dirname + path;
+  read_path = read_path.replace("%20"," ");
   util.log("Read path:" + read_path);
   fs.readFile(read_path,
     function(err,data) {
@@ -129,7 +130,7 @@ function buildSafePath(res,rel_path) {
     return null;
   }
   var pth = path.join(workspace, pathExt);
-  console.log(pth);
+  console.log("Safe path:"+pth);
   return pth;
 }
 
@@ -182,7 +183,7 @@ http.createServer(function(req,res){
     // normalize url by removing querystring, optional
     // trailing slash, and making lowercase
     util.log("Request:" + req.url);
-    var url_path = req.url.replace(/\/?(?:\?.*)?$/, '').toLowerCase();
+    var url_path = req.url.replace(/\/?(?:\?.*)?$/, '');  //.toLowerCase();
     util.log("Request:" + url_path);
     util.log("Request length:" + url_path.length);
     util.log("Res:" + res);
@@ -221,7 +222,8 @@ http.createServer(function(req,res){
           // this is special for returning to parent
           pth = path.dirname(pth);
         } else {
-          pth = path.join(pth, decodeURI(post_obj.subpath)).replace("\\","/");
+          pth = path.join(pth, decodeURI(post_obj.subpath));
+          pth = pth.replace(/\\/g,"/");
           // the \\ character is misinterpreted when past back listing files
         }
       }
