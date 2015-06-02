@@ -284,6 +284,9 @@
         p += '<div>Save to:<input id="nameField" type="text" value=""/></div>';
         savePath = dir_obj.path;
       }
+      var scroll_bar = (Object.keys(dir_obj.dir).length > 4);
+      if(scroll_bar)
+        p += '<div style="overflow:scroll;height:200px;width:100%;overflow:auto;margin:0;border:0">';
       p += '<table ' + fs + '>';
       p += '<thead><tr><th>Name</th></tr></thead>';
       p += '<tbody>';
@@ -348,6 +351,8 @@
         f = 'black';
       }
       p += '</tbody></table>';
+      if(scroll_bar)
+        p += '</div>';
       //console.log("Dialog content:"+p);
       var content = document.getElementById('DlgContent');
       content.innerHTML = p;
