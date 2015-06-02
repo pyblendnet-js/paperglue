@@ -44,11 +44,21 @@
     drawStripBoard(10, 100, 34);
     //paperGlue.loadImages([first_image], pgMenus.default_image_menus,postImageLoadInit);
     // init is completed after images have been loaded
+    postImageLoadInit();  // since there are no images to load
   }
+
+  var partsMenu = [{
+    label: 'get part',
+    callback: getPart
+  }, ];
 
   function postImageLoadInit() {
     paperGlue.setSnap([5, 5, 10, 10]);
     paperGlue.showAreas();
+    menusToAppend = {
+      file:partsMenu
+    };
+    contextMenu.append(menusToAppend);
     //paperGlue.closeDialog = dialog.closeDialog;
     //paperGlue.fileSelector = dialog.fileSelectorDialog;
     //paperGlue.loadDoRec(postDoRec);  //wait for image loads
@@ -73,6 +83,29 @@
       l.add([x, 0], [x, myCanvas.height]);
     }
   }
+
+  function getPart() {
+    if (window.location.protocol === 'file:') { //local storage
+      alert("veroWeb does not support local storage - use node.js server via veroLaunch.bat.");
+    } else {
+      nodeComms.setFileSelector(partSelectorDialog);
+      nodeComms.listFiles("loadFile", "xml", "parts");
+    }
+  }
+
+  function partSelectorDialog(objective, xtns, dir_obj) {
+    console.log("fileSelectorDialog:" + objective);
+    fileSelectObjective = objective;
+    dialog.fileSelector(objective, xtns, dir_obj, {
+      module: "nodeComms",
+      funct: "listFiles"
+    }, partSelected);
+  }
+
+  function partSelected(objective, path, subpath) {
+    console.log(objective + " from:" + path + "/" + subpath);
+  }
+
 
   function drawStripBoard(spacing, length, width) {
     var l;
