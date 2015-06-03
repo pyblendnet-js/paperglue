@@ -2,7 +2,7 @@
   var globals = window.globals;
   var paperGlue = globals.paperGlue; // see initApp below
   var pgMenus = globals.pgMenus;
-  var dependancies = ['paperGlue','pgMenus'];
+  var dependancies = ['paperGlue','pgMenus','nodeComms','xml2obj'];
 
   var wireLinks = [];
 
@@ -85,6 +85,7 @@
   }
 
   function getPart() {
+    console.log("getPart");
     if (window.location.protocol === 'file:') { //local storage
       alert("veroWeb does not support local storage - use node.js server via veroLaunch.bat.");
     } else {
@@ -94,7 +95,7 @@
   }
 
   function partSelectorDialog(objective, xtns, dir_obj) {
-    console.log("fileSelectorDialog:" + objective);
+    console.log("partSelectorDialog:" + objective);
     fileSelectObjective = objective;
     dialog.fileSelector(objective, xtns, dir_obj, {
       module: "nodeComms",
@@ -102,10 +103,19 @@
     }, partSelected);
   }
 
+  var part_path;
+
   function partSelected(objective, path, subpath) {
-    console.log(objective + " from:" + path + "/" + subpath);
+    console.log("PartSelected:"+objective + " from:" + path + "/" + subpath);
+    part_path = path;
+    nodeComms.loadFile(path,subpath,partParse);
   }
 
+  function partParse(data) {
+    var obj = loadXML(data);
+    console.log(JSON.stringify(obj.part));
+    paperGlue.loadSingleImage("project/"+part_path + "/images/"+obj.part.imageName,obj.part.name,{pos:contextMenu.getEventPos()});
+  }
 
   function drawStripBoard(spacing, length, width) {
     var l;

@@ -167,14 +167,14 @@
 	  }
 
 	  function onLoadReply(res) {
-	    console.log("Onreply:" + res);
+	    //console.log("Onreply:" + res);
 	    if (res.indexOf('500') === 0) { //starts with error code
 	      console.log("Report error:" + res);
 	    } else {
 	      console.log("attempting to parse json object");
 	      //try {
 	      var reply_obj = JSON.parse(res);
-	      console.log(reply_obj);
+	      //console.log(reply_obj);
 	      switch (reply_obj.type) {
 	        case 'file':
 	          fileParser(reply_obj.data);

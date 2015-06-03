@@ -263,7 +263,7 @@
       } else {
         openCommon();  // no buttons, so no need for rtn
       }
-      if(typeof selectFileCallback === 'undefined')
+      if(typeof select_callback === 'function')
         selectFileCallback = select_callback;
       // for save mode this is called from fileSelectReturn with path,subpath
       // for other modes this is called from selectFile with objective,path,file
@@ -361,7 +361,7 @@
     }
 
   function selectFile(objective, path, subpath) {
-    console.log(objective + " for file " + path + "/" + subpath);
+    console.log("selectFile:" + objective + " for file " + path + "/" + subpath);
     if(typeof selectFileCallback === 'function')
       selectFileCallback(objective, path, subpath);
     closeDialog();
