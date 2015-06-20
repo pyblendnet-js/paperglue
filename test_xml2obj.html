@@ -1,0 +1,37 @@
+<!doctype html>
+<html>
+<head>
+  <meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+  <meta content="utf-8" http-equiv="encoding">
+  <script type="text/javascript" src="js/xml2obj.js"> </script>
+<script>
+// from http://stackoverflow.com/questions/12955783/read-write-xml-node-values-in-nodejs
+function httpGet(theUrl) {
+    var xmlHttp = null;
+
+    xmlHttp = new XMLHttpRequest();
+    xmlHttp.open( "GET", theUrl, false );
+    xmlHttp.send( null );
+    return xmlHttp.responseText;
+}
+
+function onload() {
+  console.log("Hello");
+  var xin = httpGet('project/parts/w_Wire_0.6mm_1.xml');
+  //var xin = "<tag1>2<tag2 atr1='5'>3</tag2>4</tag1>"
+  //var xin = "<tag1><tag2>3</tag2><tag2>5</tag2></tag1>"
+  //var xin = "<tag1><tag2>3</tag2><tag3>5</tag3></tag1>"
+  console.log("XML:"+xin);
+  var obj = loadXML(xin);
+  var jsonified = JSON.stringify(obj);
+  var json_div = document.getElementById('json_div');
+  console.log(jsonified);
+  json_div.innerHTML = jsonified;
+}
+</script>
+</head>
+<body onload="onload()">
+<div id="json_div">
+</div>
+</body>
+</html>
