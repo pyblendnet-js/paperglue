@@ -85,9 +85,9 @@
 		pos: null
 	};
 	var baseImportDefaults = cloneShallow(importDefaults);
-	var cursorPos = []; // mouse, raster, origin, center
+	var cursorPos = []; // mouse, raster, origin, center, connection(s)
 	var cursorImage = null; // to allow cursor hide in selectItem
-	var cursorColors = ['#f00', '#ff0', '#88f', '#8f8'];
+	var cursorColors = ['#f00', '#ff0', '#88f', '#8f8', '#f8f'];
 	var currentStateRate = 0.0; // immediate jumps to state
 
   var imageLoadsPending = 0;  // try to keep track of pending loads
@@ -268,8 +268,13 @@
 
 	function showCursor(ci) {
 		console.log("Show cursor#" + ci + " @pos:" + cursorPos[ci]);
-		drawCross(cursorPos[ci], 20, '#000');
-		drawCross(cursorPos[ci].subtract([1, 1]), 20, cursorColors[ci]);
+		drawCross(cursorPos[ci].add([1,1]), 20, '#000');
+		var color;
+		if(ci < 4)
+		  color = cursorColors[ci];
+		else
+			color = cursorColors[4];
+		drawCross(cursorPos[ci], 20, color);
 	}
 
 	function showImageCursors(obj, show_mouse_cursor) {
@@ -288,12 +293,22 @@
 			showCursor(0);
 		cursorPos[1] = raster.position;
 		showCursor(1);
-		console.log("Show cursors:" + Object.keys(imgobj));
+		//console.log("Show cursors:" + Object.keys(imgobj));
+		if (imgobj.hasOwnProperty('connections')) {
+			// console.log("Connections:"+imgobj.connections.length);
+			// console.log("Raster:"+raster);
+			// console.log("ImgObj:"+Object.keys(imgobj));
+			// console.log("Size:"+imgobj.size);
+			for(var i = 0; i < imgobj.connections.length; i++) {
+				cursorPos[4+i]= getImgConnectionPos(imgobj,raster,i);
+			  showCursor(4+i);
+			}
+		}
 		if (imgobj.hasOwnProperty('center')) {
 			var cp = imgobj.center;
 			if (imgobj.hasOwnProperty('scale'))
 				cp.multiply(imgobj.scale);
-			console.log("Scaled center:" + cp + " Scale:" + imgobj.scale);
+		 	console.log("Scaled center:" + cp + " Scale:" + imgobj.scale);
 			cursorPos[2] = raster.position.subtract(cp.rotate(raster.rotation));
 			showCursor(2);
 		}
@@ -306,6 +321,17 @@
 		}
 		project._activeLayer = baseLayer;
 	}
+
+  function getImgConnectionPos(imgobj,raster,i) {
+		var tp = new Point(imgobj.size.width/2,imgobj.size.height/2);
+  	var zp = imgobj.connections[i].pos;
+	  console.log("Scaled connection:" + zp + " Scale:" + imgobj.scale);
+	  var rp = zp.subtract(tp);
+	  if (imgobj.hasOwnProperty('scale'))
+	  	rp = rp.multiply(imgobj.scale);
+	  console.log("rp:" + rp + " tp:" + tp);
+	  return raster.position.add(rp.rotate(raster.rotation));
+}
 
 	// onmousedown callback for images that are cloneable, dragable or have context menu
 	function onImageMouseDown(event) {
@@ -335,7 +361,7 @@
 				}
 				console.log("rb:"+rightButton);
 				if (rightButton) {
-					if (imgobj.hasOwnProperty('contextMenu')) { // if not defined then stay with default
+					if(imgobj.hasOwnProperty('contextMenu')) { // if not defined then stay with default
 						console.log("Attaching image context menu");
 						currentContextObject = {
 							id: id,
@@ -478,6 +504,10 @@
 			delete selectedItems[id];
 	}
 
+	function setCustomProps(custom_default_props) {
+	  customDefaultProps = custom_default_props;
+  }
+
 	/**
 	 * Called from external script via window.globals to add images to the document with behaviour parameters
 	 * @param {array} images_to_load is array of image objects having parameters src, id, [isSymbol:bool, dragClone:bool, contextMenu:object, instanceContextMenu:object, pos:point, scale:float]
@@ -547,6 +577,7 @@
 		//	imgobj.height = img.naturalHeight;
 		// use raster size instead after load
 		imgobj.raster = new Raster(imgobj.id); // make this a paper image
+		imgobj.size = imgobj.raster.size;  // otherwise lost if turned to symbol
 		//imgobj.raster.onLoad = imageOnLoad;
 
 		if (imgobj.hasOwnProperty('scale')) {
@@ -654,6 +685,8 @@
 				if (!!id) {
 					lineSelected = lineInstances[id].path;
 					selectLine(event);
+				} else if(globals.hasOwnProperty('onMouseDown')){
+					globals.onMouseDown(event);
 				}
 			}
 		}
@@ -924,6 +957,8 @@
 			//console.log("Hit test area#" + id);
 			if (hitTestArea(id, hit_point)) {
 				console.log("Hit test area#" + id);
+				if(globals.hasOwnProperty('areaClicked'))
+				  globals.areaClicked(id);
 				return id;
 			}
 		}
@@ -1296,8 +1331,14 @@
 				// for undo it will be necessary to look for previous position if any
 				// point needs to be cloned to dereference
 				line_id = validatePath(lineSelected);
-				if (!line_id)
-					hitTestAreas(mouseDownPosition);
+				if (line_id < 0) {  //zero length line
+					if(editMode) {
+					  if(globals.hasOwnProperty('editPoint'))
+						   globals.editPoint(mouseDownPosition);
+          } else {
+					  hitTestAreas(mouseDownPosition);
+					}
+				}
 				lineSelected = null;
 				// continue through to path addition or removal
 			} else if (!!imageSelected) {
@@ -1306,7 +1347,9 @@
 					.position.equals(
 						imageSelectedPosition)), imageSelectedRotation);
 				imageSelected = null;
-			} // end of edit mode
+			} else if(globals.hasOwnProperty('editPoint')) {
+				globals.editPoint(mouseDownPosition);
+			}// end of edit mode
 		} else { // not edit mode
 			var hit_id = hitTestAreas(mouseDownPosition);
 			if (!!hit_id) {
@@ -1402,6 +1445,7 @@
 		var inst = obj.inst;
 		inst.raster.scale(scale / inst.scale);
 		inst.scale = scale;
+		console.log("Scale image type:"+obj.type);
 		if (obj.type === 'image') { // need to restore as symbol master
 			inst.symbol = new Symbol(inst.raster);
 			var pos = inst.raster.position;
@@ -1414,6 +1458,9 @@
 			inst.raster.position = pos;
 			inst.raster.rotation = rot;
 			inst.raster.onMouseDown = onImageMouseDown; //md;
+		  // for(var ci in inst.src.connections) {
+			//   connections[ci].pos = connections[ci].pos*scale;
+			// }
 		}
 	}
 
@@ -1453,13 +1500,13 @@
 				return id;
 			}
 		}
-		return null;
+		return -1;
 	}
 
 	function validatePath(path, force_id) {
 		// only use force id for redo where the old id must be reused
 		var next_id = nextID;
-		var line_id = null;
+		var line_id = -1;  // not a valid id
 		if (typeof force_id === 'undefined') {
 			line_id = getLineID(path);
 		} else {
@@ -1468,13 +1515,13 @@
 		}
 		//console.log("Path length:" + path.length);
 		var round_only = !snapDefault;
-		if (line_id !== null) {
+		if (line_id >= 0) {  // this is valid id
 			var inst = lineInstances[line_id];
 			if (inst.hasOwnProperty('snap'))
 				round_only = !inst.snap;
 		}
 		if (snapLine(path, round_only)) {
-			if (line_id === null) { //this path doesn't exist
+			if (line_id < 0) { //this path doesn't exist
 				console.log('Creating new line with id:', next_id);
 				lineInstances[next_id] = {
 					path: path
@@ -1486,6 +1533,7 @@
 				if (next_id == nextID)
 					nextID++;
 				line_id = next_id;
+				console.log("Set line_id to:"+next_id);
 			}
 			if (typeof force_id == 'undefined') { // else don't record redos
 				var np = [lineSelected.firstSegment.point.clone(), lineSelected
@@ -1510,12 +1558,12 @@
 			}
 		} else { // length of line is too short
 			console.log("Zero length line");
-			if (line_id === null) { //this path doesn't exist
+			if (line_id < 0) { //this path doesn't exist
 				path.remove();
 			} else {
 				removeLine(line_id);
 			}
-			return null;
+			return -1; // invalid line id
 		}
 		return line_id;
 	}
@@ -2578,8 +2626,7 @@
 	}
 
 	function getLineInstances() {
-		console.log("Returning line instances:", Object.keys(lineInstances)
-			.length);
+		//console.log("Returning line instances:", Object.keys(lineInstances).length);
 		return lineInstances;
 	}
 
@@ -2690,13 +2737,35 @@
 		}
 	}
 
+	function setConnectionToCursor() {
+		if (currentContextObject.hasOwnProperty('src')) {
+			var src = currentContextObject.src;
+			if (currentContextObject.hasOwnProperty('raster')) {
+				var raster = currentContextObject.raster;
+				var dp = raster.position.subtract(cursorPos[0]);
+				var pos = (roundPoint(dp.rotate(-raster.rotation))).divide(src.scale);
+				if(!src.hasOwnProperty('connections'))
+				  src.connections = [];
+				if(!src.hasOwnProperty('connectNr'))  //if not set then add to end
+				  src.connectNr = src.connections.length;
+				if(src.connectNr < src.connections.length)
+				  src.connections[src.connectNr].pos = pos;
+				else
+				  src.connections[src.connectNr] = {pos:pos,id:src.connectNr+""};
+				cursorPos[4 + src.connectNr] = cursorPos[0];
+				console.log("Connection#"+src.connectNr+":" + src.connections[src.connectNr]);
+			}
+		}
+		hideCursor();
+	}
+
 	function setCenterToCursor() {
 		if (currentContextObject.hasOwnProperty('src')) {
 			var src = currentContextObject.src;
 			if (currentContextObject.hasOwnProperty('raster')) {
 				var raster = currentContextObject.raster;
 				var dp = raster.position.subtract(cursorPos[0]);
-				src.center = (roundPoint(dp.rotate(-raster.rotation))) / src.scale;
+				src.center = (roundPoint(dp.rotate(-raster.rotation))).divide(src.scale);
 				cursorPos[2] = cursorPos[0];
 				console.log("Center:" + src.center);
 				if (!src.hasOwnProperty('origin')) // probably the same if not set
@@ -2712,7 +2781,7 @@
 			if (currentContextObject.hasOwnProperty('raster')) {
 				var raster = currentContextObject.raster;
 				var dp = raster.position.subtract(cursorPos[0]);
-				src.origin = (roundPoint(dp.rotate(-raster.rotation))) / src.scale;
+				src.origin = (roundPoint(dp.rotate(-raster.rotation))).divide(src.scale);
 				cursorPos[3] = cursorPos[0];
 				console.log("Origin:" + src.origin);
 				if (!src.hasOwnProperty('center')) // probably the same if not set
@@ -2743,8 +2812,8 @@
 			hideAreas();
 		}
 
-		if (typeof window.globals.setMode !== 'undefined')
-			window.globals.setMode(mode);
+		if (typeof globals.setMode !== 'undefined')
+			globals.setMode(mode);
 	}
 
 	function areaSelect() {
@@ -3234,8 +3303,8 @@
 	}
 
 	function writeStatus(msg) {
-		if (typeof window.globals.writeStatus === 'function')
-			window.globals.writeStatus(msg);
+		if (typeof globals.writeStatus === 'function')
+			globals.writeStatus(msg);
 	}
 
 	function writeEditStatus() {
@@ -3282,10 +3351,11 @@
 	var exports = {
 		init: init,
 		rasterize: rasterize,
+		setCustomProps: setCustomProps,
 		loadImages: loadImages,
 		loadSingleImage: loadSingleImage,
 		getNextID: getNextID,
-		getsymbols: getSymbolInstances,
+		getSymbols: getSymbolInstances,
 		getNumSymbols: getNumSymbols,
 		symbolPlace:symbolPlace,
 		getImages: getImageInstances,
@@ -3306,6 +3376,7 @@
 		nameCurrentImage: nameCurrentImage,
 		moveCurrentImage: moveCurrentImage,
 		scaleCurrentImage: scaleCurrentImage,
+		setConnectionToCursor:setConnectionToCursor,
 		setCenterToCursor: setCenterToCursor,
 		setOriginToCursor: setOriginToCursor,
 		showCursor: showCursor,

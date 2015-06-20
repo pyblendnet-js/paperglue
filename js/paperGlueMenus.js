@@ -11,6 +11,40 @@
   var dependancies = ['paperGlue', 'pgdialogs'];
 
   function initMenus() {
+    var symbolOptionsMenu = [
+      {
+        label: 'snap',
+        propCall: getSnapModeCall,
+        callback: paperGlue.toggleSnap  //toggleSnap
+      }, {
+        label: 'dragClones',
+        propCall: paperGlue.getDragMode,  //getDragModeCall,
+        callback: paperGlue.toggleDrag    //toggleDrag
+      }
+    ];
+    var symbolConnectionsMenu = [
+      {
+        label: 'setCenter',
+        propCall: imgGetCenterCall,
+        callback: paperGlue.setCenterToCursor  //setCenterToCursor
+      }, {
+        label: 'setOrigin',
+        propCall: imgGetOriginCall,
+        callback: paperGlue.setOriginToCursor  //setOriginToCursor
+      },{
+        label: 'selectConnection',
+        propCall: getConnectionNrCall,
+        callback: incConnectionNrCall
+      },{
+        label: 'setConnection',
+        propCall: getConnectionCall,
+        callback: paperGlue.setConnectionToCursor  //setConnectionToCursor
+      },{
+        label: 'addConnection',
+        callback: addConnectionCall
+      }
+    ];
+
     var symbolMenu = [{
       label: 'name',
       propCall: imgGetNameCall
@@ -21,28 +55,19 @@
       label: 'size',
       propCall: imgGetSizeCall
     }, {
-      label: 'snap',
-      propCall: getSnapModeCall,
-      callback: toggleSnap
-    }, {
-      label: 'dragClones',
-      propCall: getDragModeCall,
-      callback: toggleDrag
+      label: 'options',
+      submenu: symbolOptionsMenu
     }, {
       label: 'properties',
       callback: pgdialogs.openImgPropDialog
     }, {
-      label: 'setCenter',
-      propCall: imgGetCenterCall,
-      callback: setCenterToCursor
-    }, {
-      label: 'setOrigin',
-      propCall: imgGetOriginCall,
-      callback: setOriginToCursor
-    }, {
+      label: 'connections',
+      submenu: symbolConnectionsMenu
+    },{
       label: 'remove',
-      callback: objRemove
+      callback: paperGlue.delCurrentContextObject  //objRemove
     }];
+
     var symbolInstanceMenu = [{
       label: 'name',
       propCall: imgGetInstanceNameCall
@@ -52,7 +77,7 @@
     }, {
       label: 'snap',
       propCall: getSnapModeCall,
-      callback: toggleSnap
+      callback: paperGlue.toggleSnap   //toggleSnap
     }, {
       label: 'properties',
       callback: pgdialogs.openImgPropDialog
@@ -188,19 +213,63 @@
     return paperGlue.getSnapDefault();
   }
 
-  function toggleSnap() {
-    paperGlue.toggleSnap();
-    return true;
+  // function toggleSnap() {
+  //   paperGlue.toggleSnap();
+  //   return true;
+  // }
+
+  // function getDragModeCall(obj) {
+  //   console.log("GetDragMode for:" + obj);
+	// 	return paperGlue.getDragMode(obj);
+  // }
+
+  // function toggleDrag() {
+  //   paperGlue.toggleDrag();
+  //   return true;
+  // }
+
+  function  getConnectionNrCall(obj) {
+    if(!obj.src.hasOwnProperty('connections'))
+      return 'No connections';
+    if(!obj.src.hasOwnProperty('connectNr'))
+      obj.src.connectNr = 0;
+    if(obj.src.connectNr >= obj.src.connections.length)
+      obj.src.connectNr = 0;
+    return obj.src.connectNr + " of " + obj.src.connections.length;
   }
 
-  function getDragModeCall(obj) {
-    console.log("GetDragMode for:" + obj);
-		return paperGlue.getDragMode(obj);
+  function  incConnectionNrCall() {
+    var obj = paperGlue.getCurrentContextObject();
+    if(!obj.src.hasOwnProperty('connections'))
+      return;
+      obj.src.connectNr++;
+    if(obj.src.connectNr >= obj.src.connections.length)
+      obj.src.connectNr = 0;
   }
 
-  function toggleDrag() {
-    paperGlue.toggleDrag();
-    return true;
+  function getConnectionCall(obj) {
+    //console.log('pos called');
+    //console.log(Object.keys(obj));
+    //console.log(obj.src);
+    if (!obj.src.hasOwnProperty('connections'))
+      return 'No connections';
+    if(!obj.src.hasOwnProperty('connectNr'))
+      obj.src.connectNr = 0;
+    if(obj.src.connections.length > 0)
+      return roundPoint(obj.src.connections[obj.src.connectNr].pos);
+    else
+      return 'N/A';
+  }
+
+  function addConnectionCall() {
+    var obj = paperGlue.getCurrentContextObject();
+    if(!obj.src.hasOwnProperty('connections')) {
+      obj.src.connections = [];
+      obj.src.connectNr = 0;
+    } else {
+      obj.src.connectNr++;
+    }
+    paperGlue.setConnectionToCursor();
   }
 
   function imgGetCenterCall(obj) {
@@ -321,13 +390,17 @@
   var idRow;
   var dialogType = "unknown";
 
-  function setCenterToCursor() {
-    paperGlue.setCenterToCursor();
-  }
+  // function setConnectionToCursor() {
+  //   paperGlue.setConnectionToCursor();
+  // }
 
-  function setOriginToCursor() {
-    paperGlue.setOriginToCursor();
-  }
+  // function setCenterToCursor() {
+  //   paperGlue.setCenterToCursor();
+  // }
+
+  // function setOriginToCursor() {
+  //   paperGlue.setOriginToCursor();
+  // }
 
   var exports = {
     listActions: openActionsWindow,
