@@ -203,7 +203,8 @@
     var rc = pntToGrid(pos);
     //console.log("Highlight:"+rc);
     clearHighLines();
-    tracePath(rc[1],rc[0]-1,rc[0],highlight);  // include initial point
+    clearTraceHistory();
+    tracePath(rc[1],rc[0],true,highlight);  // include initial point
     // highlight this section of track
     // look for links meeting this track
     // jump to linked tracks and repeat
@@ -225,42 +226,68 @@
     lineSelected.opacity = 0.5;
     lineSelected.strokeWidth = 8;
     lineSelected.strokeCap = 'round';
-    //console.log("Line from "+gridToPnt(c1,r1)+" to "+gridToPnt(c2,r2));
+    console.log("Line from "+gridToPnt(r1,c1)+" to "+gridToPnt(r2,c2));
     lineSelected.add(gridToPnt(r1,c1));
     lineSelected.add(gridToPnt(r2,c2));
     highLines.push(lineSelected);
   }
 
-  function tracePath(row,col_l,col_r,action) {
+  var tracePnts = [];
+
+  function clearTraceHistory() {
+    tracePnts = [];
+  }
+
+  // trace path of conductivity from point at row,col
+  // if inc_start then include scan of the first point
+  // when a path is included perform action
+  function tracePath(row,col,inc_start,action) {
     // look for break(s) on this track
-    var left_lim = traceDir(row,col_l,-1,-1,action);
-    var right_lim = traceDir(row,col_r,1,columns,action);
-    action(row,left_lim,row,right_lim);
+    var left_lim = traceDir(row,col-1,-1,-1,action);
+    var col_r = col;
+    if(!inc_start)  // don't look at the start point
+      col_r += 1;
+    var right_lim = traceDir(row,col_r,1,columns+1,action);
+    if(left_lim < right_lim)
+      action(row,left_lim,row,right_lim);
   }
 
   function traceDir(row,col,dir,lim,action) {
     //console.log("Trace from "+row+","+col+" in dir:"+dir+" to "+lim);
     for(var c = col; c != lim; c += dir) {
-      var j = findJoint(row,c);
-      switch(j) {
-        case 'break':
-          return c-dir;
-        case 'resistor':
-          // might follow this resistor in future versions or create node map
-          break;
-      }
-      var pnt = findLine(row,c);
-      if(!!pnt) {
-        var lrc = pntToGrid(pnt);
-        //console.log("Found line from "+c+","+row+" to "+lrc);
-        action(row,c,lrc[1],lrc[0]);  //do the line
-        tracePath(lrc[1],lrc[0]-1,lrc[0]+1,action);  //this time do not include initial point
-      }
+      var rv = checkPnt(row,c,action);
+      if(rv == c)
+        return rv-dir;
     }
-    return lim;
+    return lim-dir;
   }
 
-  function findJoint(row,col) {
+  function checkPnt(row,col,action,er,ec) {
+      //er and ec are optional row and column for line or joint connection to ignor
+      var ti = row*columns+col;
+      if(tracePnts.indexOf(ti) >= 0)
+        return col;  // this point already down so break recursion
+      tracePnts.push(ti);
+      var j = findJoint(row,col,er,ec);
+      if(j == 'break')
+        return col;  // move one back
+      // if(isResistive(j)) { // resistor
+      //   // might follow this resistor in future versions or create node map
+      //   break;
+      // }
+      var lrc = findLine(row,col,er,ec);
+      if(!!lrc) {
+        //console.log("Found line from "+c+","+row+" to "+lrc);
+        action(row,col,lrc[1],lrc[0]);  //do the line
+        if(lrc[1] >= 0 && lrc[1] < rows && lrc[0] >= 0 && lrc[1] < columns)
+          tracePath(lrc[1],lrc[0],false,action);  //this time do not include initial point
+        else
+          checkPnt(lrc[1],lrc[0],action,row,col);  //exclude starting point
+      }
+
+  }
+
+  function findJoint(row,col,ex_row,ex_col) {
     var symbols = paperGlue.getSymbols();
     for(var id in symbols) {
       var symbol = symbols[id];
@@ -269,13 +296,17 @@
       if(imgobj.id === 'Break') { // special instance - has no connection
         var rcx = pntToGrid(symbol.raster.position);
         if(rcx[1] == row && rcx[0] == col)
-          return 'break';
+          return 'break';  // this location is a strip board break
         continue;
       }
       if(imgobj.hasOwnProperty('connections')) {
         for(var i = 0; i < imgobj.connections.length; i++) {
-          var pos = paperGlue.getImgConnectionPos(imgobj.src,symbol.raster,i);
+          var pos = paperGlue.getImgConnectionPos(imgobj,symbol.raster,i);
           var rc = pntToGrid(pos);
+          if(typeof ex_row !== 'undefined') {
+            if(rc[1] == ex_row && rc[0] == ex_col)
+              continue;  // this connection is to be ignored
+          }
           if(rc[1] == row && rc[0] == col)
             return imgobj.id;
         }
@@ -285,7 +316,8 @@
     }
   }
 
-  function findLine(row,col) {
+  function findLine(row,col,ex_row,ex_col) {
+    console.log("Exclude "+ex_row+","+ex_col);
     var lines = paperGlue.getLines();
     //console.log("Check:"+col+","+row);
     for(var id in lines) {
@@ -293,16 +325,34 @@
       var l = lines[id];
       var p1 = l.path.firstSegment.point;
       var p2 = l.path.lastSegment.point;
-      var rc = pntToGrid(p1);
+      var rc1 = pntToGrid(p1);
+      var rc2 = pntToGrid(p2);
       //console.log("End1:"+rc);
-      if(rc[0] == col && rc[1] == row)
-        return p2;
-      rc = pntToGrid(p2);
+      if(rc1[0] == col && rc1[1] == row) {
+        if(typeof ex_row !== 'undefined') {
+          if(ex_row == rc2[1] && ex_col == rc2[0]) {
+            console.log("Excluding "+ex_row+","+ex_col);
+            continue;
+          }
+        }
+        return rc2;
+      }
       //console.log("End2:"+rc);
-      if(rc[0] == col && rc[1] == row)
-        return p1;
+      if(rc2[0] == col && rc2[1] == row) {
+        if(typeof ex_row !== 'undefined') {
+          if(ex_row == rc1[1] && ex_col == rc1[0]) {
+            console.log("Excluding "+ex_row+","+ex_col);
+            continue;
+          }
+        }
+        return rc1;
+      }
     }
     return null;
+  }
+
+  function isResistive(id) {
+
   }
 
   globals.editPoint = editPoint;

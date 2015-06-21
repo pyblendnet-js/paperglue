@@ -331,7 +331,7 @@
 	  	rp = rp.multiply(imgobj.scale);
 	  console.log("rp:" + rp + " tp:" + tp);
 	  return raster.position.add(rp.rotate(raster.rotation));
-}
+  }
 
 	// onmousedown callback for images that are cloneable, dragable or have context menu
 	function onImageMouseDown(event) {
@@ -3370,6 +3370,7 @@
 		getLineColor: getLineColor,
 		setLineColor: setLineColor,
 		setCurrentLineColor: setCurrentLineColor,
+		getImgConnectionPos:getImgConnectionPos,
 		removeAll:removeAll,
 		getCurrentContextObject: getCurrentContextObject,
 		delCurrentContextObject: delCurrentContextObject,
