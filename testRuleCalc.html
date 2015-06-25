@@ -1,0 +1,19 @@
+<!doctype html>
+<html>
+<head>
+  <meta content="text/html;charset=utf-8" http-equiv="Content-Type">
+  <meta content="utf-8" http-equiv="encoding">
+  <script>
+  window.globals = { }; // for interscope comms
+  </script>
+  <script type="text/javascript" src="js/ruleCalc.js"> </script>
+</head>
+<body>
+<script>
+  var obj = {a:0,b:1,c:1};
+  var rule = "a = b + c";
+  window.globals.ruleCalc.calcRule(rule,1.0,obj);
+  console.log("a = " + obj.a);
+</script>
+</body>
+</html>

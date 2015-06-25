@@ -88,6 +88,8 @@
 	var cursorPos = []; // mouse, raster, origin, center, connection(s)
 	var cursorImage = null; // to allow cursor hide in selectItem
 	var cursorColors = ['#f00', '#ff0', '#88f', '#8f8', '#f8f'];
+	var cursorModes = ['showAll','connectionCursorsOnly','hideConnectionCursors'];
+	var cursorMode = 0;  //see showCursor
 	var currentStateRate = 0.0; // immediate jumps to state
 
   var imageLoadsPending = 0;  // try to keep track of pending loads
@@ -267,6 +269,13 @@
 	}
 
 	function showCursor(ci) {
+		if(ci < 4) {
+			if(cursorMode === 1 )
+			  return;
+		} else {
+			if(cursorMode === 2)
+				return;
+		}
 		console.log("Show cursor#" + ci + " @pos:" + cursorPos[ci]);
 		drawCross(cursorPos[ci].add([1,1]), 20, '#000');
 		var color;
@@ -275,6 +284,21 @@
 		else
 			color = cursorColors[4];
 		drawCross(cursorPos[ci], 20, color);
+	}
+
+	function getCursorMode() {
+	  return cursorModes[cursorMode];
+	}
+
+	function setCursorMode(mode) {
+		cursorMode = mode;
+	}
+
+	function toggleCursorMode() {
+		cursorMode++;
+		if(cursorMode >= cursorModes.length)
+		  cursorMode = 0;
+		hideCursor();
 	}
 
 	function showImageCursors(obj, show_mouse_cursor) {
@@ -3191,6 +3215,8 @@
 				img.flashUp = flashImg(img, img.flashUp, flash_prop);
 			}
 		} else {
+			if(globals.hasOwnProperty(onFrame))
+			  globals.onFrame(dt);
 			for (id in flashingImages) {
 				img = flashingImages[id];
 				var flash_up = true;
@@ -3222,9 +3248,9 @@
 					img.raster.rotation += img.rot*dt;
 				}
 			}
-		} catch(e) {
-			console.log("Exception in sprite loop:"+e);
-		}
+		  } catch(e) {
+			  console.log("Exception in sprite loop:"+e);
+		  }
 		}
 		onFrameBusy = false; // allow new event
 	}
@@ -3382,6 +3408,9 @@
 		setOriginToCursor: setOriginToCursor,
 		showCursor: showCursor,
 		hideCursor: hideCursor,
+		getCursorMode: getCursorMode,
+		setCursorMode: setCursorMode,
+		toggleCursorMode: toggleCursorMode,
 		showImageCursors: showImageCursors,
 		getSnapDefault: getSnapDefault,
 		toggleSnap: toggleSnap,

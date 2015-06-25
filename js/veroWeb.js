@@ -2,7 +2,8 @@
   var globals = window.globals;
   var paperGlue = globals.paperGlue; // see initApp below
   var pgMenus = globals.pgMenus;
-  var dependancies = ['paperGlue','pgMenus','nodeComms','xml2obj'];
+  var ruleCalc = globals.ruleCalc;
+  var dependancies = ['paperGlue','pgMenus','nodeComms','xml2obj','ruleCalc'];
 
   var wireLinks = [];
 
@@ -36,6 +37,7 @@
 
     //paperGlue = window.globals.paperGlue; //to access paperGlue commands
     paperGlue.init(); // sets up extra layers
+    paperGlue.setCursorMode(1);  //only show connections
     drawStripBoard(gridStep, columns, rows);
     //paperGlue.loadImages([first_image], pgMenus.default_image_menus,postImageLoadInit);
     // init is completed after images have been loaded
@@ -220,18 +222,22 @@
     highlines = [];
   }
 
-  function highlight(r1,c1,r2,c2) {
+  function highlight(r1,c1,r2,c2,col) {
     var lineSelected = new Path();
-    lineSelected.strokeColor = 'red';
+    if(typeof col === 'undefined')
+      lineSelected.strokeColor = 'red';
+    else
+      lineSelected.strokeColor = col;
     lineSelected.opacity = 0.5;
     lineSelected.strokeWidth = 8;
     lineSelected.strokeCap = 'round';
-    console.log("Line from "+gridToPnt(r1,c1)+" to "+gridToPnt(r2,c2));
+    //console.log("Line from "+gridToPnt(r1,c1)+" to "+gridToPnt(r2,c2));
     lineSelected.add(gridToPnt(r1,c1));
     lineSelected.add(gridToPnt(r2,c2));
     highLines.push(lineSelected);
   }
 
+  var simMode = false;
   var tracePnts = [];
 
   function clearTraceHistory() {
@@ -268,7 +274,7 @@
       if(tracePnts.indexOf(ti) >= 0)
         return col;  // this point already down so break recursion
       tracePnts.push(ti);
-      var j = findJoint(row,col,er,ec);
+      var j = findJoint(row,col,er,ec,action);
       if(j == 'break')
         return col;  // move one back
       // if(isResistive(j)) { // resistor
@@ -287,7 +293,7 @@
 
   }
 
-  function findJoint(row,col,ex_row,ex_col) {
+  function findJoint(row,col,ex_row,ex_col,action) {
     var symbols = paperGlue.getSymbols();
     for(var id in symbols) {
       var symbol = symbols[id];
@@ -307,8 +313,22 @@
             if(rc[1] == ex_row && rc[0] == ex_col)
               continue;  // this connection is to be ignored
           }
-          if(rc[1] == row && rc[0] == col)
+          if(rc[1] == row && rc[0] == col) {
+            if(simMode) {
+              for(var ri in imgobj.rules) {
+                var rule = imgobj.rules[ri];
+                ruleCalc.calcRule(rule,0.5,symbol);
+              }
+              for(var j = 0; j < imgobj.connections.length; j++) {
+                if(j == i)
+                  continue;  //dont do self
+                var pos2 = paperGlue.getImgConnectionPos(imgobj,symbol.raster,j);
+                var rc2 = pntToGrid(pos2);
+                tracePath(rc2[1],rc2[0],false,action);
+              }
+            }
             return imgobj.id;
+          }
         }
       } else {
         return null;
@@ -355,8 +375,53 @@
 
   }
 
-  globals.editPoint = editPoint;
+  //var sources = [];
+  var groundSymbols = [];
 
+  function setMode(mode) {
+    if(mode == 'run') {     // prepare for onFrame runtime
+      simMode = true;
+      // find all voltage sources
+      var symbols = paperGlue.getSymbols();
+      for(var id in symbols) {
+        var symbol = symbols[id];
+        var imgobj = symbol.src;
+        console.log("Check symbol:"+imgobj.id);
+        //if(imgobj.id.indexOf('Source') >= 0) {
+        //  sources.add(symbol);
+        //} else
+        if(imgobj.id == 'Grnd')
+          groundSymbols.add(symbol);
+        // reset all junctions to ground/neutral = 0.0V
+        if(imgobj.hasOwnProperty('connections')) {
+          symbol.nodes = [];
+          for(var i = 0; i < imgobj.connections.length; i++) {
+            symbol.nodes.push([0,0]);  // zero current and zero volts
+          }
+        }
+      }
+    } else {
+      simMode = false;
+    }
+  }
+
+  function lineState(r1,c1,r2,c2) {
+    //set color for current line voltage or current
+    col = '#ff00ff00';
+    highlight(r1,c1,r2,c2,col);
+  }
+
+  function onFrame(dt) { //call from paperGlue limited to 40mSec repeat
+    clearTraceHistory();
+    for(var gi in groundSymbols) {
+      var symbol = groundSymbols[si];
+      var rc = pntToGrid(symbol.raster.position);
+      tracePath(rc[1],rc[0],true,lineState);  // include initial point
+    }
+  }
+
+  globals.editPoint = editPoint;
+  globals.setMode = setMode;
   //window.globals.keyhandler = keyDown;  // requests paperglue to pass event here
 
   //console.log("Globals:");

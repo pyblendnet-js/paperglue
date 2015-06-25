@@ -20,6 +20,10 @@
         label: 'dragClones',
         propCall: paperGlue.getDragMode,  //getDragModeCall,
         callback: paperGlue.toggleDrag    //toggleDrag
+      },{
+        label: 'cursorMode',
+        propCall: paperGlue.getCursorMode,  //getDragModeCall,
+        callback: paperGlue.toggleCursorMode    //toggleDrag
       }
     ];
     var symbolConnectionsMenu = [
