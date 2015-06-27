@@ -29,7 +29,7 @@ function calcRule(rule, ease_fraction, symbol) {
       }
     } else if(alpha_patt.test(re)) {
       console.log("Item#"+ bi + " is alpha");
-      if(symbol.hasOwnProperty(re)) {
+      if(symbol.values.hasOwnProperty(re)) {
         if(bi === 0) {
           paraTarget = re;
           continue;

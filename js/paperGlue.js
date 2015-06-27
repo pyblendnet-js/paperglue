@@ -1585,7 +1585,7 @@
 			if (line_id < 0) { //this path doesn't exist
 				path.remove();
 			} else {
-				removeLine(line_id);
+				removeLine(line_id,true);
 			}
 			return -1; // invalid line id
 		}
@@ -1593,6 +1593,7 @@
 	}
 
 	function removeLine(id, record) {
+		console.log("Remove line id:"+ id + " record:" + record);
 		if (lineInstances.hasOwnProperty(id)) { // this path does exist
 			var line = lineInstances[id];
 			if (record) {
@@ -2179,11 +2180,11 @@
 				to_do.id = parseInt(to_do.id) + nextID;
 			if (to_do.id >= new_nextID)
 				new_nextID = to_do.id + 1;
+			if (to_do.hasOwnProperty('oldValue'))  //line delete has only oldValue
+				to_do.oldValue = parseLine(to_do.oldValue);
 			if (to_do.hasOwnProperty('pos')) {
 				console.log("Fix pos");
 				to_do.pos = parseLine(to_do.pos); // check for paper.js object JSON conversion problems
-				if (to_do.hasOwnProperty('oldValue'))
-					to_do.oldValue = parseLine(to_do.oldValue);
 			} else if (to_do.hasOwnProperty('rect')) {
 				console.log("Fix rect");
 				to_do.rect = parseRect(to_do.rect); // check for paper.js object JSON conversion problems
@@ -2252,14 +2253,14 @@
 	function removeLines() {
 		console.log("Removing lines:" + Object.keys(lineInstances).length);
 		for (var id in lineInstances) {
-			removeLine(id);
+			removeLine(id,false);  // do not record event
 		}
 	}
 
 	function removeSymbols() {
 		console.log("Removing images:" + Object.keys(symbolInstances).length);
 		for (var id in symbolInstances) {
-			symbolRemove(id);
+			symbolRemove(id,false);
 		}
 	}
 
@@ -2310,7 +2311,7 @@
 				}
 				var path = lineInstances[last_do.id].path;
 				if (!last_do.hasOwnProperty('oldValue') || !last_do.oldValue) { // no previous existance
-					removeLine(last_do.id);
+					removeLine(last_do.id,false);
 				} else {
 					path.firstSegment.point = last_do.oldValue[0];
 					path.lastSegment.point = last_do.oldValue[1];

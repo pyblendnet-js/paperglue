@@ -122,9 +122,13 @@
 
   function partImageLoaded(id,imgobj) {
     partList[id].imgobj = imgobj;
+    imgobj.connections = [];
     if(partList[id].para.hasOwnProperty("connections")) {
-      imgobj.connections = [];
-      var pins = partList[id].para.connections.list;
+      var pins;
+      if(partList[id].para.connections.hasOwnProperty('list'))
+        pins = partList[id].para.connections.list;
+      else
+        pins = [partList[id].para.connections];  // only one pin
       for(var i in pins) {
         var p = pins[i].pin;
         console.log("adding pin:"+p.num+"="+p.x+","+p.y);
@@ -142,6 +146,29 @@
       }
     } else
       alert(partList[id] + " has no connections yet");
+    imgobj.values = [];
+    if(partList[id].para.hasOwnProperty("values")) {
+      var plv = partList[id].para.values;
+      if(plv.hasOwnProperty('list')) {
+        for(var vi in plv.list)
+        imgobj.values.push(plv.list[vi].value);
+      } else
+        imgobj.values.push(plv.value);  // only one value
+    }
+    imgobj.rules = [];
+    if(partList[id].para.hasOwnProperty("rules")) {
+      var plr = partList[id].para.rules;
+      if(plr.hasOwnProperty('list')) {
+        for(var ri in plr.list) {
+          imgobj.rules.push(plr.list[ri].rule);
+        }
+      }
+      else
+        imgobj.rules.push(plr.rule);  // only one rule
+    }
+    console.log("Part has "+imgobj.connections.length + " connections");
+    console.log("Part has "+imgobj.values.length + " values");
+    console.log("Part has "+imgobj.rules.length + " rules");
   }
 
   function drawStripBoard(spacing, length, width) {

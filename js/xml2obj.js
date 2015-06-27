@@ -73,7 +73,7 @@ function loadXML(txt, inner_hash, attrib_hash) {
       } else {
         var values = {};
         tag_obj.obj[nm] = values;
-        if(tag_obj.tag.length > 1) {
+        if(tag_obj.tag.length > 1) {  // tag has attributes
           //console.log("Attrib:"+tag_obj.tag);
           var attr = {};
           for(var ai = 1; ai < tag_obj.tag.length; ai++) {
@@ -112,7 +112,7 @@ function loadXML(txt, inner_hash, attrib_hash) {
             }
           }
         }
-        if(mcount === 1) {
+        if(mcount === 1) {  // only one item so need for list key
           for(var onm in tag_obj.list) {
             var om = tag_obj.list[onm].obj;
             var k = Object.keys(om)[0];

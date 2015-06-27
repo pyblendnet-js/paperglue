@@ -131,7 +131,7 @@
 		}
 
 		function loadFile(path, subpath, file_parser) {
-	    console.log("Load");
+	    console.log("Load:"+path+"/"+subpath);
 			if(typeof file_parser === 'function')
 			  fileParser = file_parser;
 	    console.log(window.location.protocol);

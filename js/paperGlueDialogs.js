@@ -755,10 +755,14 @@
   }
 
   function saveRecord(path, subpath) {
-    console.log("Try to save");
-    console.log("Globals:" + Object.keys(globals));
-    if (typeof nodeComms !== 'undefined')
-      console.log("SendData:", typeof nodeComms.sendData);
+    //console.log("Try to save");
+    //console.log("Globals:" + Object.keys(globals));
+    if(typeof path === 'undefined')
+      path = "";
+    if(typeof subpath === 'undefined')
+      subpath = "doRecord.pgl";
+    //if (typeof nodeComms !== 'undefined')
+    //  console.log("SendData:", typeof nodeComms.sendData);
     var jdata = paperGlue.buildRedoData();
     nodeComms.saveFile(jdata, path, subpath);
   }
@@ -770,6 +774,10 @@
   }
 
   function loadRecord(path, subpath) {
+    if(typeof path === 'undefined')
+      path = "";
+    if(typeof subpath === 'undefined')
+      subpath = "doRecord.pgl";
     nodeComms.setFileParser(paperGlue.parseRecord);
     nodeComms.loadFile(path, subpath);
   }
