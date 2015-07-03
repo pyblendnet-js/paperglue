@@ -674,7 +674,8 @@
               else if (typeof subpath !== 'undefined') // should be
                 id = subpath; // use image file name as id
               console.log("Load image file:" + path);
-              paperGlue.loadSingleImage(path, id, {pos:contextMenu.getEventPos()});
+              paperGlue.loadSingleImage(path, id, {pos:contextMenu.getEventPos().substract(view.center)});
+              //console.log("Center:",view.center);
               return;
             }
             if (ip.indexOf(path) === 0) {
@@ -730,7 +731,7 @@
     } else { // assume we have a path to an image provided by listFile via myscript fileSelectDialog
       // see workspace = 'project' in server.js
       var full_path = "project/" + path + "/" + subpath;
-      paperGlue.loadSingleImage(full_path, subpath, {pos:contextMenu.getEventPos()});
+      paperGlue.loadSingleImage(full_path, subpath, {pos:contextMenu.getEventPos().subtract(view.center)});
     }
   }
 

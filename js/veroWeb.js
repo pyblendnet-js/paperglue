@@ -54,7 +54,7 @@
     paperGlue.setSnap([gridOffset, gridOffset, gridStep, gridStep]);  // x,y pre-offset and x,y grid
     paperGlue.showAreas();
     menusToAppend = {
-      file:partsMenu
+      defaultContextMenu:partsMenu
     };
     contextMenu.append(menusToAppend);
     //paperGlue.closeDialog = dialog.closeDialog;
@@ -117,19 +117,24 @@
     console.log(JSON.stringify(part));
     partList[part.name] = {para:part};
     paperGlue.loadSingleImage("project/"+part_path + "/images/"+part.imageName,part.name,
-    {pos:contextMenu.getEventPos(),onLoad:partImageLoaded});
+    {pos:paperGlue.viewToReal(contextMenu.getEventPos()),onLoad:partImageLoaded});
   }
 
   function partImageLoaded(id,imgobj) {
+    while(!partList.hasOwnProperty(id) && id[id.length-1] === 'C')
+      id = id.slice(0,-1);
     partList[id].imgobj = imgobj;
     imgobj.connections = [];
+    imgobj.values = {};
     if(partList[id].para.hasOwnProperty("connections")) {
       var pins;
+      var nodes = [];
       if(partList[id].para.connections.hasOwnProperty('list'))
         pins = partList[id].para.connections.list;
       else
         pins = [partList[id].para.connections];  // only one pin
       for(var i in pins) {
+        nodes.push([0,0]);
         var p = pins[i].pin;
         console.log("adding pin:"+p.num+"="+p.x+","+p.y);
         //console.log(typeof p.x);
@@ -144,16 +149,20 @@
         console.log("Type:"+typeof imgobj.connections[i]);
         //console.log(imgobj.connections[i].pos);
       }
+      imgobj.values.nodes = nodes;
     } else
       alert(partList[id] + " has no connections yet");
-    imgobj.values = [];
     if(partList[id].para.hasOwnProperty("values")) {
       var plv = partList[id].para.values;
       if(plv.hasOwnProperty('list')) {
-        for(var vi in plv.list)
-        imgobj.values.push(plv.list[vi].value);
-      } else
-        imgobj.values.push(plv.value);  // only one value
+        for(var vi in plv.list) {
+          console.log("plv.list[vi]:"+plv.list[vi]);
+          //imgobj.values.push(plv.list[vi].value);
+          parseValues(imgobj.values,plv.list[vi]);
+        }
+      } else {
+        parseValues(imgobj.values,plv);
+      }
     }
     imgobj.rules = [];
     if(partList[id].para.hasOwnProperty("rules")) {
@@ -167,8 +176,25 @@
         imgobj.rules.push(plr.rule);  // only one rule
     }
     console.log("Part has "+imgobj.connections.length + " connections");
-    console.log("Part has "+imgobj.values.length + " values");
+    console.log("Part has "+Object.keys(imgobj.values).length + " values");
+    console.log(Object.keys(imgobj.values));
     console.log("Part has "+imgobj.rules.length + " rules");
+  }
+
+  function parseValues(obj,tag) {
+    if(tag.hasOwnProperty('value')) {
+      var val = tag.value;
+      if(val.hasOwnProperty('attrib')) {
+        var atr = val.attrib;
+        if(atr.hasOwnProperty('name')) {
+          console.log("plv:"+Object.keys(atr));
+          var v = "0";
+          if(atr.hasOwnProperty('default'))
+            v = atr.default;  // leave as default
+          obj[atr.name] = v;  // only one value
+        }
+      }
+    }
   }
 
   function drawStripBoard(spacing, length, width) {
@@ -230,6 +256,8 @@
   function editPoint(pos) {
     //console.log("Highlight:"+event.point);
     var rc = pntToGrid(pos);
+    if(rc[0] < 0 || rc[0] >= rows || rc[1] < 0 || rc[1] >= columns)
+      return;  // outof limits
     //console.log("Highlight:"+rc);
     clearHighLines();
     clearTraceHistory();
@@ -274,8 +302,15 @@
   // trace path of conductivity from point at row,col
   // if inc_start then include scan of the first point
   // when a path is included perform action
+
   function tracePath(row,col,inc_start,action) {
     // look for break(s) on this track
+    if(col < 0 || col >= columns || row < 0 || row >= rows) {
+      // object is outside of strip board so check external junctions
+      console.log("Check point only");
+      checkPnt(row,col,action);
+      return;
+    }
     var left_lim = traceDir(row,col-1,-1,-1,action);
     var col_r = col;
     if(!inc_start)  // don't look at the start point
@@ -286,7 +321,7 @@
   }
 
   function traceDir(row,col,dir,lim,action) {
-    //console.log("Trace from "+row+","+col+" in dir:"+dir+" to "+lim);
+    console.log("Trace from "+row+","+col+" in dir:"+dir+" to "+lim);
     for(var c = col; c != lim; c += dir) {
       var rv = checkPnt(row,c,action);
       if(rv == c)
@@ -302,6 +337,8 @@
         return col;  // this point already down so break recursion
       tracePnts.push(ti);
       var j = findJoint(row,col,er,ec,action);
+      if(j !== null)
+        console.log("Found joint:" + j + " at" + col + "," + row);
       if(j == 'break')
         return col;  // move one back
       // if(isResistive(j)) { // resistor
@@ -310,7 +347,7 @@
       // }
       var lrc = findLine(row,col,er,ec);
       if(!!lrc) {
-        //console.log("Found line from "+c+","+row+" to "+lrc);
+        console.log("Found line from "+col+","+row+" to "+lrc);
         action(row,col,lrc[1],lrc[0]);  //do the line
         if(lrc[1] >= 0 && lrc[1] < rows && lrc[0] >= 0 && lrc[1] < columns)
           tracePath(lrc[1],lrc[0],false,action);  //this time do not include initial point
@@ -336,19 +373,28 @@
         for(var i = 0; i < imgobj.connections.length; i++) {
           var pos = paperGlue.getImgConnectionPos(imgobj,symbol.raster,i);
           var rc = pntToGrid(pos);
+          console.log("Compare " + rc);
           if(typeof ex_row !== 'undefined') {
             if(rc[1] == ex_row && rc[0] == ex_col)
               continue;  // this connection is to be ignored
           }
           if(rc[1] == row && rc[0] == col) {
+            console.log("Connection with" + imgobj.id);
             if(simMode) {
+              var depend_on = [];
               for(var ri in imgobj.rules) {
                 var rule = imgobj.rules[ri];
-                ruleCalc.calcRule(rule,0.5,symbol);
+                console.log("Apply rule:" + rule);
+                var d = ruleCalc.calcRule(rule,i,0.5,symbol.values);
+                if(d >= 0 && depend_on.indexOf(d) >= 0)
+                  depend_on.push(d);
               }
               for(var j = 0; j < imgobj.connections.length; j++) {
                 if(j == i)
                   continue;  //dont do self
+                // look in rules to see if j has some dependance on i
+                if(depend_on.indexOf(j) < 0)
+                  continue;  // this output is not dependant on input i
                 var pos2 = paperGlue.getImgConnectionPos(imgobj,symbol.raster,j);
                 var rc2 = pntToGrid(pos2);
                 tracePath(rc2[1],rc2[0],false,action);
@@ -361,10 +407,11 @@
         return null;
       }
     }
+    return null;
   }
 
   function findLine(row,col,ex_row,ex_col) {
-    console.log("Exclude "+ex_row+","+ex_col);
+    //console.log("Exclude "+ex_row+","+ex_col);
     var lines = paperGlue.getLines();
     //console.log("Check:"+col+","+row);
     for(var id in lines) {
@@ -417,8 +464,10 @@
         //if(imgobj.id.indexOf('Source') >= 0) {
         //  sources.add(symbol);
         //} else
-        if(imgobj.id == 'Grnd')
-          groundSymbols.add(symbol);
+        if(imgobj.id == 'Grnd') {
+          console.log("Found ground symbol");
+          groundSymbols.push(symbol);
+        }
         // reset all junctions to ground/neutral = 0.0V
         if(imgobj.hasOwnProperty('connections')) {
           symbol.nodes = [];
@@ -427,8 +476,11 @@
           }
         }
       }
+      frameFree = true;
+      globals.onFrame = onFrame;
     } else {
       simMode = false;
+      globals.onFrame = null;
     }
   }
 
@@ -438,11 +490,19 @@
     highlight(r1,c1,r2,c2,col);
   }
 
+  var frameFree = true;
+
   function onFrame(dt) { //call from paperGlue limited to 40mSec repeat
+    if(!frameFree)
+      return;
+    frameFree = false;
+    console.log("On frame " + dt);
     clearTraceHistory();
     for(var gi in groundSymbols) {
-      var symbol = groundSymbols[si];
-      var rc = pntToGrid(symbol.raster.position);
+      var symbol = groundSymbols[gi];
+      var pos = paperGlue.getImgConnectionPos(imgobj,symbol.raster,0);
+      var rc = pntToGrid(pos);
+      console.log("Frame trace at" + rc);
       tracePath(rc[1],rc[0],true,lineState);  // include initial point
     }
   }

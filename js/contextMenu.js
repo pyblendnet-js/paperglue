@@ -156,10 +156,10 @@
 	function append(menus_to_append) {
 		// console.log("ThisVars:"+Object.keys(this));
 		// console.log("WindowVars:"+Object.keys(window));
-		for (var m in menus_to_append) {
+		for (var m in menus_to_append) {  //scan through menu names
 			var dm = defaultContextMenu;
 			if (m.length > 0 && m !== 'defaultContextMenu') {
-				dm = findMenu(m);
+				dm = findMenu(m);  // look for current menu
 				if (!dm) {
           console.log("m:"+m);
 					alert("Could not find default menu " + m + " to append");

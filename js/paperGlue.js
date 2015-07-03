@@ -94,12 +94,22 @@
 
   var imageLoadsPending = 0;  // try to keep track of pending loads
 	var onImagesLoaded;  // callback when image loading has completed
+	var homeZoom;  // initialised in init
+	var homeCenter;
 
 	function cloneShallow(obj) {
 		var ro = {};
 		for (var i in obj)
 			ro[i] = obj[i];
 		return ro;
+	}
+
+	function viewToReal(pos) {
+		//console.log("ViewToReal:",pos);
+		//console.log(view.center, homeCenter, view.zoom);
+		var p = pos.subtract(homeCenter).divide(view.zoom).add(view.center);
+		//console.log("ViewToReal:",p);
+		return p;
 	}
 
 	/** Set quantum [x,y] for snap on lines and images
@@ -230,6 +240,8 @@
 		body = document.getElementById("body");
 		paper.install(window);
 		paper.setup('myCanvas');
+		homeZoom = view.zoom;
+		homeCenter = view.center;
 		importDefaults.pos = view.center;
 		view.onFrame = onFrame;
 		var tool = new Tool();
@@ -349,11 +361,11 @@
   function getImgConnectionPos(imgobj,raster,i) {
 		var tp = new Point(imgobj.size.width/2,imgobj.size.height/2);
   	var zp = imgobj.connections[i].pos;
-	  console.log("Scaled connection:" + zp + " Scale:" + imgobj.scale);
+	  //console.log("Scaled connection:" + zp + " Scale:" + imgobj.scale);
 	  var rp = zp.subtract(tp);
 	  if (imgobj.hasOwnProperty('scale'))
 	  	rp = rp.multiply(imgobj.scale);
-	  console.log("rp:" + rp + " tp:" + tp);
+	  //console.log("rp:" + rp + " tp:" + tp);
 	  return raster.position.add(rp.rotate(raster.rotation));
   }
 
@@ -551,9 +563,9 @@
 			var imgobj = images_to_load.pop();
 			//console.log("imgobj:"+imgobj);
 			imgobj.initialProp = Object.keys(imgobj);
-      if (imagesLoaded.hasOwnProperty(imgobj.id)) {
+      while(imagesLoaded.hasOwnProperty(imgobj.id)) {
 				if (confirm("Image name "+imgobj.id+ " is already loaded. Add 'C' to id string or cancel to reload?")) {
-					imgobj.id += 'C';
+					imgobj.id += 'C';  // keep doing this till we get a unique name
 					// note: images are loaded from three different events:
 					// initApp in myScript.js calls with array of required images
 					// initApp then calls loadDoRec which will look for a dorec.js
@@ -563,6 +575,7 @@
 				} else {
 					var previous = imagesLoaded[imgobj.id];
 					previous.raster.remove(); // assume this is a reload
+					break;
 				}
 			}
 			imagesLoaded[imgobj.id] = imgobj; // record master images
@@ -607,10 +620,10 @@
 		if (imgobj.hasOwnProperty('scale')) {
 			imgobj.raster.scale(imgobj.scale);
 		}
-		console.log("Is image a symbol:"+imgobj.isSymbol);
+		//console.log("Is image a symbol:"+imgobj.isSymbol);
 		if (imgobj.hasOwnProperty('isSymbol')) { // this image can appear many times as instances
 			if (imgobj.isSymbol === true) { // needs true comparison
-				console.log("Image "+imgobj.id+" is symbol");
+				//console.log("Image "+imgobj.id+" is symbol");
 				imgobj.symbol = new Symbol(imgobj.raster);
 				imgobj.raster.remove(); //dont need this cluttering the document
 				imgobj.raster = imgobj.symbol.place();
@@ -618,11 +631,11 @@
 			}
 		}
 		if (imgobj.hasOwnProperty('pos') && !!imgobj.pos) { // a position given so it will be visible
-			console.log("Pos:" + imgobj.pos);
+			//console.log("Pos:" + imgobj.pos);
 			imgobj.raster.position = imgobj.pos;
 		} else { // no position so dont show yet
 			imgobj.raster.remove();
-			console.log("don't need this cluttering the document");
+			//console.log("don't need this cluttering the document");
 		}
 		var listen_to_mouse = imgobj.hasOwnProperty('contextMenu');
 		if (imgobj.hasOwnProperty('dragClone')) { // if not defined then assume false
@@ -1833,16 +1846,16 @@
 			else
 				grad = view.size.multiply(0.025);
 			if (!!delta) {
-				console.log("Center:" + view.center);
-				console.log("delta:" + delta);
-				console.log("grad:" + grad);
+				//console.log("Center:" + view.center);
+				//console.log("delta:" + delta);
+				//console.log("grad:" + grad);
 				var moveby = [Math.round(delta[0] * grad.width), Math.round(
 					delta[1] *
 					grad
 					.height)];
 				console.log("moveby:" + moveby);
 				view.center = view.center.add(moveby);
-				console.log("Center:" + view.center);
+				//console.log("Center:" + view.center);
 			}
 		}
 		writeEditStatus();
@@ -2026,8 +2039,9 @@
 		for (var id in imagesLoaded) {
 			var im = imagesLoaded[id];
 			var img = {};
+			var save_exclude = ['loadedProp','symbol','raster'];
 			for (var ik in im) {
-				if (ik === 'loadedProp')
+				if(save_exclude.indexOf(ik) >= 0)
 					continue;
 				console.log(ik);
 				console.log("Loaded:" + im.loadedProp.indexOf(ik));
@@ -2139,7 +2153,7 @@
 				console.log("This image already loaded");
 				continue;
 			}
-			var imgobj = parseImageObj(imglist[ik]);
+			var imgobj = parseObj(imglist[ik]);
 			imgs_to_load.push(imgobj);
 		}
 		if(imgs_to_load.length > 0) {
@@ -2183,19 +2197,19 @@
 			if (to_do.hasOwnProperty('oldValue'))  //line delete has only oldValue
 				to_do.oldValue = parseLine(to_do.oldValue);
 			if (to_do.hasOwnProperty('pos')) {
-				console.log("Fix pos");
+				//console.log("Fix pos");
 				to_do.pos = parseLine(to_do.pos); // check for paper.js object JSON conversion problems
 			} else if (to_do.hasOwnProperty('rect')) {
-				console.log("Fix rect");
+				//console.log("Fix rect");
 				to_do.rect = parseRect(to_do.rect); // check for paper.js object JSON conversion problems
 			} else if (to_do.hasOwnProperty('size')) {
-				console.log("Fix size");
+				//console.log("Fix size");
 				to_do.size = parseRect(to_do.size); // check for paper.js object JSON conversion problems
 			}
 			doRecord.push(to_do);
 		}
 		nextID = new_nextID;
-		console.log("NextID will be " + nextID);
+		//console.log("NextID will be " + nextID);
 	}
 
 
@@ -2237,16 +2251,40 @@
 			return ord; // no change
 	}
 
-	function parseImageObj(obj) {
+	function parseObj(obj) {
 		// correct all the JSON parsed points in the obj
+		// walk object looking for paper object requiring conversion
 		var nobj = {};
 		for (var k in obj) {
-			if (Array.isArray(obj[k]))
-				nobj[k] = parsePoint(obj[k]);
-			else
-				nobj[k] = obj[k];
+			var obj1 = obj[k];
+			//console.log("Parse item "+ k + " type:" + typeof obj1);
+			if (Array.isArray(obj1)) {
+				//console.log("Parse array " + k + " keys:" + Object.keys(obj1));
+				if(obj1[0] == 'Size' || obj1[0] == 'Point')
+  				nobj[k] = parsePoint(obj1);
+				else {
+					var narray = [];
+					for (var k2 in obj1) {
+						var obj2 = obj1[k2];
+						//console.log("Parse array item "+k2+ " type "+ typeof obj2);
+						if(typeof obj2 === 'object')
+						  narray.push(parseObj(obj2));
+						else
+						  narray.push(obj2);
+						//console.log("Add to array");
+					}
+					nobj[k] = narray;
+					//console.log("Array " + k + " has " + narray.length + "items");
+  			}
+			}
+			else if(typeof obj1 === 'object') {
+			  //console.log("Parse obj " + k + " keys:" + Object.keys(obj[k]));
+				nobj[k] = parseObj(obj1);
+			} else {
+				nobj[k] = obj1;
+			}
 		}
-		console.log(nobj);
+		//console.log(nobj);
 		return nobj;
 	}
 
@@ -3191,6 +3229,9 @@
 			return;
 		}
 		lastFlashTime = event.time;
+		if(globals.hasOwnProperty('onFrame') && typeof globals.onFrame === 'function')
+			globals.onFrame(dt);
+
 		var img, id;
 		if (editMode) {
 			for (id in imagesLoaded) {
@@ -3216,8 +3257,6 @@
 				img.flashUp = flashImg(img, img.flashUp, flash_prop);
 			}
 		} else {
-			if(globals.hasOwnProperty(onFrame))
-			  globals.onFrame(dt);
 			for (id in flashingImages) {
 				img = flashingImages[id];
 				var flash_up = true;
@@ -3378,6 +3417,7 @@
 	var exports = {
 		init: init,
 		rasterize: rasterize,
+		viewToReal:viewToReal,
 		setCustomProps: setCustomProps,
 		loadImages: loadImages,
 		loadSingleImage: loadSingleImage,
