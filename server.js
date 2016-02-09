@@ -191,6 +191,8 @@ http.createServer(function(req,res){
     var ext = path.extname(url_path);
     if( ext == ".js")
       content_type = 'text/javascript';
+    else if( ext == ".css")
+      content_type = 'text/css'; 
     else if(ext == "png")
         content_type = 'image/png';
     else if(ext == "jpg")

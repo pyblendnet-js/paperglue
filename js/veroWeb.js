@@ -114,7 +114,7 @@
   function partParse(data) {
     var obj = loadXML(data);
     var part = obj.part;
-    console.log(JSON.stringify(part));
+    //console.log(JSON.stringify(part));
     partList[part.name] = {para:part};
     paperGlue.loadSingleImage("project/"+part_path + "/images/"+part.imageName,part.name,
     {pos:paperGlue.viewToReal(contextMenu.getEventPos()),onLoad:partImageLoaded});
@@ -128,13 +128,11 @@
     imgobj.values = {};
     if(partList[id].para.hasOwnProperty("connections")) {
       var pins;
-      var nodes = [];
       if(partList[id].para.connections.hasOwnProperty('list'))
         pins = partList[id].para.connections.list;
       else
         pins = [partList[id].para.connections];  // only one pin
       for(var i in pins) {
-        nodes.push([0,0]);
         var p = pins[i].pin;
         console.log("adding pin:"+p.num+"="+p.x+","+p.y);
         //console.log(typeof p.x);
@@ -149,7 +147,6 @@
         console.log("Type:"+typeof imgobj.connections[i]);
         //console.log(imgobj.connections[i].pos);
       }
-      imgobj.values.nodes = nodes;
     } else
       alert(partList[id] + " has no connections yet");
     if(partList[id].para.hasOwnProperty("values")) {
@@ -157,7 +154,6 @@
       if(plv.hasOwnProperty('list')) {
         for(var vi in plv.list) {
           console.log("plv.list[vi]:"+plv.list[vi]);
-          //imgobj.values.push(plv.list[vi].value);
           parseValues(imgobj.values,plv.list[vi]);
         }
       } else {
@@ -178,6 +174,8 @@
     console.log("Part has "+imgobj.connections.length + " connections");
     console.log("Part has "+Object.keys(imgobj.values).length + " values");
     console.log(Object.keys(imgobj.values));
+    if(imgobj.values.hasOwnProperty('nodes'))  // for preset values - rarely used
+      console.log(Object.keys(imgobj.values.nodes));
     console.log("Part has "+imgobj.rules.length + " rules");
   }
 
@@ -292,8 +290,11 @@
     highLines.push(lineSelected);
   }
 
-  var simMode = false;
+  var simMode = 0;  // 0 = bus&link, 1 = volt, 2 = amp
   var tracePnts = [];
+  var overflow = false;
+  var overflowVoltage = 10.0;  //100.0;  // 100V on a strip board - unlikely
+  var overflowCurrent = 5.0;  //50.0;   // 50A on a strip board even less likely
 
   function clearTraceHistory() {
     tracePnts = [];
@@ -316,12 +317,14 @@
     if(!inc_start)  // don't look at the start point
       col_r += 1;
     var right_lim = traceDir(row,col_r,1,columns+1,action);
-    if(left_lim < right_lim)
+    if(left_lim < right_lim) {
       action(row,left_lim,row,right_lim);
+    }
   }
 
   function traceDir(row,col,dir,lim,action) {
-    console.log("Trace from "+row+","+col+" in dir:"+dir+" to "+lim);
+    //console.log("Trace from "+row+","+col+" in dir:"+dir+" to "+lim);
+    jointDir = dir;
     for(var c = col; c != lim; c += dir) {
       var rv = checkPnt(row,c,action);
       if(rv == c)
@@ -337,8 +340,8 @@
         return col;  // this point already down so break recursion
       tracePnts.push(ti);
       var j = findJoint(row,col,er,ec,action);
-      if(j !== null)
-        console.log("Found joint:" + j + " at" + col + "," + row);
+      //if(j !== null)
+        //console.log("Found joint:" + j + " at " + col + "," + row);
       if(j == 'break')
         return col;  // move one back
       // if(isResistive(j)) { // resistor
@@ -348,10 +351,17 @@
       var lrc = findLine(row,col,er,ec);
       if(!!lrc) {
         console.log("Found line from "+col+","+row+" to "+lrc);
+        //console.log("Joints:"+JSON.stringify(joints));
         action(row,col,lrc[1],lrc[0]);  //do the line
-        if(lrc[1] >= 0 && lrc[1] < rows && lrc[0] >= 0 && lrc[1] < columns)
+        if(lrc[1] >= 0 && lrc[1] < rows && lrc[0] >= 0 && lrc[1] < columns) {
+          //console.log("Level:"+jointStack.length+" Joints before link:"+JSON.stringify(joints));
+          jointStack.push(joints);
+          joints = [lineNodes[jointLine][1-jointLineEnd]]; // other end of line
+          //console.log("Level:"+jointStack.length+" Joints at link:"+JSON.stringify(joints));
           tracePath(lrc[1],lrc[0],false,action);  //this time do not include initial point
-        else
+          joints = jointStack.pop();
+          //console.log("Level:"+jointStack.length+" Joints after link:"+JSON.stringify(joints));
+        } else
           checkPnt(lrc[1],lrc[0],action,row,col);  //exclude starting point
       }
 
@@ -362,7 +372,7 @@
     for(var id in symbols) {
       var symbol = symbols[id];
       var imgobj = symbol.src;
-      console.log("Check symbol:"+imgobj.id);
+      //console.log("Check symbol:"+imgobj.id);
       if(imgobj.id === 'Break') { // special instance - has no connection
         var rcx = pntToGrid(symbol.raster.position);
         if(rcx[1] == row && rcx[0] == col)
@@ -371,35 +381,57 @@
       }
       if(imgobj.hasOwnProperty('connections')) {
         for(var i = 0; i < imgobj.connections.length; i++) {
+          console.log("@2:" & i);
           var pos = paperGlue.getImgConnectionPos(imgobj,symbol.raster,i);
           var rc = pntToGrid(pos);
-          console.log("Compare " + rc);
+          //console.log("Compare " + rc);
           if(typeof ex_row !== 'undefined') {
             if(rc[1] == ex_row && rc[0] == ex_col)
               continue;  // this connection is to be ignored
           }
           if(rc[1] == row && rc[0] == col) {
-            console.log("Connection with" + imgobj.id);
-            if(simMode) {
+            console.log("Connection with " + imgobj.id);
+            if(simMode > 0) {
+              if(jointDir < 0)  // put at front
+                joints.unshift(symbol.values.nodes[i]);
+              else              // put at rear of joints
+                joints.push(symbol.values.nodes[i]);
+              //console.log("Nodes:"+JSON.stringify(symbol.values.nodes));
+              //console.log("Level:"+jointStack.length+" Joints before rules:"+JSON.stringify(joints));
+              //console.log("Joints at joint:"+JSON.stringify(joints));
               var depend_on = [];
+              var d;
               for(var ri in imgobj.rules) {
                 var rule = imgobj.rules[ri];
                 console.log("Apply rule:" + rule);
-                var d = ruleCalc.calcRule(rule,i,0.5,symbol.values);
-                if(d >= 0 && depend_on.indexOf(d) >= 0)
-                  depend_on.push(d);
+                d = ruleCalc.calcRule(rule,0.1,symbol.values,i);
+                // only return nodes as d that are dependant on node i
+                if(d >= 0) {
+                  //console.log("Node values:"+JSON.stringify(symbol.values.nodes));
+                  if((Math.abs(symbol.values.nodes[d][0]) > overflowVoltage) || (Math.abs(symbol.values.nodes[d][1]) > overflowCurrent)) {
+                    overflow = true;
+                    return null;
+                  }
+                  // multi rules may have dependant as potential and current
+                  // only want to process dependant nodes once - so
+                  if(depend_on.indexOf(d) < 0)
+                    depend_on.push(d);
+                }
               }
-              for(var j = 0; j < imgobj.connections.length; j++) {
-                if(j == i)
-                  continue;  //dont do self
-                // look in rules to see if j has some dependance on i
-                if(depend_on.indexOf(j) < 0)
-                  continue;  // this output is not dependant on input i
-                var pos2 = paperGlue.getImgConnectionPos(imgobj,symbol.raster,j);
+              // now process dependant nodes
+              for(var di in depend_on)
+              {
+                d = depend_on[di];
+                console.log("@3:" & d);
+                var pos2 = paperGlue.getImgConnectionPos(imgobj,symbol.raster,d);
                 var rc2 = pntToGrid(pos2);
+                jointStack.push(joints);
+                joints = [symbol.values.nodes[d]];
                 tracePath(rc2[1],rc2[0],false,action);
+                joints = jointStack.pop();
               }
             }
+            //console.log("Level:"+jointStack.length+" Joints after joint:"+JSON.stringify(joints));
             return imgobj.id;
           }
         }
@@ -429,6 +461,7 @@
             continue;
           }
         }
+        updateLineNode(id,0);
         return rc2;
       }
       //console.log("End2:"+rc);
@@ -439,26 +472,70 @@
             continue;
           }
         }
+        updateLineNode(id,1);
         return rc1;
       }
     }
     return null;
   }
 
-  function isResistive(id) {
+  function updateLineNode(id,end) {
+    if(!lineNodes.hasOwnProperty(id))  // only make if doesn't exist
+      lineNodes[id] = [[0,0,1E6],[0,0,1E6]];  // a node for either end
+      // each node has voltage, current out and impedance
+    else { // equalise
+      var ln = lineNodes[id];
+      var ln0 = ln[0];
+      var ln1 = ln[1];
 
+      var v;
+      if(ln0[2] === 0 && ln1[2] === 0 && ln0[0] !== ln1[0])
+        console.error("Link impedance fault");
+      else if (ln0[2] === 0) {  // zero impedance line
+        v = ln0[0];
+        ln1[2] = 0;
+      } else if (ln1[2] === 0) {  // zero impedance line
+        v = ln1[0];
+        ln0[2] = 0;
+      } else {
+        v = (ln0[0]/ln0[2] + ln1[0]/ln1[2])*(ln0[2]+ln1[2])/2.0;  // take average voltage for both ends based on impedance
+      }
+      ln0[0] = v;
+      ln1[0] = v;
+      // note: current is positive if sourcing, negative of sinking
+      var i = (ln0[1] - ln1[1])/2.0;  // take average current but reversed
+      ln0[1] = i;  // if one end sources
+      ln1[1] = -i;  // then the other end must be a sink
+    }
+    jointLine = id;
+    jointLineEnd = end;
+    if(jointDir < 0)
+      joints.unshift(lineNodes[id][end]);
+    else
+      joints.push(lineNodes[id][end]);
   }
 
   //var sources = [];
+  var maxPotential = 12.0;  // change this if higher voltage source found
+  var minPotential = -12.0;
   var groundSymbols = [];
+  var lineNodes = {};  // line voltages,currents (rem current reverses at one end) and impedances
+  var jointLine = null;  // set in findLine for sim mode
+  var jointLineEnd;  // 0 for one dir and 1 for other end
+  var joints = [];  //links to [potential,current] nodes
+  var jointDir = -1; //determines if joint is added to front or rear
+  var jointStack = [];  // pushed when following connection (with dir added)
 
   function setMode(mode) {
     if(mode == 'run') {     // prepare for onFrame runtime
-      simMode = true;
+      simMode = 1;
+      overflow = false;  // assuming this happened on the last sim
       // find all voltage sources
       var symbols = paperGlue.getSymbols();
       for(var id in symbols) {
         var symbol = symbols[id];
+        if(!symbol.hasOwnProperty('values'))
+          symbol.values = {};  //usually copied from imgobj as creation
         var imgobj = symbol.src;
         console.log("Check symbol:"+imgobj.id);
         //if(imgobj.id.indexOf('Source') >= 0) {
@@ -470,24 +547,73 @@
         }
         // reset all junctions to ground/neutral = 0.0V
         if(imgobj.hasOwnProperty('connections')) {
-          symbol.nodes = [];
+          symbol.values.nodes = [];
           for(var i = 0; i < imgobj.connections.length; i++) {
-            symbol.nodes.push([0,0]);  // zero current and zero volts
+            symbol.values.nodes.push([0,0,1E6]);  // zero volts, zero current and 1Meg impedance
           }
+          //console.log("Initial symbol nodes:"+JSON.stringify(symbol.values.nodes));
         }
       }
       frameFree = true;
       globals.onFrame = onFrame;
     } else {
-      simMode = false;
+      simMode = 0;  // trace only bus and link
       globals.onFrame = null;
     }
   }
 
   function lineState(r1,c1,r2,c2) {
     //set color for current line voltage or current
-    col = '#ff00ff00';
-    highlight(r1,c1,r2,c2,col);
+    if(joints.length === 0) {  // should be at least earth connection
+      console.error("No joints?");
+      highlight(r1,c1,r2,c2,col);
+    } else {
+      //console.log("line state joints:"+JSON.stringify(joints));
+      var pot = 0;  // sum all the potentials
+      var potdiv = 0;  // sum of inverse impedances
+      var cur = 0;
+      var minimp = 1E100;  // find min impedance
+      var minci = 0;
+      for(var ci in joints)  {
+        var jt = joints[ci];
+        if(jt[0] > maxPotential)
+          maxPotential = jt[0];
+        if(jt[0] < minPotential)
+          minPotential = jt[0];
+        var revimp = 1E100;
+        if(jt[2] > 0)
+          revimp = 1.0/jt[2];
+        pot += jt[0]*revimp;
+        potdiv += revimp;
+        cur += jt[1];  // assumes joints are in a row
+        if(jt[2] < minimp) {
+          minimp = jt[2];
+          minci = ci;
+        }
+      }
+      // cur should be zero - give difference to min impedance joint
+      joints[minci][1] += cur;
+      pot /= potdiv;  // average potentials
+      for(ci in joints) {
+        joints[ci][0] = pot;  // set all joints to average
+        joints[ci][2] = minimp;
+      }
+      //console.log("Pot:"+pot);
+      var fpot;
+      if(pot >= 0)
+        fpot = Math.round(pot * 255 / maxPotential);
+      else
+        fpot = Math.round(pot * 255 / minPotential);
+      fpot = Math.min(255,fpot);
+      var hpot = fpot.toString(16);
+      var ipot = (255-fpot).toString(16);
+      //console.log("fpot:"+fpot);
+      if(pot >= 0)  // positives range to red
+        col = "rgb(" + fpot + ","+ (255-fpot) + ",00)";
+      else  // negatives range to blue
+        col = "rgb(00," + (255-fpot) +","+ fpot+")";
+      highlight(r1,c1,r2,c2,col);
+    }
   }
 
   var frameFree = true;
@@ -496,15 +622,25 @@
     if(!frameFree)
       return;
     frameFree = false;
-    console.log("On frame " + dt);
+    console.log("On frame " + dt.toFixed(2));
     clearTraceHistory();
+    clearHighLines();
+    joints = [];
+    jointStack = [];
     for(var gi in groundSymbols) {
       var symbol = groundSymbols[gi];
+      console.log("#1:" & JSON.stringify(imgobj.connections));
       var pos = paperGlue.getImgConnectionPos(imgobj,symbol.raster,0);
       var rc = pntToGrid(pos);
       console.log("Frame trace at" + rc);
       tracePath(rc[1],rc[0],true,lineState);  // include initial point
+      if(overflow) {
+        console.log("Overflow");
+        break;
+      }
     }
+    if(!overflow)
+      frameFree = true;  // if commented then one frame only
   }
 
   globals.editPoint = editPoint;

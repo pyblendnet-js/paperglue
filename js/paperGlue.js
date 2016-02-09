@@ -331,7 +331,7 @@
 		showCursor(1);
 		//console.log("Show cursors:" + Object.keys(imgobj));
 		if (imgobj.hasOwnProperty('connections')) {
-			// console.log("Connections:"+imgobj.connections.length);
+			//console.log("Connections:"+imgobj.connections.length);
 			// console.log("Raster:"+raster);
 			// console.log("ImgObj:"+Object.keys(imgobj));
 			// console.log("Size:"+imgobj.size);
@@ -360,6 +360,7 @@
 
   function getImgConnectionPos(imgobj,raster,i) {
 		var tp = new Point(imgobj.size.width/2,imgobj.size.height/2);
+		//console.log("getImgConnection for "+imgobj.id+" # "+i);
   	var zp = imgobj.connections[i].pos;
 	  //console.log("Scaled connection:" + zp + " Scale:" + imgobj.scale);
 	  var rp = zp.subtract(tp);
@@ -527,6 +528,11 @@
 			console.log("Forces instance is:" + inst);
 		}
 		symbolInstances[img_id] = inst;
+		if(imgobj.hasOwnProperty('values')) {
+			inst.values = {};
+			for(var ik in imgobj.values)
+			  inst.values[ik] = imgobj.values[ik];
+		}
 		imgobj.instances += 1;
 		return inst;
 	}
@@ -2214,7 +2220,7 @@
 
 
 	function parsePoint(ord) {
-		console.log(ord[0]); // will be undefined for a real point
+		//console.log(ord[0]); // will be undefined for a real point
 		if (ord[0] === 'Point')
 			return new Point(ord[1], ord[2]);
 		else
@@ -2244,7 +2250,7 @@
 	}
 
 	function parseSize(ord) {
-		console.log(ord[0]); // will be undefined for a real point
+		//console.log(ord[0]); // will be undefined for a real point
 		if (ord[0] === 'Size')
 			return new Size(ord[1], ord[2]);
 		else
@@ -2323,6 +2329,7 @@
 			doRecordAdd({
 				action: 'symbolDelete',
 				id: id,
+				type: 'symbol',
 				src_id: obj.src.id,
 				pos: obj.raster.position,
 				rot: obj.raster.rotation
@@ -2478,8 +2485,8 @@
 		console.log("Redo");
 		if (doRecordIndex >= doRecord.length)
 			return false; // nothing to undo
-		console.log("doRecordIndex:" + doRecordIndex);
-		console.log("doRecord.length:" + doRecord.length);
+		//console.log("doRecordIndex:" + doRecordIndex);
+		//console.log("doRecord.length:" + doRecord.length);
 		var to_do = doRecord[doRecordIndex];
 		if (to_do.id > nextID)
 			nextID = to_do.id; // this used to happen with loading of old data
@@ -2490,7 +2497,7 @@
 		var imgobj;
 		switch (to_do.action) {
 			case 'lineMove':
-				console.log(Object.keys(lineInstances).length);
+				//console.log(Object.keys(lineInstances).length);
 				if (!lineInstances.hasOwnProperty(to_do.id)) {
 					console.log("path id " + to_do.id +
 						" nolonger exists - remaking");
@@ -2530,7 +2537,7 @@
 				//console.log("Index:"+(doRecordIndex+1)+" out of"+doRecord.length);
 				if (to_do.action == 'imageMove') {
 					doRecordIndex++;
-					console.log("ID:" + to_do.id);
+					//console.log("ID:" + to_do.id);
 					raster = symbolInstances[to_do.id].raster;
 					raster.position = to_do.pos;
 				}
@@ -2562,8 +2569,8 @@
 				removeAreaInstance(to_do.id, false);
 				break;
 			case 'setState':
-				console.log("SETSTATE");
-				console.log(Object.keys(to_do));
+				//console.log("SETSTATE");
+				//console.log(Object.keys(to_do));
 				if (to_do.hasOwnProperty('clearFlag')) {
 					console.log("clearFlag" + to_do.clearFlag);
 					if (to_do.clearFlag) {
@@ -2624,9 +2631,13 @@
 					if (di < doRecordIndex - 1)
 						keep_all = true;
 					break;
+				case 'image':
+					if (!imagesLoaded.hasOwnProperty(to_do.id))
+						continue; // image nolonger exists
+					break;
 				case 'symbol':
 					if (!symbolInstances.hasOwnProperty(to_do.id))
-						continue; // image nolonger exists
+						continue; // symbol nolonger exists
 					break;
 				case 'line':
 					if (!lineInstances.hasOwnProperty(to_do.id))
@@ -2732,26 +2743,26 @@
 		return currentContextObject; // remeber this is not an instance - contains id into instance
 	}
 
-	function removeSymbolRecord(src) {
+	function removeSymbolRecord(src_id) {
 		// removes all instances of an image with src from doRecord
-		var found = false;
-		var symbols = [];
+		var symbol_ids = [];
+		var del_rec;
 		do {
-			for (var i in doRecord) {
-				var dorec = doRecord[i];
-				var del = false;
-				if (dorec.action === 'symbolPlace' && dorec.src_id === src) {
-					symbol_ids.push(dorec.img_id);
-					del = true; // remove image creations
-				} else if (dorec.type === 'symbol' && dorec.id in symbol_ids)
-					del = true; // remove every symbol that used this img
-				if (del) {
-					delete doRecord[i];
-					found = true;
-					break;
-				}
+			del_rec = false;
+		  for (var i in doRecord) {
+			  var dorec = doRecord[i];
+ 		    if (dorec.action === 'symbolPlace' && dorec.src_id === src_id) {
+			 	  symbol_ids.push(dorec.id);
+				  del_rec = true;
+			  } else if (dorec.type === 'symbol' && symbol_ids.indexOf(dorec.id) >= 0)   {
+			    del_rec = true; // remove every symbol that used this img
+			  }
+		    if(del_rec) {
+		      delete doRecord[i];
+				  break;
+			  }
 			}
-		} while (found); // have to start again each time an instance is found
+		} while(del_rec);
 	}
 
 	function delCurrentContextObject() {
@@ -2816,7 +2827,7 @@
 				else
 				  src.connections[src.connectNr] = {pos:pos,id:src.connectNr+""};
 				cursorPos[4 + src.connectNr] = cursorPos[0];
-				console.log("Connection#"+src.connectNr+":" + src.connections[src.connectNr]);
+				//console.log("Connection#"+src.connectNr+":" + src.connections[src.connectNr]);
 			}
 		}
 		hideCursor();
@@ -2830,7 +2841,7 @@
 				var dp = raster.position.subtract(cursorPos[0]);
 				src.center = (roundPoint(dp.rotate(-raster.rotation))).divide(src.scale);
 				cursorPos[2] = cursorPos[0];
-				console.log("Center:" + src.center);
+				//console.log("Center:" + src.center);
 				if (!src.hasOwnProperty('origin')) // probably the same if not set
 					src.origin = src.center;
 			}
@@ -2846,7 +2857,7 @@
 				var dp = raster.position.subtract(cursorPos[0]);
 				src.origin = (roundPoint(dp.rotate(-raster.rotation))).divide(src.scale);
 				cursorPos[3] = cursorPos[0];
-				console.log("Origin:" + src.origin);
+				//console.log("Origin:" + src.origin);
 				if (!src.hasOwnProperty('center')) // probably the same if not set
 					src.center = src.origin;
 			}
@@ -2882,12 +2893,12 @@
 	function areaSelect() {
 		var rect = new Rectangle(roundPoint(areaSelected.segments[0].point),
 			roundPoint(areaSelected.segments[2].point));
-		console.log("rect:" + rect);
+		//console.log("rect:" + rect);
 		if (areasVisible) {
 			for (var aid in areaInstances) {
 				var a = areaInstances[aid];
-				console.log("TopLeft:" + a.rect.topLeft);
-				console.log("BottomRight:" + a.rect.bottomRight);
+				//console.log("TopLeft:" + a.rect.topLeft);
+				//console.log("BottomRight:" + a.rect.bottomRight);
 				if (rect.contains(a.rect.topLeft) && rect.contains(a.rect.bottomRight)) {
 					if (a.hasOwnProperty('path'))
 						selectedItems[aid] = a.path;
@@ -2913,7 +2924,7 @@
 		for (var iid in symbolInstances) {
 			var imgobj = symbolInstances[iid];
 			var bounds = imgobj.raster.bounds;
-			console.log("Bounds" + bounds);
+			//console.log("Bounds" + bounds);
 			if (rect.contains(bounds.topLeft) && rect.contains(bounds.bottomRight)) {
 				selectedItems[iid] = imgobj.raster;
 				selectedPos[iid] = imgobj.raster.position;
@@ -2996,15 +3007,15 @@
 				}
 			}
 		}
-		console.log("doRecordIndex:" + doRecordIndex);
-		console.log("doRecord.length:" + doRecord.length);
+		//console.log("doRecordIndex:" + doRecordIndex);
+		//console.log("doRecord.length:" + doRecord.length);
 		if (doRecordIndex < doRecord.length) { //replacing current state
 			to_do = doRecord[doRecordIndex];
 			if (to_do.type === 'setState') { // this position already stated
 				id = to_do.id;
-				console.log("Length:" + doRecord.length);
+				//console.log("Length:" + doRecord.length);
 				doRecord.splice(doRecordIndex, 1);
-				console.log("Length:" + doRecord.length);
+				//console.log("Length:" + doRecord.length);
 			}
 		}
 		var inst = state;
@@ -3115,8 +3126,8 @@
 			else
 				redo();
 			steps++;
-			console.log("RecordIndex:" + doRecordIndex);
-			console.log(direction + "," + doRecord.length);
+			//console.log("RecordIndex:" + doRecordIndex);
+			//console.log(direction + "," + doRecord.length);
 		}
 		return null; // to indicate that we failed to find state point
 	}
@@ -3289,7 +3300,7 @@
 				}
 			}
 		  } catch(e) {
-			  console.log("Exception in sprite loop:"+e);
+			  console.error("Exception in sprite loop:"+e);
 		  }
 		}
 		onFrameBusy = false; // allow new event

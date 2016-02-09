@@ -19,14 +19,14 @@
 
 	function OnLoad(e) {
 			var xhr = this;
-			console.log("E:" + e);
-			console.log("Ready state:", xhr.readyState);
+			//console.log("E:" + e);
+			//console.log("Ready state:", xhr.readyState);
 			if (xhr.readyState === 4) {
 				if (xhr.status === 200) {
-					console.log("Response:" + xhr.responseText);
+					//console.log("Response:" + xhr.responseText);
 					//console.log("Response Type:"+xhr.responseType);
 					if (xhr.responseText.length === 0) {
-						console.log("Server listening!");
+						//console.log("Server listening!");
 					} else {
 						if (typeof nodeComms.onReply === 'function')
 							nodeComms.onReply(xhr.responseText);
@@ -97,18 +97,18 @@
 	  }
 
 		function saveFile(jdata, path, subpath) {
-			console.log("jdata:" + jdata);
+			//console.log("jdata:" + jdata);
 			if (window.location.protocol == 'file:') {
 				// might try to impletement local storage some day
 				console.log("Storage type:" + typeof(Storage));
 				if (typeof(Storage) === "undefined") {
 					console.log("Local storage not implemented");
 				} else {
-					console.log("Data:" + jdata);
+					//console.log("Data:" + jdata);
 					if (typeof path === 'undefined')
 						subpath = "data";
 					localStorage[subpath] = jdata;
-					console.log("Local storage:" + localStorage);
+					//console.log("Local storage:" + localStorage);
 				}
 			} else if (typeof nodeComms.sendData === 'function') {
 				var save_data = {
@@ -144,7 +144,7 @@
 	          subpath = "data";
 	        if (localStorage.hasOwnProperty(subpath)) {
 	          console.log("Parsing length = " + localStorage[subpath].length);
-						console.log(fileParser);
+						//console.log(fileParser);
 	          fileParser(localStorage[subpath]);
 	        } else {
 	          alert("Local storage has no item of name:" + subpath);
@@ -169,7 +169,7 @@
 	  function onLoadReply(res) {
 	    //console.log("Onreply:" + res);
 	    if (res.indexOf('500') === 0) { //starts with error code
-	      console.log("Report error:" + res);
+	      console.error("Report error:" + res);
 	    } else {
 	      console.log("attempting to parse json object");
 	      //try {
